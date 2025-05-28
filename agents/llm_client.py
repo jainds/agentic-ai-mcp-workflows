@@ -325,7 +325,17 @@ class LLMSkillMixin:
             
             # Try to parse as JSON, fallback to empty dict
             try:
-                return json.loads(response)
+                # Strip markdown code blocks if present
+                json_str = response.strip()
+                if json_str.startswith("```json"):
+                    json_str = json_str[7:]  # Remove ```json
+                if json_str.startswith("```"):
+                    json_str = json_str[3:]   # Remove ```
+                if json_str.endswith("```"):
+                    json_str = json_str[:-3]  # Remove trailing ```
+                json_str = json_str.strip()
+                
+                return json.loads(json_str)
             except json.JSONDecodeError:
                 self.logger.warning(f"Could not parse claim details as JSON: {response}")
                 return {}

@@ -400,7 +400,7 @@ async def main():
         return await agent_server.handle_skills_request()
     
     # Start server
-    port = int(os.getenv("CLAIMS_DATA_AGENT_PORT", 8012))
+    port = int(os.getenv("AGENT_PORT", 8012))
     return app, port
 
 

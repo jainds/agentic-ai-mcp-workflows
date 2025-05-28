@@ -10,7 +10,8 @@ class ClaimsDomainAgent(DomainAgent, LLMSkillMixin):
     """Domain agent for claims workflow management"""
     
     def __init__(self, port: int = 8007):
-        super().__init__("ClaimsDomainAgent", port)
+        DomainAgent.__init__(self, "ClaimsDomainAgent", port)
+        LLMSkillMixin.__init__(self)
         
         # Register technical agents
         self.register_technical_agent(

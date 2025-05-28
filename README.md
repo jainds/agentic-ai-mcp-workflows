@@ -69,10 +69,11 @@ insurance-ai-poc/
 - Docker
 - kubectl
 - Kind or Minikube
-- OpenRouter API key (optional, for LLM features)
+- OpenRouter API key ([get one here](https://openrouter.ai/keys))
 
 ### 1. Environment Setup
 
+**🔐 Secure Setup (Recommended)**
 ```bash
 # Clone and navigate to project
 cd insurance-ai-poc
@@ -83,9 +84,38 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Interactive environment setup (will prompt for API key)
+./scripts/setup_env.sh
 ```
 
-### 2. Local Kubernetes Cluster
+**Manual Setup**
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env with your OpenRouter API key (never commit this file!)
+nano .env
+# Add: OPENROUTER_API_KEY=your_actual_key_here
+```
+
+**CI/CD Setup**
+```bash
+# For automated deployments, export environment variable
+export OPENROUTER_API_KEY=your_key_here
+```
+
+### 2. Test LLM Integration
+
+```bash
+# Test your API key works
+python scripts/test_llm_integration.py smoke
+
+# Run comprehensive LLM tests
+python scripts/test_llm_integration.py all
+```
+
+### 3. Local Kubernetes Cluster
 
 ```bash
 # Start Kind cluster
@@ -96,38 +126,27 @@ kubectl cluster-info
 kubectl create namespace insurance-poc
 ```
 
-### 3. Environment Configuration
-
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your OpenRouter API key
-OPENROUTER_API_KEY=your_key_here
-```
-
 ### 4. Deploy Services
 
 ```bash
-# Build and deploy all services
-./scripts/deploy.sh
+# Build and deploy all services (uses your .env file securely)
+./scripts/deploy_k8s.sh
 
 # Check deployment status
 kubectl get pods -n insurance-poc
 kubectl get services -n insurance-poc
 ```
 
-### 5. Run Tests
+### 5. Verify Deployment
 
 ```bash
-# Unit tests
-pytest tests/unit/
+# Test external endpoints
+curl http://localhost:30005/health  # Support Agent
+curl http://localhost:30008/health  # Claims Agent
 
-# Integration tests
-pytest tests/integration/
-
-# End-to-end tests
-pytest tests/e2e/
+# Run tests in cluster
+kubectl exec -it deployment/support-agent -n insurance-poc -- \
+  python scripts/test_llm_integration.py smoke
 ```
 
 ## Usage Examples
@@ -136,18 +155,28 @@ pytest tests/e2e/
 
 ```bash
 # Direct API call to SupportDomainAgent
-curl -X POST http://localhost:8005/ask \
+curl -X POST http://localhost:30005/execute \
   -H "Content-Type: application/json" \
-  -d '{"message": "What is the status of policy 202?"}'
+  -d '{
+    "skill_name": "HandleGeneralSupport",
+    "parameters": {
+      "user_message": "What is the status of my auto insurance policy?"
+    }
+  }'
 ```
 
 ### Claim Creation
 
 ```bash
 # File a new claim
-curl -X POST http://localhost:8007/ask \
+curl -X POST http://localhost:30008/execute \
   -H "Content-Type: application/json" \
-  -d '{"message": "I want to file a claim for a car accident on 2024-01-15"}'
+  -d '{
+    "skill_name": "HandleGeneralClaimsSupport",
+    "parameters": {
+      "user_message": "I want to file a claim for a car accident"
+    }
+  }'
 ```
 
 ## Development Workflow
@@ -178,10 +207,10 @@ curl -X POST http://localhost:8007/ask \
 
 ### Agent Endpoints
 
-- **SupportDomainAgent**: `http://support-agent:8005`
-  - Skills: `CheckPolicyStatus`, `HandleGeneralInquiry`
-- **ClaimsDomainAgent**: `http://claims-agent:8007`
-  - Skills: `CreateClaim`, `CheckClaimStatus`
+- **SupportDomainAgent**: `http://localhost:30005`
+  - Skills: `HandleCustomerInquiry`, `HandlePolicyInquiry`, `HandleGeneralSupport`
+- **ClaimsDomainAgent**: `http://localhost:30008`
+  - Skills: `HandleClaimFiling`, `HandleClaimStatusCheck`, `HandleGeneralClaimsSupport`
 
 ### Service Endpoints
 
@@ -192,6 +221,28 @@ curl -X POST http://localhost:8007/ask \
 - **Claims Service**: `http://claims-service:8002`
   - `POST /claim`: Create new claim
   - `GET /claim/{id}`: Get claim status
+
+## Security Best Practices
+
+### ✅ Implemented Security Features
+
+- **No Hardcoded Secrets**: API keys loaded from environment variables
+- **Template-based Deployment**: Uses `envsubst` for secure variable substitution
+- **Git-ignored Credentials**: `.env` file is never committed to repository
+- **Interactive Setup**: `setup_env.sh` script guides secure configuration
+- **Kubernetes Secrets**: Sensitive data stored in cluster secrets
+
+### 🔐 API Key Management
+
+```bash
+# Check API key is properly configured (shows first 10 chars only)
+kubectl get secret llm-api-keys -n insurance-poc -o jsonpath='{.data.OPENROUTER_API_KEY}' | base64 -d | cut -c1-10
+
+# Rotate API key
+echo "OPENROUTER_API_KEY=new-key" > .env
+envsubst < k8s/manifests/secrets.yaml | kubectl apply -f -
+kubectl rollout restart deployment -n insurance-poc
+```
 
 ## Monitoring and Debugging
 

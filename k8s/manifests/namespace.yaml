@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: insurance-poc
+  labels:
+    name: insurance-poc
+    environment: development 

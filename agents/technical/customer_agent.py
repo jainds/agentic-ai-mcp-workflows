@@ -193,7 +193,7 @@ async def main():
         return await agent_server.handle_skills_request()
     
     # Start server
-    port = int(os.getenv("CUSTOMER_AGENT_PORT", 8010))
+    port = int(os.getenv("AGENT_PORT", 8010))
     return app, port
 
 

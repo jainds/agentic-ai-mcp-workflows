@@ -10,7 +10,8 @@ class SupportDomainAgent(DomainAgent, LLMSkillMixin):
     """Domain agent for customer support workflows"""
     
     def __init__(self, port: int = 8005):
-        super().__init__("SupportDomainAgent", port)
+        DomainAgent.__init__(self, "SupportDomainAgent", port)
+        LLMSkillMixin.__init__(self)
         
         # Register technical agents
         self.register_technical_agent(

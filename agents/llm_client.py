@@ -7,6 +7,17 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 
+# Import observability
+try:
+    from .observability import get_observability, trace_llm_method
+    OBSERVABILITY_AVAILABLE = True
+except ImportError:
+    OBSERVABILITY_AVAILABLE = False
+    def trace_llm_method(task_type: str):
+        def decorator(func):
+            return func
+        return decorator
+
 
 class LLMProvider(str, Enum):
     OPENAI = "openai"
@@ -465,3 +476,259 @@ class LLMSkillMixin:
         """Close LLM client connection"""
         if hasattr(self, 'llm_client'):
             await self.llm_client.close()
+
+
+class LLMClient:
+    """Enhanced LLM client with comprehensive observability"""
+    
+    def __init__(self):
+        self.logger = logging.getLogger("llm_client")
+        
+        # LLM Configuration
+        self.primary_model = os.getenv("PRIMARY_MODEL", "openai/gpt-4o-mini")
+        self.fallback_model = os.getenv("FALLBACK_MODEL", "openai/gpt-4o-mini")
+        self.base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+        self.api_key = os.getenv("OPENROUTER_API_KEY")
+        
+        if not self.api_key:
+            self.logger.warning("⚠️  OPENROUTER_API_KEY not found in environment")
+        
+        # HTTP client for API calls
+        self.http_client = httpx.AsyncClient(timeout=30.0)
+
+    @trace_llm_method("chat_completion")
+    async def llm_chat(self, messages: List[Dict[str, str]], model: Optional[str] = None, temperature: float = 0.7) -> str:
+        """Make LLM chat completion with observability tracking"""
+        model = model or self.primary_model
+        
+        # Get observability context
+        obs = get_observability() if OBSERVABILITY_AVAILABLE else None
+        
+        if obs:
+            # Create a prompt summary for tracing
+            prompt_summary = str(messages[-1].get('content', ''))[:200] + "..." if len(str(messages[-1].get('content', ''))) > 200 else str(messages[-1].get('content', ''))
+            
+            async with obs.trace_llm_call(
+                model=model,
+                task_type="chat_completion", 
+                prompt=prompt_summary,
+                temperature=temperature
+            ) as trace_context:
+                return await self._make_llm_request(messages, model, temperature, trace_context)
+        else:
+            return await self._make_llm_request(messages, model, temperature, None)
+
+    async def _make_llm_request(self, messages: List[Dict[str, str]], model: str, temperature: float, trace_context: Optional[Dict]) -> str:
+        """Make the actual LLM API request"""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": 1000
+        }
+        
+        try:
+            response = await self.http_client.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            content = result["choices"][0]["message"]["content"]
+            
+            # Track token usage
+            usage = result.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            
+            # Record metrics
+            obs = get_observability()
+            if obs:
+                obs.record_token_usage(
+                    model=model,
+                    task_type="chat_completion",
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens
+                )
+                
+                # Update trace context
+                if trace_context and trace_context.get("generation"):
+                    trace_context["generation"].update(
+                        output=content,
+                        usage={
+                            "prompt_tokens": prompt_tokens,
+                            "completion_tokens": completion_tokens,
+                            "total_tokens": prompt_tokens + completion_tokens
+                        }
+                    )
+            
+            return content
+            
+        except httpx.HTTPError as e:
+            # Try fallback model if primary fails
+            if model == self.primary_model and self.fallback_model != self.primary_model:
+                self.logger.warning(f"Error with model {model}: {e}")
+                return await self._make_llm_request(messages, self.fallback_model, temperature, trace_context)
+            else:
+                self.logger.error(f"Error with model {model}: {e}")
+                raise
+
+    @trace_llm_method("intent_extraction")
+    async def extract_intent(self, user_message: str) -> Dict[str, Any]:
+        """Extract intent from user message with observability"""
+        try:
+            prompt = LLMTemplates.TASK_TEMPLATES["extract_customer_intent"].format(
+                message=user_message
+            )
+            
+            response = await self.llm_chat([
+                {"role": "user", "content": prompt}
+            ], temperature=0.2)
+            
+            intent = response.strip().lower()
+            
+            # Validate intent
+            valid_intents = ["claim_status", "claim_filing", "general_support"]
+            if intent not in valid_intents:
+                intent = "general_support"  # Default fallback
+            
+            return {"intent": intent}
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting intent: {e}")
+            return {"intent": "general_support"}  # Safe fallback
+
+    @trace_llm_method("claim_details_extraction")
+    async def extract_claim_details(self, user_message: str) -> Dict[str, Any]:
+        """Extract claim details from user message"""
+        try:
+            prompt = LLMTemplates.TASK_TEMPLATES["extract_claim_details"].format(
+                message=user_message
+            )
+            
+            response = await self.llm_chat([
+                {"role": "user", "content": prompt}
+            ], temperature=0.2)
+            
+            # Try to parse as JSON, fallback to empty dict
+            try:
+                # Strip markdown code blocks if present
+                json_str = response.strip()
+                if json_str.startswith("```json"):
+                    json_str = json_str[7:]  # Remove ```json
+                if json_str.startswith("```"):
+                    json_str = json_str[3:]   # Remove ```
+                if json_str.endswith("```"):
+                    json_str = json_str[:-3]  # Remove ending ```
+                
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                self.logger.warning(f"Could not parse claim details as JSON: {response}")
+                return {}
+                
+        except Exception as e:
+            self.logger.error(f"Error extracting claim details: {e}")
+            return {}
+
+    @trace_llm_method("claim_id_extraction") 
+    async def extract_claim_id(self, user_message: str) -> Optional[int]:
+        """Extract claim ID from user message"""
+        try:
+            prompt = LLMTemplates.TASK_TEMPLATES["extract_claim_id"].format(
+                message=user_message
+            )
+            
+            response = await self.llm_chat([
+                {"role": "user", "content": prompt}
+            ], temperature=0.1)
+            
+            # Try to extract number
+            response = response.strip().lower()
+            if response == "null" or response == "none":
+                return None
+                
+            # Extract first number found
+            import re
+            numbers = re.findall(r'\d+', response)
+            if numbers:
+                return int(numbers[0])
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting claim ID: {e}")
+            return None
+
+    @trace_llm_method("customer_id_extraction")
+    async def extract_customer_id(self, user_message: str) -> Optional[int]:
+        """Extract customer ID from user message"""
+        try:
+            prompt = LLMTemplates.TASK_TEMPLATES["extract_customer_id"].format(
+                message=user_message
+            )
+            
+            response = await self.llm_chat([
+                {"role": "user", "content": prompt}
+            ], temperature=0.1)
+            
+            # Try to extract number
+            response = response.strip().lower()
+            if response == "null" or response == "none":
+                return None
+                
+            # Extract first number found
+            import re
+            numbers = re.findall(r'\d+', response)
+            if numbers:
+                return int(numbers[0])
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting customer ID: {e}")
+            return None
+
+    @trace_llm_method("response_generation")
+    async def generate_response(self, context: str, user_message: str, data: Dict[str, Any]) -> str:
+        """Generate customer service response with observability"""
+        try:
+            prompt = LLMTemplates.TASK_TEMPLATES["generate_response"].format(
+                context=context,
+                user_message=user_message,
+                data=json.dumps(data, indent=2)
+            )
+            
+            response = await self.llm_chat([
+                {"role": "user", "content": prompt}
+            ], temperature=0.7)
+            
+            return response
+            
+        except Exception as e:
+            self.logger.error(f"Error generating response: {e}")
+            return "I apologize, but I'm having trouble processing your request right now. Please try again or contact customer service for assistance."
+
+    async def close(self):
+        """Close HTTP client"""
+        await self.http_client.aclose()
+
+    def get_metrics_summary(self) -> Dict[str, Any]:
+        """Get LLM client metrics summary"""
+        obs = get_observability()
+        if obs:
+            return obs.get_metrics_summary()
+        else:
+            return {
+                "observability": False,
+                "models": {
+                    "primary": self.primary_model,
+                    "fallback": self.fallback_model
+                }
+            }

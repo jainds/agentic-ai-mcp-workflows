@@ -1,0 +1,132 @@
+{
+  "id": null,
+  "title": "Insurance Business Operations",
+  "tags": [
+    "insurance",
+    "business",
+    "kpis"
+  ],
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Claims Processing Volume",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(workflow_executions_total{workflow_type=~\".*claim.*\"}[5m])",
+          "legendFormat": "Claims per minute - {{workflow_type}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "yAxes": [
+        {
+          "label": "Claims/min",
+          "min": 0
+        },
+        {
+          "show": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Customer Inquiry Success Rate",
+      "type": "singlestat",
+      "targets": [
+        {
+          "expr": "rate(workflow_executions_total{status=\"success\"}[5m]) / rate(workflow_executions_total[5m]) * 100"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "valueName": "current",
+      "format": "percent",
+      "thresholds": "80,95"
+    },
+    {
+      "id": 3,
+      "title": "Average Response Time",
+      "type": "singlestat",
+      "targets": [
+        {
+          "expr": "avg(workflow_execution_duration_seconds)"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "valueName": "current",
+      "format": "s",
+      "thresholds": "5,10"
+    },
+    {
+      "id": 4,
+      "title": "Agent Communication Flow",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(agent_requests_total[5m])",
+          "legendFormat": "{{source_agent}} \u2192 {{target_agent}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "id": 5,
+      "title": "LLM Token Usage",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "rate(llm_token_usage_total[5m])",
+          "legendFormat": "{{task_type}} - {{token_type}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      }
+    },
+    {
+      "id": 6,
+      "title": "Top Claims by Type",
+      "type": "table",
+      "targets": [
+        {
+          "expr": "topk(5, sum by (claim_type) (workflow_executions_total{workflow_type=~\".*claim.*\"}))",
+          "format": "table"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      }
+    }
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "30s"
+}

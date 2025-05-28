@@ -1,0 +1,174 @@
+{
+  "kubernetes": {
+    "status": "healthy",
+    "cluster_info": "Kubernetes control plane is running at https://127.0.0.1:6443\nCoreDNS is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy\nMetrics-server is running at https://127.0.0.1:6443/api/v1/namespaces/kube-system/services/https:metrics-server:https/proxy\n\nTo further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.\n",
+    "nodes": "NAME                   STATUS   ROLES                  AGE   VERSION\nlima-rancher-desktop   Ready    control-plane,master   34d   v1.32.5+k3s1\n"
+  },
+  "pods": {
+    "status": "degraded",
+    "pods": {
+      "claims-agent-6cf855c5ff-4jp98": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "claims-agent-6cf855c5ff-ddb86": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "claims-data-agent-bd6ddb887-gvsqt": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "claims-data-agent-bd6ddb887-pt7sz": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "claims-domain-agent-6559d865b7-lnkxm": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "claims-domain-agent-f9dd969c7-mr24j": {
+        "ready": "0/1",
+        "status": "CrashLoopBackOff",
+        "healthy": false
+      },
+      "claims-service-6d66f4766-hk9ts": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "claims-service-6d66f4766-znz6p": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "customer-agent-6cd56c5c55-5bn8b": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "customer-agent-6cd56c5c55-jz9n9": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "customer-service-5b47854b7b-828ls": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "customer-service-5b47854b7b-85m5c": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "policy-agent-86c484f7cc-7tzpw": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "policy-agent-86c484f7cc-n8m9j": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "policy-service-674764c4fd-hzrdl": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "policy-service-674764c4fd-lwsk2": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "support-agent-765fcdf9f7-4v5mh": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "support-agent-765fcdf9f7-pv7st": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      },
+      "ui-dashboard-dc585c74b-kfzpz": {
+        "ready": "1/1",
+        "status": "Running",
+        "healthy": true
+      }
+    },
+    "raw_output": "NAME                                   READY   STATUS             RESTARTS         AGE\nclaims-agent-6cf855c5ff-4jp98          1/1     Running            0                2m36s\nclaims-agent-6cf855c5ff-ddb86          1/1     Running            0                2m47s\nclaims-data-agent-bd6ddb887-gvsqt      1/1     Running            0                39m\nclaims-data-agent-bd6ddb887-pt7sz      1/1     Running            0                39m\nclaims-domain-agent-6559d865b7-lnkxm   1/1     Running            0                137m\nclaims-domain-agent-f9dd969c7-mr24j    0/1     CrashLoopBackOff   12 (2m20s ago)   39m\nclaims-service-6d66f4766-hk9ts         1/1     Running            0                39m\nclaims-service-6d66f4766-znz6p         1/1     Running            0                38m\ncustomer-agent-6cd56c5c55-5bn8b        1/1     Running            0                39m\ncustomer-agent-6cd56c5c55-jz9n9        1/1     Running            0                38m\ncustomer-service-5b47854b7b-828ls      1/1     Running            0                39m\ncustomer-service-5b47854b7b-85m5c      1/1     Running            0                38m\npolicy-agent-86c484f7cc-7tzpw          1/1     Running            0                38m\npolicy-agent-86c484f7cc-n8m9j          1/1     Running            0                38m\npolicy-service-674764c4fd-hzrdl        1/1     Running            0                38m\npolicy-service-674764c4fd-lwsk2        1/1     Running            0                38m\nsupport-agent-765fcdf9f7-4v5mh         1/1     Running            0                38m\nsupport-agent-765fcdf9f7-pv7st         1/1     Running            0                38m\nui-dashboard-dc585c74b-kfzpz           1/1     Running            0                38m\n"
+  },
+  "services": {
+    "status": "healthy",
+    "services": "NAME                           TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE\nclaims-agent                   ClusterIP   10.43.139.35    <none>        8007/TCP         152m\nclaims-agent-nodeport          NodePort    10.43.87.207    <none>        8007:30008/TCP   100m\nclaims-data-agent              ClusterIP   10.43.97.106    <none>        8012/TCP         101m\nclaims-domain-agent            ClusterIP   10.43.17.25     <none>        8007/TCP         152m\nclaims-domain-agent-nodeport   NodePort    10.43.135.247   <none>        8007:30007/TCP   152m\nclaims-service                 ClusterIP   10.43.228.248   <none>        8002/TCP         152m\ncustomer-agent                 ClusterIP   10.43.142.252   <none>        8010/TCP         152m\ncustomer-service               ClusterIP   10.43.28.10     <none>        8000/TCP         152m\ncustomer-service-nodeport      NodePort    10.43.104.178   <none>        8000:30000/TCP   152m\npolicy-agent                   ClusterIP   10.43.37.68     <none>        8011/TCP         152m\npolicy-service                 ClusterIP   10.43.135.119   <none>        8001/TCP         152m\nsupport-agent                  ClusterIP   10.43.114.94    <none>        8005/TCP         152m\nsupport-agent-nodeport         NodePort    10.43.64.96     <none>        8005:30005/TCP   152m\nui-dashboard                   ClusterIP   10.43.199.245   <none>        8501/TCP         55m\nui-dashboard-nodeport          NodePort    10.43.247.103   <none>        8501:30501/TCP   55m\n",
+    "connectivity": {
+      "support-agent": {
+        "port": 30005,
+        "accessible": true,
+        "response": {
+          "status": "healthy",
+          "agent": "SupportDomainAgent",
+          "agent_type": "domain",
+          "skills": [
+            "CheckPolicyStatus",
+            "HandleBillingInquiry",
+            "HandleClaimStatusInquiry",
+            "HandleCustomerInquiry",
+            "HandleGeneralSupport",
+            "HandlePolicyInquiry"
+          ],
+          "timestamp": "2025-05-28T07:53:22.896812"
+        },
+        "status_code": 200
+      },
+      "claims-agent": {
+        "port": 30008,
+        "accessible": true,
+        "response": {
+          "status": "healthy",
+          "agent": "ClaimsDomainAgent",
+          "agent_type": "domain",
+          "skills": [
+            "CreateClaim",
+            "GetClaimStatus",
+            "HandleClaimFiling",
+            "HandleClaimInquiry",
+            "HandleClaimStatusCheck",
+            "HandleGeneralClaimsSupport"
+          ],
+          "timestamp": "2025-05-28T07:53:22.899169"
+        },
+        "status_code": 200
+      }
+    }
+  },
+  "secrets": {
+    "status": "healthy",
+    "secrets": "NAME           TYPE     DATA   AGE\nllm-api-keys   Opaque   5      3m7s\n",
+    "api_key_length": 73
+  },
+  "functionality": {
+    "status": "healthy",
+    "tests": {
+      "claim_inquiry": {
+        "success": true,
+        "workflow": "claim_status",
+        "has_response": true,
+        "response_time": 8.982599
+      },
+      "health_check": {
+        "success": true,
+        "agent_name": "ClaimsDomainAgent",
+        "skills_count": 6,
+        "status": "healthy"
+      }
+    }
+  }
+}

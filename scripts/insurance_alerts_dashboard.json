@@ -1,0 +1,87 @@
+{
+  "id": null,
+  "title": "Insurance System Alerts",
+  "tags": [
+    "insurance",
+    "alerts",
+    "monitoring"
+  ],
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "High Priority Alerts",
+      "type": "alert-list",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": 2,
+      "title": "Failed Claims Processing",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "increase(workflow_executions_total{status=\"error\",workflow_type=~\".*claim.*\"}[5m])",
+          "legendFormat": "Failed claims - {{workflow_type}}"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "alert": {
+        "conditions": [
+          {
+            "query": {
+              "queryType": "A",
+              "refId": "A"
+            },
+            "reducer": {
+              "type": "last",
+              "params": []
+            },
+            "evaluator": {
+              "params": [
+                5
+              ],
+              "type": "gt"
+            }
+          }
+        ],
+        "executionErrorState": "alerting",
+        "frequency": "1m",
+        "handler": 1,
+        "name": "High failed claims rate",
+        "noDataState": "no_data"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Agent Response Time SLA",
+      "type": "graph",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(workflow_execution_duration_seconds_bucket[5m])) > 10",
+          "legendFormat": "Response time > 10s"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      }
+    }
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "1m"
+}

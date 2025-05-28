@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-server
+  namespace: insurance-poc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metrics-server
+  template:
+    metadata:
+      labels:
+        app: metrics-server
+    spec:
+      containers:
+      - name: metrics-server
+        image: python:3.9-slim
+        ports:
+        - containerPort: 8080
+        command: ["/bin/bash"]
+        args:
+        - -c
+        - |
+          mkdir -p /app
+          cat > /app/server.py << 'EOF'
+          import http.server
+          import socketserver
+          import random
+          import time
+          from http import HTTPStatus
+          
+          class MetricsHandler(http.server.SimpleHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == '/metrics':
+                      self.send_response(HTTPStatus.OK)
+                      self.send_header("Content-type", "text/plain")
+                      self.end_headers()
+                      
+                      metrics = self.generate_metrics()
+                      self.wfile.write(metrics.encode())
+                  else:
+                      self.send_response(HTTPStatus.NOT_FOUND)
+                      self.end_headers()
+              
+              def generate_metrics(self):
+                  agents = ["support-agent", "claims-agent", "customer-agent", "policy-agent", "claims-data-agent"]
+                  metrics = []
+                  
+                  for agent in agents:
+                      # Agent request rate (requests per second)
+                      request_rate = random.uniform(0.1, 2.0)
+                      metrics.append(f'agent_requests_per_second{{agent_name="{agent}"}} {request_rate:.3f}')
+                      
+                      # Agent response time (seconds)
+                      response_time = random.uniform(0.5, 3.0)
+                      metrics.append(f'agent_response_duration_seconds{{agent_name="{agent}"}} {response_time:.3f}')
+                      
+                      # Agent success rate (0-1)
+                      success_rate = random.uniform(0.85, 0.99)
+                      metrics.append(f'agent_success_rate{{agent_name="{agent}"}} {success_rate:.3f}')
+                      
+                      # LLM token usage
+                      token_usage = random.randint(100, 1000)
+                      metrics.append(f'llm_tokens_total{{agent_name="{agent}",token_type="completion"}} {token_usage}')
+                      
+                      # Agent health (1 = healthy, 0 = unhealthy)
+                      metrics.append(f'agent_health{{agent_name="{agent}"}} 1.0')
+                      
+                      # HTTP request counts
+                      http_requests = random.randint(50, 200)
+                      metrics.append(f'http_requests_total{{agent_name="{agent}",method="POST",endpoint="/execute"}} {http_requests}')
+                      
+                      # Error rate
+                      error_rate = random.uniform(0.01, 0.05)
+                      metrics.append(f'agent_error_rate{{agent_name="{agent}"}} {error_rate:.3f}')
+                      
+                      # Workflow metrics
+                      workflows = ["general_support", "policy_inquiry", "claim_status", "billing_inquiry"]
+                      for workflow in workflows:
+                          count = random.randint(5, 50)
+                          duration = random.uniform(2.0, 8.0)
+                          success_count = int(count * random.uniform(0.9, 1.0))
+                          metrics.append(f'workflow_executions_total{{agent_name="{agent}",workflow="{workflow}",status="success"}} {success_count}')
+                          metrics.append(f'workflow_executions_total{{agent_name="{agent}",workflow="{workflow}",status="error"}} {count - success_count}')
+                          metrics.append(f'workflow_duration_seconds{{agent_name="{agent}",workflow="{workflow}"}} {duration:.3f}')
+                  
+                  return "\n".join(metrics) + "\n"
+          
+          if __name__ == "__main__":
+              PORT = 8080
+              with socketserver.TCPServer(("", PORT), MetricsHandler) as httpd:
+                  print(f"Serving metrics at http://0.0.0.0:{PORT}/metrics")
+                  httpd.serve_forever()
+          EOF
+          
+          cd /app && python server.py
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-server
+  namespace: insurance-poc
+  labels:
+    app: metrics-server
+spec:
+  selector:
+    app: metrics-server
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: metrics 

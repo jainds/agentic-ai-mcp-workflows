@@ -1,0 +1,370 @@
+---
+# Jaeger for Distributed Tracing
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: insurance-poc
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.50
+        ports:
+        - containerPort: 16686  # UI
+        - containerPort: 14268  # Collector
+        - containerPort: 14250  # gRPC
+        env:
+        - name: COLLECTOR_ZIPKIN_HOST_PORT
+          value: ":9411"
+        - name: COLLECTOR_OTLP_ENABLED
+          value: "true"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: insurance-poc
+spec:
+  selector:
+    app: jaeger
+  ports:
+  - name: ui
+    port: 16686
+    targetPort: 16686
+  - name: collector
+    port: 14268
+    targetPort: 14268
+  - name: grpc
+    port: 14250
+    targetPort: 14250
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-nodeport
+  namespace: insurance-poc
+spec:
+  type: NodePort
+  selector:
+    app: jaeger
+  ports:
+  - name: ui
+    port: 16686
+    targetPort: 16686
+
+---
+# Prometheus for Metrics Collection
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: insurance-poc
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+    
+    scrape_configs:
+    - job_name: 'prometheus'
+      static_configs:
+      - targets: ['localhost:9090']
+    
+    - job_name: 'metrics-server'
+      static_configs:
+      - targets: ['metrics-server:8080']
+      metrics_path: /metrics
+      scrape_interval: 10s
+    
+    - job_name: 'insurance-agents'
+      static_configs:
+      - targets: 
+        - 'claims-agent:8007'        # Domain agent
+        - 'claims-domain-agent:8007' # Domain agent  
+        - 'support-agent:8005'       # Domain agent
+        - 'customer-agent:8010'      # Technical agent
+        - 'policy-agent:8011'        # Technical agent
+        - 'claims-data-agent:8012'   # Technical agent
+      metrics_path: /metrics
+      scrape_interval: 10s
+    
+    - job_name: 'kubernetes-pods'
+      kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+          - insurance-poc
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: insurance-poc
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.45.0
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/prometheus/prometheus.yml
+          subPath: prometheus.yml
+        args:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        - '--web.console.libraries=/etc/prometheus/console_libraries'
+        - '--web.console.templates=/etc/prometheus/consoles'
+        - '--storage.tsdb.retention.time=200h'
+        - '--web.enable-lifecycle'
+      volumes:
+      - name: config-volume
+        configMap:
+          name: prometheus-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: insurance-poc
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - port: 9090
+    targetPort: 9090
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-nodeport
+  namespace: insurance-poc
+spec:
+  type: NodePort
+  selector:
+    app: prometheus
+  ports:
+  - port: 9090
+    targetPort: 9090
+
+---
+# Grafana for Dashboards
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: insurance-poc
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus:9090
+      access: proxy
+      isDefault: true
+    - name: Jaeger
+      type: jaeger
+      url: http://jaeger:16686
+      access: proxy
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-config
+  namespace: insurance-poc
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      updateIntervalSeconds: 10
+      options:
+        path: /var/lib/grafana/dashboards
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: insurance-agents-dashboard
+  namespace: insurance-poc
+data:
+  agents-dashboard.json: |
+    {
+      "id": null,
+      "title": "Insurance Multi-Agent System",
+      "tags": ["insurance", "agents", "AI"],
+      "timezone": "browser",
+      "panels": [
+        {
+          "title": "Agent Request Rate",
+          "type": "graph",
+          "targets": [
+            {
+              "expr": "rate(agent_requests_total[5m])",
+              "legendFormat": "{{source_agent}} -> {{target_agent}}"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+        },
+        {
+          "title": "LLM Request Duration",
+          "type": "graph", 
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, rate(llm_request_duration_seconds_bucket[5m]))",
+              "legendFormat": "95th percentile"
+            }
+          ],
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+        },
+        {
+          "title": "Workflow Success Rate",
+          "type": "singlestat",
+          "targets": [
+            {
+              "expr": "rate(workflow_executions_total{status=\"success\"}[5m]) / rate(workflow_executions_total[5m]) * 100"
+            }
+          ],
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8}
+        },
+        {
+          "title": "Agent Health",
+          "type": "singlestat",
+          "targets": [
+            {
+              "expr": "avg(agent_health_status)"
+            }
+          ],
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8}
+        }
+      ],
+      "time": {"from": "now-1h", "to": "now"},
+      "refresh": "5s"
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: insurance-poc
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:10.1.0
+        ports:
+        - containerPort: 3000
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: "admin123"
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: "false"
+        volumeMounts:
+        - name: grafana-datasources
+          mountPath: /etc/grafana/provisioning/datasources
+        - name: grafana-dashboards-config
+          mountPath: /etc/grafana/provisioning/dashboards
+        - name: grafana-dashboards
+          mountPath: /var/lib/grafana/dashboards
+      volumes:
+      - name: grafana-datasources
+        configMap:
+          name: grafana-datasources
+      - name: grafana-dashboards-config
+        configMap:
+          name: grafana-dashboards-config
+      - name: grafana-dashboards
+        configMap:
+          name: insurance-agents-dashboard
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: insurance-poc
+spec:
+  selector:
+    app: grafana
+  ports:
+  - port: 3000
+    targetPort: 3000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-nodeport
+  namespace: insurance-poc
+spec:
+  type: NodePort
+  selector:
+    app: grafana
+  ports:
+  - port: 3000
+    targetPort: 3000
+
+---
+# LangFuse for LLM Observability (Optional - requires external setup)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: langfuse-config
+  namespace: insurance-poc
+data:
+  LANGFUSE_HOST: "https://cloud.langfuse.com"
+  # Add your LangFuse keys as secrets:
+  # LANGFUSE_PUBLIC_KEY: "pk-..."
+  # LANGFUSE_SECRET_KEY: "sk-..." 

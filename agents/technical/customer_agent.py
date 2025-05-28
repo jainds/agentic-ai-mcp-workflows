@@ -149,7 +149,7 @@ class CustomerDataAgent(TechnicalAgent):
 
 async def main():
     """Run the CustomerDataAgent as a standalone service"""
-    from fastapi import FastAPI, HTTPException
+    from fastapi import FastAPI, HTTPException, Response
     from fastapi.middleware.cors import CORSMiddleware
     import uvicorn
     
@@ -159,6 +159,14 @@ async def main():
         description="Technical agent for customer data operations",
         version="1.0.0"
     )
+    
+    # Add Prometheus instrumentation
+    try:
+        from prometheus_fastapi_instrumentator import Instrumentator
+        instrumentator = Instrumentator()
+        instrumentator.instrument(app).expose(app)
+    except ImportError:
+        print("⚠️ Prometheus instrumentation not available")
     
     # Add CORS middleware
     app.add_middleware(
@@ -191,6 +199,12 @@ async def main():
     async def get_skills():
         """Get available skills"""
         return await agent_server.handle_skills_request()
+    
+    @app.get("/metrics")
+    async def get_metrics():
+        """Prometheus metrics endpoint"""
+        metrics_data = await agent_server.handle_metrics_request()
+        return Response(content=metrics_data, media_type="text/plain")
     
     # Start server
     port = int(os.getenv("AGENT_PORT", 8010))

@@ -402,6 +402,13 @@ async def main():
     # Start server
     port = int(os.getenv("AGENT_PORT", 8012))
     return app, port
+    
+    @app.get("/metrics")
+    async def metrics():
+        """Prometheus metrics endpoint"""
+        metrics_data = await agent_server.handle_metrics_request()
+        from fastapi import Response
+        return Response(content=metrics_data, media_type="text/plain")
 
 
 def run_server():

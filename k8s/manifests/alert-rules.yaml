@@ -1,0 +1,239 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-alert-rules
+  namespace: insurance-poc
+data:
+  insurance_alerts.yml: |
+    groups:
+    - name: insurance.business
+      rules:
+      # High Claims Processing Failure Rate
+      - alert: HighClaimsFailureRate
+        expr: rate(workflow_executions_total{status="error",workflow_type=~".*claim.*"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: claims-processing
+        annotations:
+          summary: "High claims processing failure rate detected"
+          description: "Claims processing failure rate is {{ $value }} per second (>0.1/sec)"
+          
+      # Slow Customer Response Time
+      - alert: SlowCustomerResponseTime
+        expr: histogram_quantile(0.95, rate(workflow_execution_duration_seconds_bucket[5m])) > 15
+        for: 3m
+        labels:
+          severity: warning
+          service: customer-support
+        annotations:
+          summary: "Customer response time SLA breach"
+          description: "95th percentile response time is {{ $value }}s (>15s threshold)"
+          
+      # Low Agent Success Rate
+      - alert: LowAgentSuccessRate
+        expr: (rate(workflow_executions_total{status="success"}[5m]) / rate(workflow_executions_total[5m])) * 100 < 85
+        for: 5m
+        labels:
+          severity: warning
+          service: agent-workflows
+        annotations:
+          summary: "Low agent workflow success rate"
+          description: "Agent success rate is {{ $value }}% (<85% threshold)"
+
+    - name: insurance.technical
+      rules:
+      # Service Down
+      - alert: ServiceDown
+        expr: up{job="insurance-agents"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: "{{ $labels.instance }}"
+        annotations:
+          summary: "Insurance service is down"
+          description: "Service {{ $labels.instance }} has been down for more than 1 minute"
+          
+      # High HTTP Error Rate
+      - alert: HighHTTPErrorRate
+        expr: rate(http_requests_total{status=~"4..|5.."}[5m]) / rate(http_requests_total[5m]) * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: http
+        annotations:
+          summary: "High HTTP error rate detected"
+          description: "HTTP error rate is {{ $value }}% (>5% threshold) for {{ $labels.instance }}"
+          
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes / 1024 / 1024) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.instance }}"
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}MB (>1000MB threshold) for {{ $labels.instance }}"
+          
+      # LLM Request Timeout
+      - alert: LLMRequestTimeout
+        expr: histogram_quantile(0.95, rate(llm_request_duration_seconds_bucket[5m])) > 30
+        for: 3m
+        labels:
+          severity: warning
+          service: llm
+        annotations:
+          summary: "LLM requests taking too long"
+          description: "95th percentile LLM request duration is {{ $value }}s (>30s threshold)"
+
+    - name: insurance.infrastructure
+      rules:
+      # Prometheus Target Down
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: monitoring
+        annotations:
+          summary: "Prometheus target is down"
+          description: "Target {{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute"
+          
+      # Missing Metrics Data
+      - alert: MissingMetricsData
+        expr: absent(up{job="insurance-agents"})
+        for: 2m
+        labels:
+          severity: critical
+          service: monitoring
+        annotations:
+          summary: "Missing metrics data from insurance agents"
+          description: "No metrics data received from insurance agents for more than 2 minutes"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: insurance-poc
+data:
+  alertmanager.yml: |
+    global:
+      smtp_smarthost: 'localhost:587'
+      smtp_from: 'alerts@insurance-ai.com'
+    
+    route:
+      group_by: ['alertname', 'severity']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 1h
+      receiver: 'default'
+      routes:
+      - match:
+          severity: critical
+        receiver: 'critical-alerts'
+      - match:
+          service: claims-processing
+        receiver: 'claims-team'
+      - match:
+          service: customer-support
+        receiver: 'support-team'
+    
+    receivers:
+    - name: 'default'
+      slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#alerts'
+        title: 'Insurance AI Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+        
+    - name: 'critical-alerts'
+      slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#critical-alerts'
+        title: '🚨 CRITICAL: Insurance AI Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+      email_configs:
+      - to: 'oncall@insurance-ai.com'
+        subject: 'CRITICAL: Insurance AI System Alert'
+        body: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+        
+    - name: 'claims-team'
+      slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#claims-alerts'
+        title: '📋 Claims Processing Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+        
+    - name: 'support-team'
+      slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#support-alerts'
+        title: '🎧 Customer Support Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}{{ end }}'
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: insurance-poc
+  labels:
+    app: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alertmanager
+  template:
+    metadata:
+      labels:
+        app: alertmanager
+    spec:
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.25.0
+        ports:
+        - containerPort: 9093
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/alertmanager/alertmanager.yml
+          subPath: alertmanager.yml
+        args:
+        - '--config.file=/etc/alertmanager/alertmanager.yml'
+        - '--storage.path=/alertmanager'
+        - '--web.external-url=http://localhost:30093'
+      volumes:
+      - name: config-volume
+        configMap:
+          name: alertmanager-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: insurance-poc
+spec:
+  selector:
+    app: alertmanager
+  ports:
+  - port: 9093
+    targetPort: 9093
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-nodeport
+  namespace: insurance-poc
+spec:
+  type: NodePort
+  selector:
+    app: alertmanager
+  ports:
+  - port: 9093
+    targetPort: 9093
+    nodePort: 30093 

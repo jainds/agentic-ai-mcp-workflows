@@ -286,6 +286,13 @@ async def main():
         """Get available skills"""
         return await agent_server.handle_skills_request()
     
+    @app.get("/metrics")
+    async def get_metrics():
+        """Prometheus metrics endpoint"""
+        metrics_data = await agent_server.handle_metrics_request()
+        from fastapi import Response
+        return Response(content=metrics_data, media_type="text/plain")
+    
     # Start server
     port = int(os.getenv("AGENT_PORT", 8011))
     return app, port

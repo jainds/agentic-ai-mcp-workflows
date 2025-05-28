@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, List
 import os
 import logging
+import requests  # Add synchronous requests
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -109,8 +110,8 @@ def extract_workflow_info(response_data: Dict[str, Any]) -> Dict[str, Any]:
     
     return info
 
-async def call_agent(agent_url: str, agent_name: str, skill_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-    """Call an agent and log the interaction"""
+def call_agent_sync(agent_url: str, agent_name: str, skill_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """Call an agent synchronously to avoid asyncio conflicts"""
     
     # Log the agent call initiation
     log_agent_activity(
@@ -128,42 +129,42 @@ async def call_agent(agent_url: str, agent_name: str, skill_name: str, parameter
     }
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # Log pre-API call thinking
-            log_llm_thinking("API_CALL_PREPARATION", f"Calling {agent_url}/execute with skill {skill_name}", agent_name)
+        # Log pre-API call thinking
+        log_llm_thinking("API_CALL_PREPARATION", f"Calling {agent_url}/execute with skill {skill_name}", agent_name)
+        
+        response = requests.post(
+            f"{agent_url}/execute",
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=30.0
+        )
+        
+        response_data = response.json()
+        
+        # Log the API call
+        log_api_call("POST", f"{agent_url}/execute", payload, response_data, response.status_code)
+        
+        # Log LLM thinking about response
+        if response_data.get('success'):
+            response_text = extract_response_text(response_data)
+            log_llm_thinking("RESPONSE_GENERATED", f"Successfully generated response: {response_text[:100]}...", agent_name)
             
-            response = await client.post(
-                f"{agent_url}/execute",
-                json=payload,
-                headers={"Content-Type": "application/json"}
-            )
-            
-            response_data = response.json()
-            
-            # Log the API call
-            log_api_call("POST", f"{agent_url}/execute", payload, response_data, response.status_code)
-            
-            # Log LLM thinking about response
-            if response_data.get('success'):
-                response_text = extract_response_text(response_data)
-                log_llm_thinking("RESPONSE_GENERATED", f"Successfully generated response: {response_text[:100]}...", agent_name)
-                
-                # Check for workflow in nested structure
-                result = response_data.get('result', {})
-                if isinstance(result, dict) and 'workflow' in result:
-                    log_llm_thinking("WORKFLOW_IDENTIFIED", f"Identified workflow: {result['workflow']}", agent_name)
-            else:
-                log_llm_thinking("ERROR_OCCURRED", f"Error in processing: {response_data.get('error', 'Unknown error')}", agent_name)
-            
-            # Log agent response
-            log_agent_activity(
-                agent_name,
-                "SKILL_CALL_COMPLETED", 
-                {"response": response_data, "status_code": response.status_code}
-            )
-            
-            return response_data
-            
+            # Check for workflow in nested structure
+            result = response_data.get('result', {})
+            if isinstance(result, dict) and 'workflow' in result:
+                log_llm_thinking("WORKFLOW_IDENTIFIED", f"Identified workflow: {result['workflow']}", agent_name)
+        else:
+            log_llm_thinking("ERROR_OCCURRED", f"Error in processing: {response_data.get('error', 'Unknown error')}", agent_name)
+        
+        # Log agent response
+        log_agent_activity(
+            agent_name,
+            "SKILL_CALL_COMPLETED", 
+            {"response": response_data, "status_code": response.status_code}
+        )
+        
+        return response_data
+        
     except Exception as e:
         error_response = {"success": False, "error": str(e)}
         log_agent_activity(
@@ -304,7 +305,7 @@ def main():
                     parameters["customer_id"] = customer_id
                 
                 # Call agent
-                response = run_async(call_agent(agent_url, agent_name, skill_name, parameters))
+                response = call_agent_sync(agent_url, agent_name, skill_name, parameters)
                 
                 # Add to conversation history
                 st.session_state.conversation_history.append({
@@ -485,7 +486,7 @@ def main():
         with col1:
             try:
                 # Check Support Agent health
-                health_response = run_async(check_agent_health(SUPPORT_AGENT_URL))
+                health_response = check_agent_health_sync(SUPPORT_AGENT_URL)
                 if health_response.get("status") == "healthy":
                     st.success("✅ Support Agent: Online")
                 else:
@@ -496,7 +497,7 @@ def main():
         with col2:
             try:
                 # Check Claims Agent health
-                health_response = run_async(check_agent_health(CLAIMS_AGENT_URL))
+                health_response = check_agent_health_sync(CLAIMS_AGENT_URL)
                 if health_response.get("status") == "healthy":
                     st.success("✅ Claims Agent: Online")
                 else:
@@ -534,12 +535,11 @@ def main():
                 for workflow, count in workflow_counts.items():
                     st.metric(f"{workflow.replace('_', ' ').title()} Workflows", count)
 
-async def check_agent_health(agent_url: str) -> Dict[str, Any]:
-    """Check agent health status"""
+def check_agent_health_sync(agent_url: str) -> Dict[str, Any]:
+    """Check agent health status synchronously"""
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{agent_url}/health")
-            return response.json()
+        response = requests.get(f"{agent_url}/health", timeout=5.0)
+        return response.json()
     except Exception as e:
         return {"status": "error", "error": str(e)}
 

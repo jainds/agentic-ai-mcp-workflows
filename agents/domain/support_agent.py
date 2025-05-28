@@ -458,6 +458,13 @@ async def main():
         """Get available skills"""
         return await agent_server.handle_skills_request()
     
+    @app.get("/metrics")
+    async def metrics():
+        """Prometheus metrics endpoint"""
+        metrics_data = await agent_server.handle_metrics_request()
+        from fastapi import Response
+        return Response(content=metrics_data, media_type="text/plain")
+    
     # Cleanup on shutdown
     @app.on_event("shutdown")
     async def shutdown_event():

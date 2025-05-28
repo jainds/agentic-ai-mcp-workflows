@@ -54,9 +54,9 @@ class OpenRouterClient:
         
         # Default models with fallbacks
         self.models = {
-            "primary": os.getenv("PRIMARY_MODEL", "openai/gpt-4o"),
-            "fallback": os.getenv("FALLBACK_MODEL", "anthropic/claude-3-haiku"),
-            "embedding": os.getenv("EMBEDDING_MODEL", "openai/text-embedding-ada-002")
+            "primary": os.getenv("PRIMARY_MODEL", "qwen/qwen3-30b-a3b:free"),
+            "fallback": os.getenv("FALLBACK_MODEL", "microsoft/mai-ds-r1:free"),
+            "embedding": os.getenv("EMBEDDING_MODEL", "microsoft/mai-ds-r1:free")
         }
 
     async def chat_completion(
@@ -223,6 +223,39 @@ Extract and structure the following information if available:
 
 Format as JSON object with null for missing information.""",
         
+        "extract_claim_id": """Extract claim ID or claim number from the customer's message:
+
+Customer Message: "{message}"
+
+Look for:
+- Claim ID numbers (like 1002, 1001, etc.)
+- Claim numbers (like CLM-AUTO-20240115-001)
+- References to "my claim", "claim #", "claimid", etc.
+
+Return only the numeric claim ID if found, or null if not found. Examples:
+- "my claimid is 1002" → 1002
+- "claim #1001" → 1001
+- "CLM-AUTO-20240115-001" → extract the numeric part if possible
+- "my claim status" → null
+
+Response format: Just the number or "null".""",
+        
+        "extract_customer_id": """Extract customer ID from the customer's message:
+
+Customer Message: "{message}"
+
+Look for:
+- Customer ID numbers (like "customer id is 101")
+- References to "customer", "my id", "customer number", etc.
+- Avoid confusing with claim IDs
+
+Return only the numeric customer ID if found, or null if not found. Examples:
+- "customer id is 101" → 101
+- "my customer number is 12345" → 12345
+- "claim 1002" → null (this is a claim ID, not customer ID)
+
+Response format: Just the number or "null".""",
+        
         "generate_response": """Based on the context and information gathered, generate a helpful response to the customer.
 
 Context: {context}
@@ -343,6 +376,68 @@ class LLMSkillMixin:
         except Exception as e:
             self.logger.error(f"Error extracting claim details: {str(e)}")
             return {}
+    
+    async def extract_claim_id(self, user_message: str) -> Optional[int]:
+        """Extract claim ID from user message"""
+        try:
+            prompt = LLMTemplates.TASK_TEMPLATES["extract_claim_id"].format(
+                message=user_message
+            )
+            
+            response = await self.llm_chat([
+                {"role": "user", "content": prompt}
+            ], temperature=0.1)
+            
+            # Parse the response
+            response = response.strip()
+            if response.lower() == "null" or not response:
+                return None
+            
+            # Try to extract numeric value
+            try:
+                return int(response)
+            except ValueError:
+                # Look for numbers in the response
+                import re
+                numbers = re.findall(r'\b\d+\b', response)
+                if numbers:
+                    return int(numbers[0])
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error extracting claim ID: {str(e)}")
+            return None
+    
+    async def extract_customer_id(self, user_message: str) -> Optional[int]:
+        """Extract customer ID from user message"""
+        try:
+            prompt = LLMTemplates.TASK_TEMPLATES["extract_customer_id"].format(
+                message=user_message
+            )
+            
+            response = await self.llm_chat([
+                {"role": "user", "content": prompt}
+            ], temperature=0.1)
+            
+            # Parse the response
+            response = response.strip()
+            if response.lower() == "null" or not response:
+                return None
+            
+            # Try to extract numeric value
+            try:
+                return int(response)
+            except ValueError:
+                # Look for numbers in the response
+                import re
+                numbers = re.findall(r'\b\d+\b', response)
+                if numbers:
+                    return int(numbers[0])
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error extracting customer ID: {str(e)}")
+            return None
     
     async def generate_response(
         self,

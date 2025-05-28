@@ -167,6 +167,92 @@ mock_claims = {
     )
 }
 
+# Add some test data for UI testing (customer 12345)
+mock_claims.update({
+    2001: Claim(
+        claim_id=2001,
+        claim_number="CLM-AUTO-20240201-001",
+        customer_id=12345,
+        policy_id=301,
+        claim_type=ClaimType.AUTO_ACCIDENT,
+        status=ClaimStatus.APPROVED,
+        priority=ClaimPriority.MEDIUM,
+        incident_details=IncidentDetails(
+            incident_date=date(2024, 2, 1),
+            incident_time="16:45",
+            location="Highway 101, San Francisco, CA",
+            description="Minor fender-bender in traffic. No injuries reported.",
+            police_report_number="SFPD-2024-0201-345",
+            weather_conditions="Light rain",
+            witnesses=["Other driver", "Traffic camera footage available"]
+        ),
+        claim_amount=ClaimAmount(
+            claimed_amount=Decimal("3200.00"),
+            assessed_amount=Decimal("2800.00"),
+            approved_amount=Decimal("2300.00"),
+            deductible=Decimal("500.00")
+        ),
+        adjuster_id=404,
+        documents=[
+            ClaimDocument(
+                document_id="doc-006",
+                document_type=DocumentType.PHOTOS,
+                filename="accident_scene_photos.zip",
+                file_url="/documents/accident_scene_photos.zip",
+                description="Photos of minor vehicle damage"
+            )
+        ],
+        notes=[
+            ClaimNote(
+                note_id="note-004",
+                author="Adjuster Lisa Chen",
+                content="Minor damage claim approved. Payment of $2,300 processed.",
+                is_internal=False
+            )
+        ],
+        payment_date=date(2024, 2, 10)
+    ),
+    2002: Claim(
+        claim_id=2002,
+        claim_number="CLM-HOME-20240205-002",
+        customer_id=12345,
+        policy_id=302,
+        claim_type=ClaimType.HOME_BURGLARY,
+        status=ClaimStatus.INVESTIGATING,
+        priority=ClaimPriority.HIGH,
+        incident_details=IncidentDetails(
+            incident_date=date(2024, 2, 5),
+            incident_time="Unknown",
+            location="789 Pine St, San Francisco, CA",
+            description="Home burglary discovered upon return from vacation. Electronics and jewelry stolen.",
+            police_report_number="SFPD-2024-0205-678"
+        ),
+        claim_amount=ClaimAmount(
+            claimed_amount=Decimal("8500.00"),
+            deductible=Decimal("1000.00")
+        ),
+        adjuster_id=405,
+        documents=[
+            ClaimDocument(
+                document_id="doc-007",
+                document_type=DocumentType.POLICE_REPORT,
+                filename="burglary_report_SFPD-2024-0205-678.pdf",
+                file_url="/documents/burglary_report_SFPD-2024-0205-678.pdf",
+                description="Police report for home burglary"
+            )
+        ],
+        notes=[
+            ClaimNote(
+                note_id="note-005",
+                author="Adjuster Mark Rodriguez",
+                content="Investigation in progress. Awaiting police investigation results and inventory verification.",
+                is_internal=True
+            )
+        ],
+        next_action_date=date(2024, 2, 20)
+    )
+})
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""

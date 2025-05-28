@@ -39,6 +39,20 @@ class ClaimsDomainAgent(DomainAgent, LLMSkillMixin):
             
             self.logger.info(f"Detected intent: {intent}")
             
+            # Extract claim ID from message if not provided
+            if not claim_id:
+                extracted_claim_id = await self.extract_claim_id(user_message)
+                if extracted_claim_id:
+                    claim_id = extracted_claim_id
+                    self.logger.info(f"Extracted claim ID from message: {claim_id}")
+            
+            # Extract customer ID from message if not provided
+            if not customer_id:
+                extracted_customer_id = await self.extract_customer_id(user_message)
+                if extracted_customer_id:
+                    customer_id = extracted_customer_id
+                    self.logger.info(f"Extracted customer ID from message: {customer_id}")
+            
             # Route based on intent
             if intent == "claim_filing":
                 return await self.handle_claim_filing(user_message, customer_id)

@@ -184,7 +184,7 @@ OPENROUTER_API_KEY=your-openrouter-api-key-here
 # Alternative: ANTHROPIC_API_KEY=your-anthropic-api-key-here
 
 # Model Configuration
-PRIMARY_MODEL=openai/gpt-4o-mini
+PRIMARY_MODEL=qwen/qwen3-30b-a3b:free
 FALLBACK_MODEL=anthropic/claude-3-haiku
 EMBEDDING_MODEL=openai/text-embedding-ada-002
 
@@ -221,7 +221,7 @@ Examples:
 
 Environment Variables:
   OPENROUTER_API_KEY    Your OpenRouter API key (required for integration tests)
-  PRIMARY_MODEL         Primary model to use (default: openai/gpt-4o-mini)
+  PRIMARY_MODEL         Primary model to use (default: qwen/qwen3-30b-a3b:free)
   FALLBACK_MODEL        Fallback model (default: anthropic/claude-3-haiku)
         """
     )

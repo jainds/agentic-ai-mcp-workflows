@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ui-dashboard
+  namespace: insurance-poc
+  labels:
+    app: ui-dashboard
+    component: frontend
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ui-dashboard
+  template:
+    metadata:
+      labels:
+        app: ui-dashboard
+        component: frontend
+        version: v1
+    spec:
+      containers:
+      - name: ui-dashboard
+        image: insurance-ai-poc-ui:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8501
+          name: http
+          protocol: TCP
+        env:
+        - name: SUPPORT_AGENT_URL
+          value: "http://support-agent:8005"
+        - name: CLAIMS_AGENT_URL
+          value: "http://claims-agent:8007"
+        envFrom:
+        - configMapRef:
+            name: agent-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui-dashboard
+  namespace: insurance-poc
+  labels:
+    app: ui-dashboard
+    component: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: ui-dashboard
+  ports:
+  - port: 8501
+    targetPort: 8501
+    protocol: TCP
+    name: http
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ui-dashboard-nodeport
+  namespace: insurance-poc
+  labels:
+    app: ui-dashboard
+    component: frontend
+spec:
+  type: NodePort
+  selector:
+    app: ui-dashboard
+  ports:
+  - port: 8501
+    targetPort: 8501
+    nodePort: 30501
+    protocol: TCP
+    name: http 

@@ -2,7 +2,7 @@
 
 ## 🚀 Deployment Overview
 
-This guide covers the complete deployment of the Insurance AI PoC to Kubernetes, including all agents and their LLM integrations.
+This guide covers the complete deployment of the Insurance AI PoC to Kubernetes, including all agents, their LLM integrations, and the interactive UI dashboard.
 
 ## 📋 Prerequisites
 
@@ -15,6 +15,14 @@ This guide covers the complete deployment of the Insurance AI PoC to Kubernetes,
 ## 🏗️ Architecture
 
 The deployment includes:
+
+### Interactive UI Dashboard
+- **Streamlit Dashboard** (Port 8501/30501): Real-time monitoring and interaction interface
+  - Multi-agent chat interface with dropdown selection
+  - Real-time LLM thinking process visualization
+  - Agent activity and API call monitoring
+  - Communication flow diagrams
+  - Health status monitoring
 
 ### Domain Agents (LLM-Enabled)
 - **Support Agent** (Port 8005/30005): Customer support workflows with LLM intelligence
@@ -83,9 +91,16 @@ kubectl get secret llm-api-keys -n insurance-poc -o jsonpath='{.data.OPENROUTER_
 
 Once deployed, the following services are available:
 
-### External Access (NodePort Services)
-- **Support Agent**: http://localhost:30005
-- **Claims Agent**: http://localhost:30008
+### 🎯 Main Access Point
+- **📊 UI Dashboard**: http://localhost:30501
+  - **Primary interface for PoC demonstration**
+  - Real-time agent interaction and monitoring
+  - LLM thinking process visualization
+  - Multi-agent communication flow
+
+### External API Access (NodePort Services)
+- **🏥 Support Agent API**: http://localhost:30005
+- **📋 Claims Agent API**: http://localhost:30008
 
 ### Internal Services (ClusterIP)
 - Customer Agent: http://customer-agent:8010
@@ -94,8 +109,27 @@ Once deployed, the following services are available:
 
 ## 🧪 Testing
 
+### UI Dashboard Testing (Recommended)
+```bash
+# Open the dashboard
+open http://localhost:30501
+
+# Or check if it's running
+curl http://localhost:30501
+```
+
+**Dashboard Features:**
+1. **Agent Selection**: Choose between Support and Claims agents
+2. **Quick Test Messages**: Pre-built test scenarios
+3. **Real-time Monitoring**: Watch LLM thinking and agent communication
+4. **API Call Visualization**: See all backend API interactions
+5. **Health Monitoring**: Real-time agent status
+
 ### Health Checks
 ```bash
+# UI Dashboard health
+curl http://localhost:30501/_stcore/health
+
 # Support Agent health
 curl http://localhost:30005/health
 
@@ -164,6 +198,38 @@ curl -X POST "http://localhost:30008/execute" \
 - `CreateClaim`: Create a new claim
 - `GetClaimStatus`: Get status of existing claim
 
+## 🎭 UI Dashboard Features
+
+### 💬 Chat Interface
+- **Agent Selection**: Dropdown to choose Support or Claims agent
+- **Customer ID**: Optional field for personalized responses
+- **Quick Test Messages**: Pre-built scenarios for each agent type
+- **Conversation History**: Shows last 5 interactions with full context
+
+### 🧠 LLM Thinking Process
+- **Real-time Visualization**: See how the LLM processes requests
+- **Step-by-step Breakdown**: From intent extraction to response generation
+- **Workflow Identification**: Shows detected workflows and intent
+- **Error Tracking**: Visualizes any processing errors
+
+### 🔍 Agent Activity Monitor
+- **Skill Execution Tracking**: Monitor when skills are called
+- **Success/Failure States**: Visual indicators for agent operations
+- **Parameter Inspection**: View input parameters and responses
+- **Timestamp Tracking**: Precise timing of all activities
+
+### 📡 API Call Monitor
+- **HTTP Request Tracking**: See all API calls made by agents
+- **Request/Response Inspection**: Full payload and response visibility
+- **Status Code Monitoring**: Visual success/failure indicators
+- **Real-time Updates**: Live view of API communication
+
+### 📊 Flow Diagram
+- **Architecture Visualization**: Mermaid diagrams showing data flow
+- **Health Status**: Real-time agent availability indicators
+- **Activity Metrics**: Count of activities per agent
+- **Workflow Patterns**: Analysis of recent interaction patterns
+
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -171,9 +237,14 @@ All agents receive the following configuration:
 
 **LLM Configuration:**
 - `OPENROUTER_API_KEY`: API key for OpenRouter (loaded from .env or environment)
-- `PRIMARY_MODEL`: Primary LLM model (openai/gpt-4o-mini)
+- `PRIMARY_MODEL`: Primary LLM model (qwen/qwen3-30b-a3b:free)
 - `FALLBACK_MODEL`: Fallback LLM model (anthropic/claude-3-haiku)
 - `OPENROUTER_BASE_URL`: OpenRouter API base URL
+
+**UI Dashboard Configuration:**
+- `SUPPORT_AGENT_URL`: http://support-agent:8005
+- `CLAIMS_AGENT_URL`: http://claims-agent:8007
+- `LOCAL_DEV`: Set to enable localhost URLs for local development
 
 **Service URLs:**
 - `CUSTOMER_AGENT_URL`: http://customer-agent:8010
@@ -181,6 +252,7 @@ All agents receive the following configuration:
 - `CLAIMS_DATA_AGENT_URL`: http://claims-agent:8012
 
 ### Resource Allocation
+- **UI Dashboard**: 256Mi-1Gi memory, 200m-1000m CPU
 - **Domain Agents**: 256Mi-1Gi memory, 200m-1000m CPU
 - **Technical Agents**: 128Mi-512Mi memory, 100m-500m CPU
 
@@ -188,13 +260,25 @@ All agents receive the following configuration:
 
 ### Common Issues
 
-**1. Pods in CrashLoopBackOff**
+**1. UI Dashboard Not Loading**
+```bash
+# Check pod status
+kubectl get pods -n insurance-poc -l app=ui-dashboard
+
+# Check logs
+kubectl logs deployment/ui-dashboard -n insurance-poc
+
+# Verify service
+kubectl get service ui-dashboard-nodeport -n insurance-poc
+```
+
+**2. Pods in CrashLoopBackOff**
 ```bash
 # Check logs
 kubectl logs deployment/<agent-name> -n insurance-poc
 ```
 
-**2. API Key Issues**
+**3. API Key Issues**
 ```bash
 # Check if API key is properly set
 kubectl get secret llm-api-keys -n insurance-poc -o yaml
@@ -208,7 +292,7 @@ kubectl patch secret llm-api-keys -n insurance-poc \
   --type='json' -p='[{"op": "replace", "path": "/data/OPENROUTER_API_KEY", "value":"'$(echo -n $OPENROUTER_API_KEY | base64)'"}]'
 ```
 
-**3. Missing envsubst command**
+**4. Missing envsubst command**
 ```bash
 # On macOS
 brew install gettext
@@ -217,14 +301,14 @@ brew install gettext
 sudo apt-get install gettext-base
 ```
 
-**4. Service Discovery Issues**
+**5. Service Discovery Issues**
 ```bash
 # Check service endpoints
 kubectl get endpoints -n insurance-poc
 
-# Test internal connectivity
-kubectl exec -it deployment/support-agent -n insurance-poc -- \
-  curl http://customer-agent:8010/health
+# Test internal connectivity from UI dashboard
+kubectl exec -it deployment/ui-dashboard -n insurance-poc -- \
+  curl http://support-agent:8005/health
 ```
 
 ## 🔄 Updates and Maintenance
@@ -233,15 +317,18 @@ kubectl exec -it deployment/support-agent -n insurance-poc -- \
 ```bash
 # Update image and trigger rolling update
 kubectl set image deployment/support-agent support-agent=insurance-ai-poc:v2 -n insurance-poc
+kubectl set image deployment/ui-dashboard ui-dashboard=insurance-ai-poc-ui:v2 -n insurance-poc
 
 # Check rollout status
 kubectl rollout status deployment/support-agent -n insurance-poc
+kubectl rollout status deployment/ui-dashboard -n insurance-poc
 ```
 
 ### Scaling
 ```bash
 # Scale deployment
 kubectl scale deployment support-agent --replicas=3 -n insurance-poc
+kubectl scale deployment ui-dashboard --replicas=2 -n insurance-poc
 ```
 
 ### Updating API Keys
@@ -273,6 +360,11 @@ All agents include:
 - **Liveness Probe**: HTTP GET /health (30s initial delay)
 - **Readiness Probe**: HTTP GET /health (5s initial delay)  
 - **Startup Probe**: HTTP GET /health (10s initial delay)
+
+**UI Dashboard Health Checks:**
+- **Liveness Probe**: HTTP GET /_stcore/health (30s initial delay)
+- **Readiness Probe**: HTTP GET /_stcore/health (5s initial delay)
+- **Startup Probe**: HTTP GET /_stcore/health (10s initial delay)
 
 ## 🔐 Security
 
@@ -307,6 +399,7 @@ kubectl create serviceaccount insurance-poc-sa -n insurance-poc
 3. **Database Integration**: Connect to persistent storage
 4. **CI/CD Pipeline**: Automate builds and deployments with secure secret management
 5. **Security Hardening**: Implement network policies and RBAC
+6. **Enhanced UI**: Add more visualization features and customization options
 
 ---
 

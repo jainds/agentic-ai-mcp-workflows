@@ -50,7 +50,7 @@ python scripts/test_llm_integration.py smoke
 
 ### Optional Configuration
 
-- `PRIMARY_MODEL`: Primary model to use (default: `openai/gpt-4o-mini`)
+- `PRIMARY_MODEL`: Primary model to use (default: `qwen/qwen3-30b-a3b:free`)
 - `FALLBACK_MODEL`: Fallback model (default: `anthropic/claude-3-haiku`)
 - `EMBEDDING_MODEL`: Embedding model (default: `openai/text-embedding-ada-002`)
 - `OPENROUTER_BASE_URL`: API base URL (default: `https://openrouter.ai/api/v1`)

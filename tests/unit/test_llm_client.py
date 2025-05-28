@@ -30,7 +30,7 @@ class TestOpenRouterClient:
                 },
                 "finish_reason": "stop"
             }],
-            "model": "openai/gpt-4o-mini",
+            "model": "qwen/qwen3-30b-a3b:free",
             "usage": {
                 "prompt_tokens": 10,
                 "completion_tokens": 15,
@@ -71,7 +71,7 @@ class TestOpenRouterClient:
             
             assert isinstance(response, LLMResponse)
             assert response.content == "This is a test response from the AI model."
-            assert response.model == "openai/gpt-4o-mini"
+            assert response.model == "qwen/qwen3-30b-a3b:free"
             assert response.provider == "openai"
             assert response.finish_reason == "stop"
             
@@ -228,7 +228,7 @@ class TestLLMSkillMixin:
         """Fixture providing a mock LLM response"""
         return LLMResponse(
             content="Test response",
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen3-30b-a3b:free",
             usage={"total_tokens": 25},
             finish_reason="stop",
             provider="openai"
@@ -272,7 +272,7 @@ class TestLLMSkillMixin:
         
         mock_response = LLMResponse(
             content='{"intent": "policy_inquiry", "confidence": 0.95, "entities": {"policy_type": "auto"}}',
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen3-30b-a3b:free",
             usage={"total_tokens": 30},
             finish_reason="stop",
             provider="openai"
@@ -294,7 +294,7 @@ class TestLLMSkillMixin:
         
         mock_response = LLMResponse(
             content="Invalid JSON response",
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen3-30b-a3b:free",
             usage={"total_tokens": 20},
             finish_reason="stop",
             provider="openai"
@@ -359,7 +359,7 @@ class TestRealAPIIntegration:
         try:
             response = await real_client.chat_completion(
                 messages, 
-                model="openai/gpt-4o-mini",
+                model="qwen/qwen3-30b-a3b:free",
                 max_tokens=50
             )
             

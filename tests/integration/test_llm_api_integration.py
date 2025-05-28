@@ -71,7 +71,7 @@ class TestRealLLMAPIIntegration:
         try:
             response = await real_client.chat_completion(
                 messages,
-                model="openai/gpt-4o-mini",
+                model="qwen/qwen3-30b-a3b:free",
                 max_tokens=10,
                 temperature=0.1
             )
@@ -91,7 +91,7 @@ class TestRealLLMAPIIntegration:
     async def test_different_models(self, real_client):
         """Test different model providers"""
         test_cases = [
-            ("openai/gpt-4o-mini", "openai"),
+            ("qwen/qwen3-30b-a3b:free", "openai"),
             ("anthropic/claude-3-haiku", "anthropic"),
         ]
         
@@ -180,7 +180,7 @@ class TestRealLLMAPIIntegration:
             tasks = [
                 real_client.chat_completion(
                     messages,
-                    model="openai/gpt-4o-mini",
+                    model="qwen/qwen3-30b-a3b:free",
                     max_tokens=10,
                     temperature=0.1
                 )
@@ -395,7 +395,7 @@ class TestLLMErrorHandlingIntegration:
             for i in range(10):
                 task = client.chat_completion(
                     messages,
-                    model="openai/gpt-4o-mini",
+                    model="qwen/qwen3-30b-a3b:free",
                     max_tokens=5
                 )
                 tasks.append(task)
@@ -430,13 +430,13 @@ class TestLLMConfigurationValidation:
         # Test with custom model configuration
         with patch.dict(os.environ, {
             "OPENROUTER_API_KEY": api_key,
-            "PRIMARY_MODEL": "openai/gpt-4o-mini",
+            "PRIMARY_MODEL": "qwen/qwen3-30b-a3b:free",
             "FALLBACK_MODEL": "anthropic/claude-3-haiku",
             "EMBEDDING_MODEL": "openai/text-embedding-ada-002"
         }):
             client = OpenRouterClient()
             
-            assert client.models["primary"] == "openai/gpt-4o-mini"
+            assert client.models["primary"] == "qwen/qwen3-30b-a3b:free"
             assert client.models["fallback"] == "anthropic/claude-3-haiku"
             assert client.models["embedding"] == "openai/text-embedding-ada-002"
             

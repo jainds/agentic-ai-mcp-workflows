@@ -30,7 +30,7 @@ def mock_env_vars():
     """Fixture providing mock environment variables for testing"""
     return {
         "OPENROUTER_API_KEY": "sk-or-v1-test-key-12345",
-        "PRIMARY_MODEL": "openai/gpt-4o-mini",
+        "PRIMARY_MODEL": "qwen/qwen3-30b-a3b:free",
         "FALLBACK_MODEL": "anthropic/claude-3-haiku",
         "EMBEDDING_MODEL": "openai/text-embedding-ada-002",
         "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",

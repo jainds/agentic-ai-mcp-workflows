@@ -27,7 +27,7 @@ class TestSupportAgentLLMIntegration:
         """Fixture providing a mock LLM response"""
         return LLMResponse(
             content="I'd be happy to help you with your policy inquiry. Let me look up your information.",
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen3-30b-a3b:free",
             usage={"total_tokens": 25},
             finish_reason="stop",
             provider="openai"
@@ -38,7 +38,7 @@ class TestSupportAgentLLMIntegration:
         """Fixture providing a mock intent extraction response"""
         return LLMResponse(
             content='{"intent": "policy_inquiry", "confidence": 0.95, "entities": {"policy_type": "auto"}}',
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen3-30b-a3b:free",
             usage={"total_tokens": 30},
             finish_reason="stop",
             provider="openai"
@@ -147,7 +147,7 @@ class TestClaimsAgentLLMIntegration:
         
         mock_response = LLMResponse(
             content='{"incident_type": "auto_accident", "urgency": "high", "required_info": ["police_report", "photos"]}',
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen3-30b-a3b:free",
             usage={"total_tokens": 40},
             finish_reason="stop",
             provider="openai"
@@ -269,7 +269,7 @@ class TestAgentLLMErrorHandling:
         # Mock invalid JSON response for intent extraction
         invalid_response = LLMResponse(
             content="This is not valid JSON",
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen3-30b-a3b:free",
             usage={"total_tokens": 10},
             finish_reason="stop",
             provider="openai"
@@ -302,7 +302,7 @@ class TestAgentLLMPerformance:
         
         mock_response = LLMResponse(
             content="Your policy is active",
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen3-30b-a3b:free",
             usage={"total_tokens": 15},
             finish_reason="stop",
             provider="openai"
@@ -324,7 +324,7 @@ class TestAgentLLMPerformance:
         
         mock_response = LLMResponse(
             content="Test response",
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen3-30b-a3b:free",
             usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
             finish_reason="stop",
             provider="openai"
@@ -350,7 +350,7 @@ class TestAgentLLMPerformance:
         
         mock_response = LLMResponse(
             content="Response",
-            model="openai/gpt-4o-mini",
+            model="qwen/qwen3-30b-a3b:free",
             usage={"total_tokens": 10},
             finish_reason="stop",
             provider="openai"

@@ -22,9 +22,10 @@ fi
 
 echo "✅ API key found (${OPENROUTER_API_KEY:0:10}...)"
 
-# Build Docker image
-echo "📦 Building Docker image..."
+# Build Docker images
+echo "📦 Building Docker images..."
 docker build -t insurance-ai-poc:latest .
+docker build -t insurance-ai-poc-ui:latest ./ui
 
 # Apply Kubernetes manifests
 echo "🔧 Applying Kubernetes manifests..."
@@ -43,6 +44,9 @@ kubectl apply -f k8s/manifests/technical-agents.yaml
 kubectl apply -f k8s/manifests/support-agent.yaml
 kubectl apply -f k8s/manifests/claims-agent.yaml
 
+# Apply UI dashboard
+kubectl apply -f k8s/manifests/ui-dashboard.yaml
+
 # Wait for deployments to be ready
 echo "⏳ Waiting for deployments to be ready..."
 kubectl wait --for=condition=available --timeout=300s deployment/customer-agent -n insurance-poc
@@ -50,6 +54,7 @@ kubectl wait --for=condition=available --timeout=300s deployment/policy-agent -n
 kubectl wait --for=condition=available --timeout=300s deployment/claims-data-agent -n insurance-poc
 kubectl wait --for=condition=available --timeout=300s deployment/support-agent -n insurance-poc
 kubectl wait --for=condition=available --timeout=300s deployment/claims-agent -n insurance-poc
+kubectl wait --for=condition=available --timeout=300s deployment/ui-dashboard -n insurance-poc
 
 echo "✅ Deployment complete!"
 
@@ -60,9 +65,17 @@ kubectl get services -n insurance-poc
 
 echo ""
 echo "🌐 Access URLs:"
-echo "Support Agent: http://localhost:30005"
-echo "Claims Agent: http://localhost:30008"
+echo "📊 UI Dashboard: http://localhost:30501"
+echo "🏥 Support Agent API: http://localhost:30005"
+echo "📋 Claims Agent API: http://localhost:30008"
 
 echo ""
 echo "🧪 To run tests in Kubernetes:"
-echo "kubectl exec -it deployment/support-agent -n insurance-poc -- python scripts/test_llm_integration.py smoke" 
+echo "kubectl exec -it deployment/support-agent -n insurance-poc -- python scripts/test_llm_integration.py smoke"
+
+echo ""
+echo "🎯 Quick Start:"
+echo "1. Open UI Dashboard: http://localhost:30501"
+echo "2. Select an agent from the dropdown"
+echo "3. Type a message or use quick test buttons"
+echo "4. Watch real-time agent activity and API calls" 

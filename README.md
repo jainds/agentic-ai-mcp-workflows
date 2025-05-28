@@ -2,9 +2,17 @@
 
 A microservices-based, multi-agent architecture for insurance customer support and claims processing, running on local Kubernetes. This proof-of-concept demonstrates end-to-end workflows using domain agents for orchestration and technical agents for data access, with A2A protocol communication and MCP tool integration.
 
+**🎯 Featured: Interactive UI Dashboard with Real-time Agent Monitoring and LLM Thinking Process Visualization**
+
 ## Architecture Overview
 
 ### Core Components
+
+- **🎭 Interactive UI Dashboard**: Real-time Streamlit interface for PoC demonstration
+  - Multi-agent chat interface with dropdown selection
+  - Real-time LLM thinking process visualization  
+  - Agent activity and API call monitoring
+  - Communication flow diagrams and health status
 
 - **Domain Agents (LLM-driven)**: Orchestrate workflows and user interaction
   - `SupportDomainAgent`: Handles customer inquiries, policy status, general support
@@ -25,6 +33,7 @@ A microservices-based, multi-agent architecture for insurance customer support a
 - **Agent Framework**: python-a2a (Agent-to-Agent protocol)
 - **Tool Integration**: FastMCP (Model Context Protocol)
 - **LLM Access**: OpenRouter API with fallback models
+- **UI Dashboard**: Streamlit with real-time monitoring
 - **Backend Services**: FastAPI + Uvicorn
 - **Orchestration**: Kubernetes (Kind/Minikube)
 - **Communication**: HTTPX for service calls, A2A for agent communication
@@ -33,6 +42,10 @@ A microservices-based, multi-agent architecture for insurance customer support a
 
 ```
 insurance-ai-poc/
+├── ui/
+│   ├── streamlit_app.py          # Interactive dashboard
+│   ├── Dockerfile                # UI container image
+│   └── requirements.txt          # UI dependencies
 ├── agents/
 │   ├── domain/
 │   │   ├── support_agent.py      # SupportDomainAgent
@@ -137,22 +150,36 @@ kubectl get pods -n insurance-poc
 kubectl get services -n insurance-poc
 ```
 
-### 5. Verify Deployment
+### 5. Access the Interactive Dashboard
 
 ```bash
-# Test external endpoints
-curl http://localhost:30005/health  # Support Agent
-curl http://localhost:30008/health  # Claims Agent
+# Open the main dashboard (primary interface)
+open http://localhost:30501
 
-# Run tests in cluster
-kubectl exec -it deployment/support-agent -n insurance-poc -- \
-  python scripts/test_llm_integration.py smoke
+# Or check if it's running
+curl http://localhost:30501
 ```
+
+**🎯 Dashboard Features:**
+- **Multi-Agent Chat**: Switch between Support and Claims agents
+- **Real-time LLM Thinking**: Watch how AI processes requests step-by-step
+- **Agent Activity Monitor**: See all backend agent communications
+- **API Call Visualization**: Monitor all HTTP requests and responses
+- **Health Status**: Real-time agent availability indicators
 
 ## Usage Examples
 
-### Policy Status Inquiry
+### Through the Interactive Dashboard (Recommended)
 
+1. **Open Dashboard**: Navigate to http://localhost:30501
+2. **Select Agent**: Choose "Support Domain Agent" or "Claims Domain Agent"
+3. **Enter Customer ID**: Optional, use `12345` for testing
+4. **Try Quick Tests**: Use sidebar buttons for pre-built scenarios
+5. **Watch Real-time Processing**: Monitor the "LLM Thinking" and "Agent Activity" tabs
+
+### Direct API Access
+
+**Policy Status Inquiry:**
 ```bash
 # Direct API call to SupportDomainAgent
 curl -X POST http://localhost:30005/execute \
@@ -165,8 +192,7 @@ curl -X POST http://localhost:30005/execute \
   }'
 ```
 
-### Claim Creation
-
+**Claim Creation:**
 ```bash
 # File a new claim
 curl -X POST http://localhost:30008/execute \
@@ -178,6 +204,41 @@ curl -X POST http://localhost:30008/execute \
     }
   }'
 ```
+
+## Dashboard Capabilities
+
+### 💬 Interactive Chat Interface
+- **Agent Selection**: Dropdown to choose between Support and Claims agents
+- **Customer Context**: Optional customer ID for personalized responses
+- **Pre-built Scenarios**: Quick test buttons for common use cases
+- **Conversation History**: Last 5 interactions with full context and metadata
+
+### 🧠 LLM Thinking Process Visualization
+- **Real-time Processing**: Watch how the LLM analyzes and responds to requests
+- **Step-by-step Breakdown**: From initial processing to final response generation
+- **Workflow Detection**: See when agents identify specific workflows (policy_inquiry, claim_filing, etc.)
+- **Intent Recognition**: Monitor how agents extract user intent from natural language
+- **Error Tracking**: Visualize any processing errors or exceptions
+
+### 🔍 Agent Activity Monitor
+- **Skill Execution**: Track when specific agent skills are invoked
+- **Parameter Inspection**: View input parameters and processing details
+- **Success/Failure States**: Visual indicators for all agent operations
+- **Response Analysis**: Inspect full agent responses and metadata
+- **Timing Information**: Precise timestamps for all activities
+
+### 📡 API Call Visualization
+- **HTTP Request Tracking**: Monitor all backend API communications
+- **Request/Response Inspection**: Full visibility into payload and response data
+- **Status Code Monitoring**: Visual success/failure indicators
+- **Real-time Updates**: Live view of all inter-service communication
+- **Error Analysis**: Detailed error information for failed requests
+
+### 📊 System Health and Metrics
+- **Agent Status**: Real-time health indicators for all deployed agents
+- **Activity Metrics**: Count and frequency of agent activities
+- **Workflow Patterns**: Analysis of recent interaction types and trends
+- **Communication Flow**: Visual diagrams showing agent-to-agent interactions
 
 ## Development Workflow
 
@@ -202,6 +263,7 @@ curl -X POST http://localhost:30008/execute \
 - **Unit Tests**: Test individual agent skills and service endpoints
 - **Integration Tests**: Test agent-to-agent communication and service integration
 - **E2E Tests**: Test complete user workflows from request to response
+- **Interactive Testing**: Use the dashboard for manual testing and demonstration
 
 ## API Documentation
 
@@ -252,6 +314,9 @@ kubectl rollout restart deployment -n insurance-poc
 # View agent logs
 kubectl logs -f deployment/support-agent -n insurance-poc
 
+# View UI dashboard logs
+kubectl logs -f deployment/ui-dashboard -n insurance-poc
+
 # View service logs
 kubectl logs -f deployment/customer-service -n insurance-poc
 ```
@@ -261,36 +326,47 @@ kubectl logs -f deployment/customer-service -n insurance-poc
 ```bash
 # Check service health
 kubectl get pods -n insurance-poc
-curl http://localhost:8000/health  # Customer service
-curl http://localhost:8001/health  # Policy service
-curl http://localhost:8002/health  # Claims service
+
+# UI Dashboard
+curl http://localhost:30501/_stcore/health
+
+# Agent APIs
+curl http://localhost:30005/health  # Support agent
+curl http://localhost:30008/health  # Claims agent
 ```
 
 ## Implementation Roadmap
 
 ### Phase 1: Foundation (Weeks 1-2)
-- [ ] Environment setup and dependencies
-- [ ] Mock backend services (Customer, Policy, Claims)
-- [ ] Basic technical agents
-- [ ] Unit tests for services and agents
+- [x] Environment setup and dependencies
+- [x] Mock backend services (Customer, Policy, Claims)
+- [x] Basic technical agents
+- [x] Unit tests for services and agents
 
 ### Phase 2: Core Agents (Weeks 3-4)
-- [ ] Domain agents with basic LLM integration
-- [ ] A2A communication between agents
-- [ ] Integration tests
-- [ ] Kubernetes deployment
+- [x] Domain agents with basic LLM integration
+- [x] A2A communication between agents
+- [x] Integration tests
+- [x] Kubernetes deployment
 
 ### Phase 3: Advanced Features (Weeks 5-6)
-- [ ] OpenRouter LLM integration
-- [ ] MCP tool integration
-- [ ] End-to-end workflows
-- [ ] Performance optimization
+- [x] OpenRouter LLM integration
+- [x] MCP tool integration
+- [x] End-to-end workflows
+- [x] Performance optimization
 
-### Phase 4: Production Readiness (Weeks 7-8)
-- [ ] Comprehensive testing
+### Phase 4: Interactive Dashboard (Week 7)
+- [x] Streamlit-based UI with real-time monitoring
+- [x] LLM thinking process visualization
+- [x] Agent activity and API call monitoring
+- [x] Multi-agent chat interface
+
+### Phase 5: Production Readiness (Week 8)
+- [x] Comprehensive testing
+- [x] Security hardening with environment variable management
+- [x] Documentation and demos
 - [ ] Monitoring and logging
-- [ ] Documentation and demos
-- [ ] Security hardening
+- [ ] CI/CD pipeline
 
 ## Contributing
 
@@ -316,6 +392,12 @@ curl http://localhost:8002/health  # Claims service
 - Unified LLM access across multiple providers
 - Easy model switching and fallbacks
 - Cost-effective for development and testing
+
+### Why Streamlit for UI?
+- Rapid prototyping and development
+- Real-time data visualization capabilities
+- Python-native integration with backend agents
+- Built-in state management for interactive features
 
 ## License
 

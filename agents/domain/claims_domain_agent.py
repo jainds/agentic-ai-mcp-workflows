@@ -24,7 +24,7 @@ class ClaimsDomainAgent(DomainAgent, LLMSkillMixin):
         )
         self.register_technical_agent(
             "ClaimsDataAgent", 
-            os.getenv("CLAIMS_DATA_AGENT_URL", "http://claims-agent:8012")
+            os.getenv("CLAIMS_DATA_AGENT_URL", "http://claims-data-agent:8012")
         )
 
     @skill("HandleClaimInquiry", "Process claims-related inquiries and route to appropriate workflow")
@@ -45,6 +45,15 @@ class ClaimsDomainAgent(DomainAgent, LLMSkillMixin):
                 if extracted_claim_id:
                     claim_id = extracted_claim_id
                     self.logger.info(f"Extracted claim ID from message: {claim_id}")
+                else:
+                    # Fallback: regex extraction for claim IDs
+                    import re
+                    claim_matches = re.findall(r'claimid\s+is\s+(\d+)|claim\s*#?\s*(\d+)', user_message.lower())
+                    if claim_matches:
+                        for match in claim_matches:
+                            claim_id = int(match[0] or match[1])
+                            self.logger.info(f"Extracted claim ID via regex fallback: {claim_id}")
+                            break
             
             # Extract customer ID from message if not provided
             if not customer_id:
@@ -52,6 +61,15 @@ class ClaimsDomainAgent(DomainAgent, LLMSkillMixin):
                 if extracted_customer_id:
                     customer_id = extracted_customer_id
                     self.logger.info(f"Extracted customer ID from message: {customer_id}")
+                else:
+                    # Fallback: regex extraction for customer IDs
+                    import re
+                    customer_matches = re.findall(r'customer\s+id\s+is\s+(\d+)|customer\s*#?\s*(\d+)', user_message.lower())
+                    if customer_matches:
+                        for match in customer_matches:
+                            customer_id = int(match[0] or match[1])
+                            self.logger.info(f"Extracted customer ID via regex fallback: {customer_id}")
+                            break
             
             # Route based on intent
             if intent == "claim_filing":

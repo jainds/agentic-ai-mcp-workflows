@@ -5,6 +5,7 @@ Provides CRUD operations for insurance claims with authentication.
 
 import os
 import uuid
+import sys
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -13,6 +14,24 @@ from fastapi.security import HTTPBearer
 from pydantic import BaseModel, Field
 from prometheus_fastapi_instrumentator import Instrumentator
 import structlog
+
+# Try to import shared utilities
+try:
+    # Add parent directory to path for importing shared utilities
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from shared.port_utils import get_service_port
+    PORT_UTILS_AVAILABLE = True
+except ImportError:
+    PORT_UTILS_AVAILABLE = False
+    print("Port utilities not available, using default port handling")
+
+# Try to import FastMCP
+try:
+    from fastmcp import FastMCP
+    FASTMCP_AVAILABLE = True
+except ImportError:
+    FASTMCP_AVAILABLE = False
+    print("FastMCP not available, running as standard FastAPI service")
 
 logger = structlog.get_logger(__name__)
 
@@ -136,6 +155,16 @@ def init_mock_data():
 @app.on_event("startup")
 async def startup_event():
     init_mock_data()
+
+# FastMCP Integration
+try:
+    from mcp_server import ClaimsMCPServer
+    claims_mcp = ClaimsMCPServer(app, claims_db)
+    logger.info("FastMCP server integrated successfully")
+except ImportError as e:
+    logger.warning("FastMCP not available, continuing without MCP integration", error=str(e))
+except Exception as e:
+    logger.error("Failed to initialize FastMCP server", error=str(e))
 
 # Utility functions
 def validate_token(token: str) -> bool:
@@ -486,8 +515,30 @@ async def search_claims(
 if __name__ == "__main__":
     import uvicorn
     
-    port = int(os.getenv("CLAIMS_SERVICE_PORT", "8000"))
     host = os.getenv("CLAIMS_SERVICE_HOST", "0.0.0.0")
     
-    logger.info("Starting Claims Service", host=host, port=port)
-    uvicorn.run(app, host=host, port=port) 
+    # Use the port utility to find an available port
+    if PORT_UTILS_AVAILABLE:
+        try:
+            port = get_service_port("claims", 8001, host=host)
+        except Exception as e:
+            print(f"Error finding available port: {e}")
+            port = int(os.getenv("CLAIMS_SERVICE_PORT", 8001))
+    else:
+        port = int(os.getenv("CLAIMS_SERVICE_PORT", 8001))
+    
+    # Check if we should run as FastMCP or regular FastAPI
+    use_fastmcp = os.getenv("USE_FASTMCP", "true").lower() == "true"
+    
+    if FASTMCP_AVAILABLE and use_fastmcp:
+        # Create an MCP server from the FastAPI app
+        mcp = FastMCP.from_fastapi(app=app)
+        logger.info("Starting Claims Service with FastMCP", host=host, port=port)
+        print(f"  FastMCP endpoints: http://{host}:{port}/mcp/")
+        print(f"  Note: Traditional HTTP endpoints not available in FastMCP mode")
+        mcp.run(transport="streamable-http", host=host, port=port)
+    else:
+        logger.info("Starting Claims Service as FastAPI", host=host, port=port)
+        print(f"  Health check: http://{host}:{port}/health")
+        print(f"  API docs: http://{host}:{port}/docs")
+        uvicorn.run(app, host=host, port=port) 

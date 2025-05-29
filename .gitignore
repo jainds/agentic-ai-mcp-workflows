@@ -341,3 +341,8 @@ agents/domain/__pycache__/claims_agent.cpython-313.pyc
 __pycache__
 __pycache__/
 *.pyc
+agents/domain/__pycache__/claims_agent.cpython-313.pyc
+agents/shared/__pycache__/a2a_base.cpython-313.pyc
+agents/shared/__pycache__/auth.cpython-313.pyc
+agents/shared/__pycache__/a2a_base.cpython-313.pyc
+agents/shared/__pycache__/auth.cpython-313.pyc

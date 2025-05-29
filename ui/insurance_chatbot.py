@@ -14,6 +14,21 @@ import logging
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
+import sys
+import os
+import asyncio
+
+# Add agents directory to Python path
+agents_path = os.path.join(os.path.dirname(__file__), '..', 'agents')
+sys.path.append(agents_path)
+
+# Import our FastMCP Data Agent
+try:
+    from technical.fastmcp_data_agent import FastMCPDataAgent, fastmcp_data_agent
+    FASTMCP_AVAILABLE = True
+except ImportError:
+    FASTMCP_AVAILABLE = False
+    print("⚠️ FastMCP Data Agent not available, using mock simulation")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -163,434 +178,66 @@ class CustomerValidator:
         }
 
 class InsuranceAIClient:
-    """Client for interacting with the Insurance AI system"""
+    """AI client for handling insurance queries with real MCP integration"""
     
     def __init__(self):
-        self.claims_agent_url = "http://claims-agent:8000"
-        self.data_agent_url = "http://data-agent:8002"
-        self.notification_agent_url = "http://notification-agent:8003"
-        self.timeout = 30
+        # Initialize response cache and metrics
+        self.response_cache = {}
+        self.api_call_log = []
+        self.system_metrics = []
+        self.analytics_data = []
+        
+        # Initialize FastMCP Data Agent if available
+        self.fastmcp_agent = None
+        if FASTMCP_AVAILABLE:
+            self.fastmcp_agent = FastMCPDataAgent()
+            self._initialize_fastmcp()
     
-    def send_message(self, user_message: str, customer_id: str) -> Dict[str, Any]:
-        """Send message to Claims Agent (Domain Agent) which will orchestrate everything"""
-        
-        # Validate customer before processing
-        validation = CustomerValidator.validate_customer(customer_id)
-        if not validation["valid"]:
-            return {
-                "success": False,
-                "error": f"Customer validation failed: {validation['error']}",
-                "status_code": 401
-            }
-        
-        start_time = time.time()
-        
-        # Log API call
-        api_call = {
-            "timestamp": datetime.now(),
-            "endpoint": f"{self.claims_agent_url}/process",
-            "method": "POST",
-            "status": "pending",
-            "response_time": 0,
-            "customer_id": customer_id,
-            "message": user_message[:50] + "..." if len(user_message) > 50 else user_message
-        }
-        st.session_state.api_calls.append(api_call)
+    def _initialize_fastmcp(self):
+        """Initialize FastMCP Data Agent asynchronously"""
+        if self.fastmcp_agent:
+            try:
+                # Create a new event loop for initialization if needed
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # If we're in an existing loop, we can't use asyncio.run
+                        # Create a task instead
+                        asyncio.create_task(self.fastmcp_agent.initialize())
+                    else:
+                        asyncio.run(self.fastmcp_agent.initialize())
+                except RuntimeError:
+                    # If no event loop exists, create one
+                    asyncio.run(self.fastmcp_agent.initialize())
+            except Exception as e:
+                print(f"⚠️ Failed to initialize FastMCP Data Agent: {e}")
+                self.fastmcp_agent = None
+    
+    async def _call_fastmcp_tool(self, operation: str, customer_id: str, **kwargs) -> Dict[str, Any]:
+        """Call FastMCP Data Agent tools"""
+        if not self.fastmcp_agent:
+            return {"success": False, "error": "FastMCP agent not available"}
         
         try:
-            # Since the actual Claims Agent doesn't have a /process endpoint,
-            # we'll use demo mode but simulate the proper A2A/MCP flow WITH customer validation
-            response = self._demo_response_with_a2a_simulation(user_message, customer_id, validation["customer_data"])
-            
-            # Update API call status
-            api_call["status"] = "success"
-            api_call["response_time"] = int((time.time() - start_time) * 1000)
-            
-            # Add system metrics
-            self._add_system_metrics(api_call["response_time"])
-            
-            # Add analytics data
-            self._add_analytics_data(user_message, response, customer_id)
-            
-            return response
-                
+            if operation == "get_customer_claims":
+                return await self.fastmcp_agent.get_customer_claims(customer_id)
+            elif operation == "get_customer_policies":
+                return await self.fastmcp_agent.get_customer_policies(customer_id)
+            elif operation == "create_claim":
+                return await self.fastmcp_agent.create_claim(
+                    customer_id=customer_id,
+                    policy_number=kwargs.get("policy_number", "POL-AUTO-123456"),
+                    incident_date=kwargs.get("incident_date", datetime.now().strftime("%Y-%m-%d")),
+                    description=kwargs.get("description", "Incident reported via chat"),
+                    amount=kwargs.get("amount", 1000.0),
+                    claim_type=kwargs.get("claim_type", "auto_collision")
+                )
+            elif operation == "generate_customer_summary":
+                return await self.fastmcp_agent.generate_customer_summary(customer_id)
+            else:
+                return {"success": False, "error": f"Unknown operation: {operation}"}
         except Exception as e:
-            # Update API call status
-            api_call["status"] = "error"
-            api_call["response_time"] = int((time.time() - start_time) * 1000)
-            api_call["error"] = str(e)
-            
-            return {
-                "success": False,
-                "error": f"Error: {str(e)}",
-                "status_code": 0
-            }
-    
-    def _demo_response_with_a2a_simulation(self, user_message: str, customer_id: str, customer_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Demo response that properly simulates A2A/MCP architecture WITH customer validation"""
-        
-        # Simulate thinking process (LLM analysis)
-        thinking_steps = [
-            "🤔 Analyzing user request with LLM...",
-            f"🔐 Validating customer ID: {customer_id}",
-            "🧠 Understanding intent and context...",
-            "📋 Determining required actions...",
-            "🔄 Planning agent orchestration strategy...",
-            "🎯 Preparing A2A protocol calls..."
-        ]
-        
-        # Simulate orchestration based on message content
-        orchestration_steps = []
-        demo_response = ""
-        
-        # Simulate API calls to technical agents (with customer context)
-        time.sleep(0.5)  # Simulate processing time
-        
-        # Better intent detection
-        user_message_lower = user_message.lower()
-        
-        # Claims status/inquiry (not filing new claims)
-        if any(word in user_message_lower for word in ["how many claims", "claims status", "claim status", "my claims", "existing claims"]):
-            orchestration_steps = [
-                f"📋 Claims Agent (Domain) analyzing claims inquiry for {customer_data['name']}",
-                "🔄 A2A call: Claims Agent → Data Agent",
-                f"📊 Data Agent using MCP tools → Claims Service API (customer: {customer_id})",
-                f"👤 Data Agent using MCP tools → Customer Service API (customer: {customer_id})",
-                "📈 Data Agent retrieving claims history via MCP",
-                "✅ Claims Agent formatting claims summary"
-            ]
-            
-            self._simulate_api_call("data-agent", "/mcp/claims/list", "GET", 200, 280, customer_id)
-            self._simulate_api_call("data-agent", "/mcp/customer/profile", "GET", 200, 150, customer_id)
-            
-            # Actual helpful response first
-            demo_response = f"""**Your Claims Summary for {customer_data['name']} (ID: {customer_id}):**
-
-**📊 Current Claims Status:**
-- **Total Claims:** 2 claims on file
-- **Active Claims:** 1 claim in progress
-- **Closed Claims:** 1 claim completed
-
-**📋 Claim Details:**
-
-**1. CLM-{customer_id}-2024-001** (Active)
-   - **Type:** Auto Accident Claim
-   - **Date Filed:** March 15, 2024
-   - **Status:** 🟡 Under Review (Inspection scheduled)
-   - **Amount:** $3,200 (estimate)
-   - **Next Step:** Vehicle inspection on Dec 30, 2024
-
-**2. CLM-{customer_id}-2023-002** (Closed)
-   - **Type:** Windshield Replacement
-   - **Date Filed:** August 10, 2023
-   - **Status:** ✅ Paid & Closed
-   - **Amount:** $450 (paid)
-   - **Completion:** September 5, 2023
-
-**📞 Need Help?**
-- For active claim CLM-{customer_id}-2024-001: Call (555) 123-4567
-- Claim adjuster: Sarah Martinez (sarah.martinez@insurance.com)
-- Expected resolution: January 15, 2025
-
----
-
-**🤖 Technical A2A/MCP Orchestration Details:**
-- Domain Agent (Claims) orchestrated Data Agent for claims lookup
-- Customer validation: {customer_data['name']} (Authorized)
-- Data Agent accessed 2 MCP tools for claims and customer data
-- Retrieved complete claims history from enterprise systems
-- Total processing time: 1.3 seconds"""
-
-        # Policy inquiry (what policies, how many policies, policy details)
-        elif any(word in user_message_lower for word in ["policies", "policy", "what do i have", "how many", "coverage", "my insurance"]):
-            orchestration_steps = [
-                f"📋 Claims Agent (Domain) analyzing policy inquiry for {customer_data['name']}",
-                "🔄 A2A call: Claims Agent → Data Agent", 
-                f"📊 Data Agent using MCP tools → Policy Service API (customer: {customer_id})",
-                f"👤 Data Agent using MCP tools → Customer Service API (customer: {customer_id})",
-                "📈 Data Agent generating coverage summary",
-                "✅ Claims Agent formatting policy response"
-            ]
-            
-            self._simulate_api_call("data-agent", "/mcp/policy/list", "GET", 200, 220, customer_id)
-            self._simulate_api_call("data-agent", "/mcp/customer/profile", "GET", 200, 120, customer_id)
-            
-            customer_policies = customer_data.get('policies', [])
-            
-            # Actual helpful response first
-            demo_response = f"""**Your Insurance Policies for {customer_data['name']} (ID: {customer_id}):**
-
-**📊 Policy Portfolio Summary:**
-- **Total Active Policies:** {len(customer_policies)} policies
-- **Account Status:** Active & Current
-- **Total Annual Premium:** $1,850
-
-**🛡️ Your Active Policies:**
-
-**1. Auto Insurance (POL-AUTO-123456)**
-   - **Vehicle:** 2022 Honda Accord
-   - **Coverage:** Comprehensive + Collision
-   - **Premium:** $1,200/year (Quarterly: $300)
-   - **Deductible:** $500 (Collision), $250 (Comprehensive)
-   - **Next Payment:** March 1, 2025
-
-**2. Home Insurance (POL-HOME-789012)**
-   - **Property:** 123 Main St, Anytown, ST 12345
-   - **Coverage:** $350,000 dwelling + $75,000 personal property
-   - **Premium:** $650/year (Annual payment)
-   - **Deductible:** $1,000
-   - **Next Payment:** June 15, 2025
-
-**📋 Coverage Highlights:**
-- **Auto:** Liability, Collision, Comprehensive, Medical, Rental Car
-- **Home:** Dwelling, Personal Property, Liability, Additional Living Expenses
-- **Combined Liability:** $500,000 total across policies
-
-**💡 Account Benefits:**
-- Multi-policy discount: 15% savings
-- Claim-free discount: 20% (3+ years)
-- Automatic payments: Active
-
----
-
-**🤖 Technical A2A/MCP Orchestration Details:**
-- Domain Agent orchestrated Data Agent for policy lookup
-- Customer validation: {customer_data['name']} (Authorized)
-- Data Agent used 2 MCP tools for policy and customer data retrieval
-- Retrieved complete policy portfolio from enterprise systems
-- Applied real-time calculations for premiums and discounts
-- Total processing time: 1.1 seconds"""
-
-        # Filing new claims
-        elif any(word in user_message_lower for word in ["file claim", "new claim", "accident", "incident", "damage"]):
-            orchestration_steps = [
-                f"📋 Claims Agent (Domain) analyzing new claim request for {customer_data['name']}",
-                "🔄 A2A call: Claims Agent → Data Agent",
-                f"📊 Data Agent using MCP tools → Claims Service API (customer: {customer_id})",
-                f"👤 Data Agent using MCP tools → Customer Service API (customer: {customer_id})", 
-                f"🔍 Data Agent using MCP tools → Fraud Detection API (customer: {customer_id})",
-                "📈 Data Agent generating risk assessment",
-                "🔄 A2A call: Claims Agent → Notification Agent",
-                f"✉️ Notification Agent using MCP tools → Email Service ({customer_data['email']})",
-                f"📱 Notification Agent using MCP tools → SMS Service (customer: {customer_id})",
-                "✅ Claims Agent compiling comprehensive response"
-            ]
-            
-            self._simulate_api_call("data-agent", "/mcp/claims/create", "POST", 200, 450, customer_id)
-            self._simulate_api_call("data-agent", "/mcp/customer/get", "GET", 200, 230, customer_id)
-            self._simulate_api_call("notification-agent", "/mcp/email/send", "POST", 200, 340, customer_id)
-            
-            customer_policies = customer_data.get('policies', [])
-            main_policy = customer_policies[0] if customer_policies else "POL-AUTO-123456"
-            
-            # Actual helpful response first
-            demo_response = f"""**Claim Successfully Filed for {customer_data['name']} (ID: {customer_id}):**
-
-**📋 Your New Claim:**
-- **Claim Number:** CLM-{customer_id}-{datetime.now().strftime('%Y%m%d')}-001234
-- **Policy:** {main_policy}
-- **Filed:** {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
-- **Status:** ✅ Successfully submitted
-
-**⚡ Immediate Actions Completed:**
-- ✅ Claim registered in system
-- ✅ Fraud risk assessment: Low risk (Score: 0.15/1.0)
-- ✅ Coverage confirmed: Up to $50,000
-- ✅ Email confirmation sent to {customer_data['email']}
-- ✅ SMS notification sent to your phone
-- ✅ Required documents checklist emailed
-
-**📋 Your Next Steps:**
-1. **Upload Photos:** Use our mobile app to submit damage photos
-2. **Schedule Inspection:** 3 time slots available this week
-3. **Gather Documents:** Driver's license, police report (if applicable)
-4. **Contact Info:** Claim adjuster will call within 24 hours
-
-**💰 Financial Details:**
-- **Estimated Coverage:** Up to $50,000
-- **Your Deductible:** $500
-- **Processing Time:** 3-5 business days after inspection
-
-**📞 Support:**
-- **Claim Hotline:** (555) 123-CLAIM
-- **Reference Number:** CLM-{customer_id}-{datetime.now().strftime('%Y%m%d')}-001234
-
----
-
-**🤖 Technical A2A/MCP Orchestration Details:**
-- Domain Agent (Claims) orchestrated 2 Technical Agents
-- Customer validation: {customer_data['name']} (Active account)
-- Data Agent executed 3 MCP tool calls to enterprise systems
-- Notification Agent executed 2 MCP tool calls for communications
-- Fraud detection completed with ML risk scoring
-- Total orchestration time: 1.2 seconds"""
-
-        # Payment/billing inquiries
-        elif any(word in user_message_lower for word in ["payment", "billing", "pay", "bill", "due", "balance"]):
-            orchestration_steps = [
-                f"📋 Claims Agent (Domain) analyzing billing inquiry for {customer_data['name']}",
-                "🔄 A2A call: Claims Agent → Data Agent",
-                f"💳 Data Agent using MCP tools → Billing Service API (customer: {customer_id})",
-                f"👤 Data Agent using MCP tools → Customer Service API (customer: {customer_id})",
-                "📊 Data Agent retrieving payment history via MCP",
-                "✅ Claims Agent formatting billing response"
-            ]
-            
-            self._simulate_api_call("data-agent", "/mcp/billing/history", "GET", 200, 160, customer_id)
-            self._simulate_api_call("data-agent", "/mcp/billing/status", "GET", 200, 90, customer_id)
-            
-            # Actual helpful response first
-            demo_response = f"""**Billing Summary for {customer_data['name']} (ID: {customer_id}):**
-
-**💰 Current Account Status:**
-- **Balance:** $0.00 (All payments current)
-- **Next Payment Due:** March 1, 2025
-- **Amount Due:** $300.00 (Auto Insurance - Quarterly)
-- **Payment Method:** Auto-pay from Wells Fargo ****1234
-
-**📊 Recent Payment History:**
-- **Dec 1, 2024:** $300.00 ✅ (Auto Insurance - Paid)
-- **Sep 1, 2024:** $300.00 ✅ (Auto Insurance - Paid)
-- **Jun 15, 2024:** $650.00 ✅ (Home Insurance - Paid)
-- **Jun 1, 2024:** $300.00 ✅ (Auto Insurance - Paid)
-
-**🔄 Payment Schedule:**
-- **Auto Insurance:** $300 quarterly (Mar, Jun, Sep, Dec)
-- **Home Insurance:** $650 annually (June)
-- **Auto-Pay:** Enabled for both policies
-
-**💳 Payment Options:**
-- **Online:** Pay at www.insurance.com/pay
-- **Phone:** Call (555) 123-BILL
-- **Mobile App:** Insurance Mobile App
-- **Auto-Pay:** Currently active
-
-**🎯 Account Benefits:**
-- No late fees (auto-pay active)
-- 5% discount for auto-pay
-- Paperless billing active
-
----
-
-**🤖 Technical A2A/MCP Orchestration Details:**
-- Domain Agent used Data Agent for billing operations
-- Customer validation: {customer_data['name']} (Authorized)
-- Data Agent accessed 2 MCP tools for financial data
-- Secure banking integration via enterprise MCP protocols
-- Retrieved complete payment history and account status
-- Total processing time: 0.9 seconds"""
-
-        # General/default response
-        else:
-            orchestration_steps = [
-                f"📋 Claims Agent (Domain) analyzing general inquiry for {customer_data['name']}",
-                "🔄 A2A call: Claims Agent → Data Agent",
-                f"👤 Data Agent using MCP tools → Customer Service API (customer: {customer_id})",
-                "🤖 Claims Agent preparing general assistance response"
-            ]
-            
-            self._simulate_api_call("data-agent", "/mcp/customer/profile", "GET", 200, 110, customer_id)
-            
-            # Actual helpful response first
-            demo_response = f"""**Hello {customer_data['name']}! I'm ready to help with your insurance needs.**
-
-**📊 Your Account Overview:**
-- **Customer:** {customer_data['name']} ({customer_id})
-- **Email:** {customer_data['email']}
-- **Active Policies:** {len(customer_data.get('policies', []))} policies
-- **Account Status:** Active & Current
-
-**💬 I can help you with:**
-- **"How many claims do I have?"** - View your claims status
-- **"What policies do I have?"** - See all your policies
-- **"When is my next payment?"** - Check billing information
-- **"I had an accident"** - File a new claim
-- **"What's covered under my auto policy?"** - Coverage details
-
-**🚀 Quick Actions:**
-Just ask me in plain English! Examples:
-- "Show me my recent claims"
-- "What's my deductible for auto insurance?"
-- "When is my home insurance payment due?"
-- "I need to add a driver to my policy"
-
----
-
-**🤖 Technical A2A/MCP Orchestration Details:**
-- Domain Agent analyzed general inquiry intent
-- Customer validation: {customer_data['name']} (Authenticated)
-- Data Agent accessed customer profile via MCP tools
-- Account overview generated from enterprise systems
-- Ready to process specific requests with full A2A orchestration
-- Total processing time: 0.7 seconds"""
-
-        return {
-            "success": True,
-            "response": {
-                "message": demo_response,
-                "thinking_steps": thinking_steps,
-                "orchestration_steps": orchestration_steps,
-                "agent_interactions": len(orchestration_steps),
-                "response_time_ms": random.randint(800, 1800),
-                "llm_model": "gpt-4-turbo",
-                "confidence_score": round(random.uniform(0.85, 0.98), 2),
-                "customer_id": customer_id,
-                "customer_name": customer_data['name']
-            },
-            "status_code": 200
-        }
-    
-    def _simulate_api_call(self, service: str, endpoint: str, method: str, status_code: int, response_time: int, customer_id: str = None):
-        """Simulate API calls to technical agents"""
-        api_call = {
-            "timestamp": datetime.now(),
-            "endpoint": f"http://{service}:800X{endpoint}",
-            "method": method,
-            "status": "success" if status_code == 200 else "error",
-            "response_time": response_time,
-            "service": service,
-            "status_code": status_code,
-            "customer_id": customer_id
-        }
-        st.session_state.api_calls.append(api_call)
-    
-    def _add_system_metrics(self, response_time: int):
-        """Add system performance metrics"""
-        metric = {
-            "timestamp": datetime.now(),
-            "response_time": response_time,
-            "cpu_usage": round(random.uniform(20, 80), 1),
-            "memory_usage": round(random.uniform(40, 90), 1),
-            "active_connections": random.randint(5, 25),
-            "throughput": random.randint(50, 200)
-        }
-        st.session_state.system_metrics.append(metric)
-        
-        # Keep only last 50 metrics
-        if len(st.session_state.system_metrics) > 50:
-            st.session_state.system_metrics = st.session_state.system_metrics[-50:]
-    
-    def _add_analytics_data(self, user_message: str, response: Dict[str, Any], customer_id: str):
-        """Add analytics data"""
-        intent = "claim" if "claim" in user_message.lower() else \
-                "policy" if "policy" in user_message.lower() else \
-                "billing" if any(word in user_message.lower() for word in ["payment", "billing", "pay"]) else \
-                "general"
-        
-        analytics = {
-            "timestamp": datetime.now(),
-            "intent": intent,
-            "response_time": response["response"]["response_time_ms"],
-            "success": response["success"],
-            "user_satisfaction": round(random.uniform(4.0, 5.0), 1),
-            "agent_interactions": response["response"]["agent_interactions"],
-            "customer_id": customer_id
-        }
-        st.session_state.analytics_data.append(analytics)
-        
-        # Keep only last 100 analytics
-        if len(st.session_state.analytics_data) > 100:
-            st.session_state.analytics_data = st.session_state.analytics_data[-100:]
+            return {"success": False, "error": str(e)}
 
 def check_service_health():
     """Check health of all services"""
@@ -1217,7 +864,7 @@ def main():
         "🧠 LLM Thinking", 
         "📡 API Monitor", 
         "📊 Analytics", 
-        "🏥 System Health"
+        "�� System Health"
     ])
     
     with tab1:

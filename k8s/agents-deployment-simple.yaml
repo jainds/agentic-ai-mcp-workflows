@@ -1,0 +1,214 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claims-agent
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: claims-agent
+    component: domain-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: claims-agent
+  template:
+    metadata:
+      labels:
+        app: claims-agent
+        component: domain-agent
+    spec:
+      containers:
+      - name: claims-agent
+        image: insurance-ai/claims-agent:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: claims-agent
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: claims-agent
+spec:
+  selector:
+    app: claims-agent
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-agent
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: data-agent
+    component: technical-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-agent
+  template:
+    metadata:
+      labels:
+        app: data-agent
+        component: technical-agent
+    spec:
+      containers:
+      - name: data-agent
+        image: insurance-ai/data-agent:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-agent
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: data-agent
+spec:
+  selector:
+    app: data-agent
+  ports:
+  - port: 8002
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-agent
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: notification-agent
+    component: technical-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-agent
+  template:
+    metadata:
+      labels:
+        app: notification-agent
+        component: technical-agent
+    spec:
+      containers:
+      - name: notification-agent
+        image: insurance-ai/notification-agent:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+        env:
+        - name: PORT
+          value: "8000"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-agent
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: notification-agent
+spec:
+  selector:
+    app: notification-agent
+  ports:
+  - port: 8003
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insurance-ui
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: insurance-ui
+    component: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insurance-ui
+  template:
+    metadata:
+      labels:
+        app: insurance-ui
+        component: frontend
+    spec:
+      containers:
+      - name: insurance-ui
+        image: insurance-ai/insurance-ui:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8501
+        env:
+        - name: STREAMLIT_SERVER_PORT
+          value: "8501"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insurance-ui
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: insurance-ui
+spec:
+  selector:
+    app: insurance-ui
+  ports:
+  - port: 8501
+    targetPort: 8501
+    protocol: TCP
+  type: LoadBalancer 

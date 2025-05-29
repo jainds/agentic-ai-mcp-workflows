@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "user-service"
+version = "1.0.0"
+description = "User management service with FastAPI"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic", 
+    "prometheus-client",
+    "PyJWT",
+    "bcrypt",
+    "python-multipart",
+] 

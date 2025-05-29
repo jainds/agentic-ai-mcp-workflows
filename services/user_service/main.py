@@ -3,17 +3,37 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import uvicorn
 import os
 import jwt
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 import bcrypt
 import logging
 from enum import Enum
 import time
 import uuid
+import sys
+# Add parent directory to path for importing shared utilities
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Try to import shared utilities
+try:
+    from shared.port_utils import get_service_port
+    PORT_UTILS_AVAILABLE = True
+except ImportError:
+    PORT_UTILS_AVAILABLE = False
+    print("Port utilities not available, using default port handling")
+
+# Try to import FastMCP
+try:
+    from fastmcp import FastMCP
+    FASTMCP_AVAILABLE = True
+except ImportError:
+    FASTMCP_AVAILABLE = False
+    print("FastMCP not available, running as standard FastAPI service")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -62,7 +82,8 @@ class UserCreate(BaseModel):
     role: UserRole
     phone: Optional[str] = None
     
-    @validator('email')
+    @field_validator('email')
+    @classmethod
     def email_must_be_valid(cls, v):
         if '@' not in v:
             raise ValueError('Invalid email format')
@@ -122,9 +143,9 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         if user_id not in users_db:
             raise HTTPException(status_code=401, detail="Invalid token")
         return users_db[user_id]
-    except jwt.ExpiredSignatureError:
+    except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.JWTError:
+    except InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 # Initialize sample data
@@ -163,8 +184,8 @@ def initialize_sample_data():
     ]
     
     for user_data in sample_users:
-        user_id = user_data.pop("id")
-        password = user_data.pop("password")
+        user_id = user_data["id"]  # Don't pop, just get the ID
+        password = user_data.pop("password")  # Only pop the password
         user_data["password_hash"] = hash_password(password)
         user_data["created_at"] = datetime.utcnow()
         user_data["last_login"] = None
@@ -321,6 +342,30 @@ async def get_user_analytics(current_user: dict = Depends(verify_token)):
 initialize_sample_data()
 
 if __name__ == "__main__":
-    port = int(os.getenv("USER_SERVICE_PORT", 8000))
     host = os.getenv("USER_SERVICE_HOST", "0.0.0.0")
-    uvicorn.run(app, host=host, port=port) 
+    
+    # Use the port utility to find an available port
+    if PORT_UTILS_AVAILABLE:
+        try:
+            port = get_service_port("user", 8000, host=host)
+        except Exception as e:
+            print(f"Error finding available port: {e}")
+            port = int(os.getenv("USER_SERVICE_PORT", 8000))
+    else:
+        port = int(os.getenv("USER_SERVICE_PORT", 8000))
+    
+    # Check if we should run as FastMCP or regular FastAPI
+    use_fastmcp = os.getenv("USE_FASTMCP", "true").lower() == "true"
+    
+    if FASTMCP_AVAILABLE and use_fastmcp:
+        # Create an MCP server from the FastAPI app
+        mcp = FastMCP.from_fastapi(app=app)
+        print(f"Starting User Service with FastMCP on {host}:{port}")
+        print(f"  FastMCP endpoints: http://{host}:{port}/mcp/")
+        print(f"  Note: Traditional HTTP endpoints not available in FastMCP mode")
+        mcp.run(transport="streamable-http", host=host, port=port)
+    else:
+        print(f"Starting User Service as FastAPI on {host}:{port}")
+        print(f"  Health check: http://{host}:{port}/health")
+        print(f"  API docs: http://{host}:{port}/docs")
+        uvicorn.run(app, host=host, port=port) 

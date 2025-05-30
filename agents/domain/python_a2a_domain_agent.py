@@ -15,6 +15,7 @@ from datetime import datetime
 import uuid
 import time
 from pathlib import Path
+import re
 
 # python-a2a library imports
 from python_a2a import (
@@ -310,7 +311,34 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         elif intent_text.startswith("```") and intent_text.endswith("```"):
             intent_text = intent_text[3:-3].strip()
         
-        intent_analysis = json.loads(intent_text)
+        # Handle cases where LLM returns JSON followed by explanation text
+        # Look for the first complete JSON object
+        try:
+            intent_analysis = json.loads(intent_text)
+        except json.JSONDecodeError:
+            # Look for JSON block in the response
+            json_match = re.search(r'\{[^}]*\}', intent_text, re.DOTALL)
+            if json_match:
+                json_part = json_match.group(0)
+                # Count braces to get complete JSON
+                brace_count = 0
+                end_pos = 0
+                for i, char in enumerate(intent_text):
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            end_pos = i + 1
+                            break
+                
+                if end_pos > 0:
+                    json_part = intent_text[:end_pos]
+                    intent_analysis = json.loads(json_part)
+                else:
+                    raise ValueError("Could not extract valid JSON from LLM response")
+            else:
+                raise ValueError("No JSON found in LLM response")
         
         logger.info("Intent analysis completed", 
                    primary_intent=intent_analysis.get("primary_intent"),
@@ -323,7 +351,7 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         """REMOVED: Rule-based intent analysis - now throws error instead"""
         raise RuntimeError("Rule-based intent analysis removed - LLM required for proper intent understanding")
     
-    def create_execution_plan(self, intent_analysis: Dict[str, Any], user_text: str) -> Dict[str, Any]:
+    def create_execution_plan(self, intent_analysis: Dict[str, Any], user_text: str, customer_id: str = "CUST-001") -> Dict[str, Any]:
         """
         Create a detailed execution plan based on intent analysis
         """
@@ -391,21 +419,26 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         # Get plan template or create custom plan
         plan = plan_templates.get(primary_intent, plan_templates["general_inquiry"]).copy()
         
-        # Enhance plan with context
+        # Enhance plan with context and customer information
+        entities = intent_analysis.get("entities", {}).copy()
+        entities["customer_id"] = customer_id  # Ensure customer_id is in entities
+        
         plan.update({
             "intent": primary_intent,
             "user_request": user_text,
-            "entities": intent_analysis.get("entities", {}),
+            "entities": entities,
             "urgency": intent_analysis.get("urgency", "medium"),
             "complexity": complexity,
             "plan_id": str(uuid.uuid4()),
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.utcnow().isoformat(),
+            "customer_id": customer_id  # Also store at top level for easy access
         })
         
         logger.info("Execution plan created", 
                    plan_id=plan["plan_id"],
                    steps=len(plan["steps"]),
-                   intent=primary_intent)
+                   intent=primary_intent,
+                   customer_id=customer_id)
         
         return plan
     
@@ -451,12 +484,20 @@ Is there any specific aspect you'd like me to explain in more detail?"""
             
             logger.info("Executing step", step_number=i+1, agent=agent_name, action=action)
             
-            # Prepare task data
+            # Prepare task data with customer context and entities
             task_data = {
                 "action": action,
                 "plan_context": execution_plan,
                 "step_info": step,
-                "previous_results": step_results
+                "previous_results": step_results,
+                # Add customer context from the execution plan
+                "customer_id": execution_plan.get("entities", {}).get("customer_id", "CUST-001"),
+                "context": {
+                    "customer_id": execution_plan.get("entities", {}).get("customer_id", "CUST-001"),
+                    "intent": execution_plan.get("intent", "general_inquiry"),
+                    "entities": execution_plan.get("entities", {}),
+                    "urgency": execution_plan.get("urgency", "medium")
+                }
             }
             
             # Call the registered agent with error handling
@@ -865,7 +906,7 @@ Please let me know how else I can help you, or feel free to try your request aga
         intent_analysis = self.understand_intent(message)
         
         # Role 2: Create and execute plan - NO ERROR HANDLING, LET ERRORS PROPAGATE  
-        execution_plan = self.create_execution_plan(intent_analysis, message)
+        execution_plan = self.create_execution_plan(intent_analysis, message, customer_id)
         execution_results = self.execute_plan(execution_plan, customer_id)
         
         # Role 3: Prepare professional response - NO ERROR HANDLING, LET ERRORS PROPAGATE

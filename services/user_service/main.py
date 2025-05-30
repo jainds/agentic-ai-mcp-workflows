@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import uvicorn
 import os
 import jwt
@@ -131,7 +131,7 @@ def create_access_token(user_id: str, role: str) -> str:
     payload = {
         "user_id": user_id,
         "role": role,
-        "exp": datetime.utcnow() + timedelta(hours=24)
+        "exp": datetime.now(UTC) + timedelta(hours=24)
     }
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
@@ -187,7 +187,7 @@ def initialize_sample_data():
         user_id = user_data["id"]  # Don't pop, just get the ID
         password = user_data.pop("password")  # Only pop the password
         user_data["password_hash"] = hash_password(password)
-        user_data["created_at"] = datetime.utcnow()
+        user_data["created_at"] = datetime.now(UTC)
         user_data["last_login"] = None
         users_db[user_id] = user_data
 
@@ -205,7 +205,7 @@ async def metrics_middleware(request, call_next):
 # Routes
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "user-service", "timestamp": datetime.utcnow()}
+    return {"status": "healthy", "service": "user-service", "timestamp": datetime.now(UTC)}
 
 @app.get("/metrics")
 async def metrics():
@@ -228,7 +228,7 @@ async def create_user(user: UserCreate):
         "role": user.role,
         "status": UserStatus.ACTIVE,
         "phone": user.phone,
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC),
         "last_login": None
     }
     
@@ -251,7 +251,7 @@ async def login(login_data: LoginRequest):
         raise HTTPException(status_code=401, detail="Account is not active")
     
     # Update last login
-    user["last_login"] = datetime.utcnow()
+    user["last_login"] = datetime.now(UTC)
     
     access_token = create_access_token(user["id"], user["role"])
     
@@ -335,11 +335,21 @@ async def get_user_analytics(current_user: dict = Depends(verify_token)):
         "active_users": active_users,
         "inactive_users": total_users - active_users,
         "role_distribution": role_distribution,
-        "timestamp": datetime.utcnow()
+        "timestamp": datetime.now(UTC)
     }
 
 # Initialize sample data on startup
 initialize_sample_data()
+
+# FastMCP Integration
+try:
+    from mcp_server import UserMCPServer
+    user_mcp = UserMCPServer(app, users_db)
+    logger.info("FastMCP server integrated successfully")
+except ImportError as e:
+    logger.warning(f"FastMCP not available, continuing without MCP integration: {e}")
+except Exception as e:
+    logger.error(f"Failed to initialize FastMCP server: {e}")
 
 if __name__ == "__main__":
     host = os.getenv("USER_SERVICE_HOST", "0.0.0.0")
@@ -358,14 +368,26 @@ if __name__ == "__main__":
     use_fastmcp = os.getenv("USE_FASTMCP", "true").lower() == "true"
     
     if FASTMCP_AVAILABLE and use_fastmcp:
-        # Create an MCP server from the FastAPI app
-        mcp = FastMCP.from_fastapi(app=app)
-        print(f"Starting User Service with FastMCP on {host}:{port}")
-        print(f"  FastMCP endpoints: http://{host}:{port}/mcp/")
-        print(f"  Note: Traditional HTTP endpoints not available in FastMCP mode")
-        mcp.run(transport="streamable-http", host=host, port=port)
+        # Use the properly configured UserMCPServer with real MCP tools
+        try:
+            from mcp_server import UserMCPServer
+            user_mcp_server = UserMCPServer(app, users_db)
+            
+            # Use the MCP server directly
+            mcp = user_mcp_server.mcp
+            
+            logger.info(f"Starting User Service with FastMCP and proper MCP tools on {host}:{port}")
+            print(f"  FastMCP endpoints: http://{host}:{port}/mcp/")
+            print(f"  MCP tools available: get_user, authenticate_user, list_users, create_user, update_user")
+            mcp.run(transport="streamable-http", host=host, port=port)
+        except Exception as e:
+            logger.error(f"Failed to start with MCP tools, falling back to regular FastAPI: {e}")
+            logger.info(f"Starting User Service as FastAPI on {host}:{port}")
+            print(f"  Health check: http://{host}:{port}/health")
+            print(f"  API docs: http://{host}:{port}/docs")
+            uvicorn.run(app, host=host, port=port)
     else:
-        print(f"Starting User Service as FastAPI on {host}:{port}")
+        logger.info(f"Starting User Service as FastAPI on {host}:{port}")
         print(f"  Health check: http://{host}:{port}/health")
         print(f"  API docs: http://{host}:{port}/docs")
         uvicorn.run(app, host=host, port=port) 

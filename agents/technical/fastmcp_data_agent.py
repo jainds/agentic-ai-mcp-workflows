@@ -446,7 +446,7 @@ class FastMCPDataAgent(A2AAgent):
         }
         
         logger.info("Handling REAL fraud_analysis request", arguments=arguments)
-        return await self.call_tool("analytics", "analyze_fraud", arguments)
+        return await self.call_tool("analytics", "calculate_risk_score", arguments)
     
     async def get_available_tools(self) -> Dict[str, List[Dict[str, Any]]]:
         """Get all available REAL tools from FastMCP services"""

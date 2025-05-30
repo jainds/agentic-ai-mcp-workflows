@@ -531,14 +531,26 @@ if __name__ == "__main__":
     use_fastmcp = os.getenv("USE_FASTMCP", "true").lower() == "true"
     
     if FASTMCP_AVAILABLE and use_fastmcp:
-        # Create an MCP server from the FastAPI app
-        mcp = FastMCP.from_fastapi(app=app)
-        logger.info("Starting Claims Service with FastMCP", host=host, port=port)
-        print(f"  FastMCP endpoints: http://{host}:{port}/mcp/")
-        print(f"  Note: Traditional HTTP endpoints not available in FastMCP mode")
-        mcp.run(transport="streamable-http", host=host, port=port)
+        # Use the properly configured ClaimsMCPServer with real MCP tools
+        try:
+            from mcp_server import ClaimsMCPServer
+            claims_mcp_server = ClaimsMCPServer(app, claims_db)
+            
+            # Use the MCP server directly
+            mcp = claims_mcp_server.mcp
+            
+            logger.info(f"Starting Claims Service with FastMCP and proper MCP tools on {host}:{port}")
+            print(f"  FastMCP endpoints: http://{host}:{port}/mcp/")
+            print(f"  MCP tools available: list_claims, get_claim_details, create_claim, update_claim_status")
+            mcp.run(transport="streamable-http", host=host, port=port)
+        except Exception as e:
+            logger.error(f"Failed to start with MCP tools, falling back to regular FastAPI: {e}")
+            logger.info(f"Starting Claims Service as FastAPI on {host}:{port}")
+            print(f"  Health check: http://{host}:{port}/health")
+            print(f"  API docs: http://{host}:{port}/docs")
+            uvicorn.run(app, host=host, port=port)
     else:
-        logger.info("Starting Claims Service as FastAPI", host=host, port=port)
+        logger.info(f"Starting Claims Service as FastAPI on {host}:{port}")
         print(f"  Health check: http://{host}:{port}/health")
         print(f"  API docs: http://{host}:{port}/docs")
         uvicorn.run(app, host=host, port=port) 

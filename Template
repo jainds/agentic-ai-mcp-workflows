@@ -1,0 +1,47 @@
+Thank you for your claims inquiry. I've conducted a comprehensive analysis of your account and current claims status.
+
+**Current Claims Status:**
+Based on my review of your claims history and current filings, here's what I found:
+• You currently have {claims_data.get('active_claims', 0)} active claim(s) in our system
+• Your primary claim status is: **{claims_data.get('claim_status', 'Unknown')}**
+• Estimated resolution timeframe: **{claims_data.get('estimated_resolution', 'To be determined')}**
+
+**Detailed Claims Analysis:**
+Our claims processing team has been actively working on your case. The "In Review" status indicates that your claim is currently undergoing thorough evaluation by our specialized claims adjusters. This process typically involves:
+
+1. **Documentation Verification**: Ensuring all required documentation is complete and accurate
+2. **Coverage Assessment**: Verifying that the claimed incident falls within your policy coverage
+3. **Loss Evaluation**: Determining the extent and value of the claimed loss
+4. **Fraud Prevention**: Standard security checks to protect both you and our company
+
+**Your Account Overview:**
+• Total active policies: **{context.get('active_policies', 0)} policies**
+• Recent claims history: **{context.get('recent_claims', 0)} claim(s) in the past 12 months**
+• Customer satisfaction score: **{context.get('satisfaction_score', 'N/A')}/5.0**
+
+**Policy Coverage Context:**
+{f"Your current policy portfolio includes {policy_data.get('policies', 0)} active policies with a total coverage value of {policy_data.get('total_coverage', 'N/A')}. Your next renewal date is scheduled for {policy_data.get('next_renewal', 'N/A')}." if policy_data else "Policy information is being retrieved from our systems."}
+
+**Risk Assessment & Recommendations:**
+Based on our analytics assessment:
+• Your current risk profile score: **{analytics_data.get('risk_score', 'N/A')}** (Lower scores indicate better risk profiles)
+• Risk category: **{"Low Risk" if analytics_data and analytics_data.get('risk_score', 1) < 0.3 else "Moderate Risk" if analytics_data and analytics_data.get('risk_score', 1) < 0.7 else "Higher Risk"}**
+• Recommendation: **{analytics_data.get('recommendation', 'Continue with current coverage')}**
+• Potential savings opportunity: **{analytics_data.get('savings_opportunity', 'Under review')}**
+
+**Next Steps & Timeline:**
+1. **Immediate**: Your claim will continue through the review process
+2. **Within 24-48 hours**: You should receive an update from your assigned claims adjuster
+3. **Within 3-5 business days**: Target completion of the review process
+4. **Upon approval**: Settlement processing will begin immediately
+
+**Important Notes:**
+- You can track your claim progress through our online portal or mobile app
+- If you have additional documentation, please submit it as soon as possible to avoid delays
+- Your claims history shows a good track record, which may expedite processing
+- Based on your {"Premium" if context.get('type') == 'Premium' else context.get('type', 'Standard')} coverage level, you have access to expedited claim processing
+
+**Contact Information:**
+If you need immediate assistance or have questions about your claim, please don't hesitate to contact our claims department directly. Your customer profile indicates you're a valued {"Premium" if context.get('type') == 'Premium' else context.get('type', 'Standard')} customer, ensuring you receive priority support.
+
+Is there any specific aspect of your claim or coverage that you'd like me to explain in more detail?"""

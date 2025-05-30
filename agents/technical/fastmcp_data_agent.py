@@ -1,6 +1,6 @@
 """
-FastMCP Data Agent - Technical agent using FastMCP to connect to insurance services.
-Handles database queries, API calls, and data analysis for domain agents.
+FastMCP Data Agent - A2A-compatible technical agent using FastMCP to connect to insurance services.
+Handles database queries, API calls, and data analysis for domain agents via official Google A2A protocol.
 """
 
 import os
@@ -11,16 +11,42 @@ from datetime import datetime
 import json
 import structlog
 
+# Official Google A2A Library imports
+from python_a2a import A2AServer, TaskRequest, TaskResponse, AgentCard
+from python_a2a.models import TaskStatus, TaskState
+
+from agents.shared.a2a_base import A2AAgent
+
 logger = structlog.get_logger(__name__)
 
-class FastMCPDataAgent:
-    """Technical agent that connects to FastMCP-enabled services"""
+
+class FastMCPDataAgent(A2AAgent):
+    """A2A-compatible technical agent that connects to FastMCP-enabled services"""
     
-    def __init__(self):
+    def __init__(self, port: int = 8002):
+        capabilities = {
+            "streaming": False,
+            "pushNotifications": False,
+            "fileUpload": False,
+            "messageHistory": True,
+            "dataAccess": True,
+            "mcpIntegration": True,
+            "google_a2a_compatible": True
+        }
+        
+        # Initialize A2A agent with official library
+        super().__init__(
+            name="FastMCPDataAgent",
+            description="Technical agent providing data access via FastMCP services using official Google A2A protocol",
+            port=port,
+            capabilities=capabilities,
+            version="2.0.0"
+        )
+        
         # Service endpoints with FastMCP integration
         self.service_urls = {
             "user": os.getenv("USER_SERVICE_URL", "http://localhost:8000"),
-            "claims": os.getenv("CLAIMS_SERVICE_URL", "http://localhost:8001"),
+            "claims": os.getenv("CLAIMS_SERVICE_URL", "http://localhost:8004"),
             "policy": os.getenv("POLICY_SERVICE_URL", "http://localhost:8002"),
             "analytics": os.getenv("ANALYTICS_SERVICE_URL", "http://localhost:8003")
         }
@@ -31,7 +57,84 @@ class FastMCPDataAgent:
         # Available tools cache
         self.available_tools = {}
         
-        logger.info("FastMCP Data Agent initialized", services=list(self.service_urls.keys()))
+        logger.info("FastMCP Data Agent initialized with A2A support", 
+                   services=list(self.service_urls.keys()), port=port)
+    
+    def handle_task(self, task: TaskRequest) -> TaskResponse:
+        """Handle incoming A2A tasks for data operations"""
+        user_data = task.user
+        action = user_data.get("action", "unknown")
+        
+        logger.info("Processing data request", task_id=task.taskId, action=action)
+        
+        try:
+            # Route to appropriate handler based on action
+            if action == "get_customer":
+                result = asyncio.run(self._handle_get_customer(user_data))
+            elif action == "get_claims":
+                result = asyncio.run(self._handle_get_claims(user_data))
+            elif action == "get_policies":
+                result = asyncio.run(self._handle_get_policies(user_data))
+            elif action == "create_claim":
+                result = asyncio.run(self._handle_create_claim(user_data))
+            elif action == "update_claim":
+                result = asyncio.run(self._handle_update_claim(user_data))
+            elif action == "fraud_analysis":
+                result = asyncio.run(self._handle_fraud_analysis(user_data))
+            else:
+                result = {"error": f"Unknown action: {action}"}
+            
+            # Set successful completion status
+            task.status = TaskStatus(
+                state=TaskState.COMPLETED,
+                message={
+                    "role": "agent",
+                    "content": {
+                        "type": "data_response",
+                        "text": f"Data operation '{action}' completed successfully"
+                    }
+                }
+            )
+            
+            # Set task artifacts with the result
+            task.artifacts = [{
+                "parts": [{
+                    "type": "data",
+                    "content": result
+                }]
+            }]
+            
+            task.metadata = {
+                "agent": "FastMCPDataAgent",
+                "action": action,
+                "result_type": type(result).__name__
+            }
+            
+            return task
+            
+        except Exception as e:
+            logger.error("Data operation failed", task_id=task.taskId, action=action, error=str(e))
+            
+            # Set error status
+            task.status = TaskStatus(
+                state=TaskState.FAILED,
+                message={
+                    "role": "agent",
+                    "content": {
+                        "type": "error",
+                        "text": f"Data operation failed: {str(e)}"
+                    }
+                }
+            )
+            
+            task.artifacts = [{
+                "parts": [{
+                    "type": "error",
+                    "content": {"error": str(e), "action": action}
+                }]
+            }]
+            
+            return task
     
     async def initialize(self):
         """Initialize the agent by discovering available tools from services"""
@@ -256,7 +359,7 @@ class FastMCPDataAgent:
         logger.info("FastMCP Data Agent closed")
 
 # Create a global instance for use by domain agents
-fastmcp_data_agent = FastMCPDataAgent()
+fastmcp_data_agent = FastMCPDataAgent() 
 
 # FastAPI Server for the agent
 if __name__ == "__main__":

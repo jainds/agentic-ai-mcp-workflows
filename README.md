@@ -1,197 +1,278 @@
-# 🛡️ Insurance AI PoC - A2A/MCP Architecture
-
-## Intelligent Insurance Assistant with Proper Agent Orchestration
-
-This project demonstrates a production-ready Insurance AI system using **A2A (Agent-to-Agent)** communication and **MCP (Model Context Protocol)** tools for enterprise integration.
+# Insurance AI PoC - Kubernetes-Native Multi-Agent System
 
 ## 🏗️ Architecture Overview
 
-### Proper A2A/MCP Design
+This project implements a sophisticated AI agent system for insurance claim processing using a multi-layered architecture:
+
+### Core Components
+
+1. **FastMCP Services** - Microservices that expose enterprise APIs via Anthropic's Model Context Protocol
+2. **A2A Domain Agents** - Intelligent orchestration layer using Google's Agent-to-Agent protocol  
+3. **Technical Agents** - Specialized adapters that bridge A2A agents to FastMCP services
+4. **Kubernetes-Native Deployment** - Production-ready containerized deployment with monitoring
+
+## 🔄 Data Flow
+
 ```
-User → Single Chatbot → Domain Agent → Technical Agents → MCP Tools → Enterprise Systems
+User Request → Streamlit UI → Domain Agent (A2A) → Technical Agent → FastMCP Services → Enterprise APIs
 ```
 
-**Key Principles:**
-- 🤖 **Single User Interface**: One chatbot handles all interactions
-- 🧠 **Domain Agent Intelligence**: LLM-powered agent makes orchestration decisions
-- 🔄 **A2A Communication**: Domain agents call Technical agents automatically
-- 🛠️ **MCP Tool Integration**: Technical agents access enterprise systems via MCP
-- ✅ **Comprehensive Responses**: Complete solutions, not manual actions
+## 📁 Project Structure
+
+```
+insurance-ai-poc/
+├── agents/                      # AI Agent implementations
+│   ├── domain/                  # Business logic orchestration agents
+│   │   └── claims_agent.py      # Claims processing domain agent
+│   ├── shared/                  # Common agent utilities
+│   │   ├── a2a_base.py         # A2A protocol base classes
+│   │   └── auth.py             # Authentication utilities
+│   └── technical/               # Technical integration agents
+│       └── fastmcp_data_agent.py # FastMCP to A2A bridge
+├── services/                    # FastMCP Microservices
+│   ├── user_service/           # User management & authentication
+│   ├── claims_service/         # Claims data & processing
+│   ├── policy_service/         # Policy management
+│   └── analytics_service/      # Business analytics
+├── k8s/                        # Kubernetes deployment manifests
+│   └── fastmcp-services-deployment.yaml
+├── scripts/                    # Deployment & utility scripts
+│   ├── start_fastmcp_services.py   # Local development server
+│   ├── deploy_fastmcp_k8s.sh       # Kubernetes deployment
+│   ├── check_fastmcp_deployment.sh # Health checking
+│   └── test_fastmcp_services.py    # Integration testing
+├── tests/                      # Test suites
+│   ├── integration/            # Cross-service integration tests
+│   ├── unit/                   # Individual component tests
+│   ├── contract/               # API contract validation
+│   └── e2e/                    # End-to-end workflow tests
+├── ui/                         # Streamlit user interface
+└── requirements-fastmcp.txt    # FastMCP service dependencies
+```
 
 ## 🚀 Quick Start
 
-### 1. Access the System
-```bash
-# The system is deployed and ready
-open http://localhost:8503
-```
+### Prerequisites
 
-### 2. Chat Naturally
-```
-Try these conversations:
-- "I was in an accident and need to file a claim"
-- "What does my policy cover for flood damage?"
-- "When is my next payment due?"
-- "I want to update my contact information"
-```
+- Python 3.11+
+- Docker & Kubernetes (Rancher Desktop recommended)
+- kubectl and helm configured
 
-### 3. Observe AI Orchestration
-- Watch the AI thinking process
-- See automatic agent orchestration  
-- Get comprehensive responses automatically
-
-## 📊 System Status
+### 1. Install Dependencies
 
 ```bash
-# Check all services
-kubectl get pods -n cursor-insurance-ai-poc
+# Install UV package manager
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Expected output:
-NAME                                   READY   STATUS    RESTARTS   AGE
-claims-agent-867fc6ff7c-ztntf          1/1     Running   0          98m
-data-agent-7858df979f-fj4qn            1/1     Running   0          98m  
-notification-agent-8489bf867d-l77jn    1/1     Running   0          98m
-simple-insurance-ui-67b977455c-sqjz2   1/1     Running   0          5m
+# Install project dependencies
+uv sync
+
+# Activate virtual environment
+source .venv/bin/activate
 ```
 
-## 🔧 System Components
+### 2. Local Development
 
-### Domain Agents (LLM-Powered)
-- **Claims Agent**: Main orchestrator for insurance operations
-  - Analyzes user requests using LLM
-  - Creates orchestration plans
-  - Calls Technical Agents via A2A protocol
-
-### Technical Agents (MCP Tools)
-- **Data Agent**: Enterprise system access via MCP tools
-  - Claims Service MCP integration
-  - Policy Service MCP integration  
-  - Customer Service MCP integration
-- **Notification Agent**: Communication via MCP tools
-  - Email service integration
-  - SMS service integration
-
-### User Interface
-- **Simple Chatbot**: Single conversation interface
-  - Natural language input
-  - Comprehensive AI responses
-  - No manual action selection needed
-
-## 💡 Usage Examples
-
-### Claims Processing
-```
-You: "I was in an accident and need to file a claim"
-
-AI: "I've processed your claim request:
-- ✅ Policy validation successful (POL-AUTO-123456)
-- ✅ Customer verification completed
-- ✅ Fraud risk assessment: Low risk
-- 📋 Claim #CLM-2024-001234 created
-- 📧 Confirmation email sent
-- 🔔 SMS notification sent
-
-Next Steps:
-1. Upload photos via our app
-2. Schedule inspection appointment  
-3. Processing time: 3-5 business days"
-```
-
-### Policy Inquiries
-```
-You: "What does my auto insurance cover?"
-
-AI: "Your policy information:
-- 📄 Policy: POL-AUTO-123456
-- 🚗 Vehicle: 2022 Honda Accord
-- ✅ Liability: $100,000/$300,000
-- ✅ Collision: $50,000 deductible $500
-- ✅ Comprehensive: $50,000 deductible $250
-
-Would you like me to explain any coverage details?"
-```
-
-## 🏗️ Deployment Architecture
-
-### Kubernetes Deployment
-- **Namespace**: `cursor-insurance-ai-poc`
-- **Services**: Claims Agent, Data Agent, Notification Agent, Simple UI
-- **Access**: LoadBalancer services with port forwarding
-- **Health Checks**: Configured for all components
-
-### Docker Images
-- `insurance-ai/claims-agent:latest` - Domain agent with LLM
-- `insurance-ai/data-agent:latest` - Technical agent with MCP tools
-- `insurance-ai/notification-agent:latest` - Communication agent
-- `insurance-ai/simple-ui:latest` - Single chatbot interface
-
-## 📚 Documentation
-
-### Architecture Guides
-- [`docs/PROPER_A2A_ARCHITECTURE_DEPLOYMENT.md`](docs/PROPER_A2A_ARCHITECTURE_DEPLOYMENT.md) - Complete architecture guide
-- [`ui/DASHBOARD_README.md`](ui/DASHBOARD_README.md) - UI documentation
-
-### Key Features
-- ✅ Single chatbot interface (no manual actions)
-- ✅ LLM-powered domain agent orchestration
-- ✅ A2A protocol for agent communication
-- ✅ MCP tools for enterprise system access
-- ✅ Comprehensive automated responses
-- ✅ Real-time thinking and orchestration visibility
-
-## 🔧 Development
-
-### Local Testing
 ```bash
-# Check system health
-curl http://localhost:8503
-curl http://localhost:8000/health
+# Start all FastMCP services locally
+python scripts/start_fastmcp_services.py
 
-# View logs
-kubectl logs deployment/simple-insurance-ui -n cursor-insurance-ai-poc
-kubectl logs deployment/claims-agent -n cursor-insurance-ai-poc
+# Services will be available at:
+# - User Service: http://localhost:8000
+# - Claims Service: http://localhost:8001  
+# - Policy Service: http://localhost:8002
+# - Analytics Service: http://localhost:8003
 ```
 
-### Architecture Validation
-- ✅ User sees only ONE chat interface
-- ✅ No manual service selection required
-- ✅ AI automatically determines required actions
-- ✅ Domain agent orchestrates all technical agents
-- ✅ Technical agents use MCP tools for enterprise access
-- ✅ Single comprehensive response per user request
+### 3. Kubernetes Deployment
 
-## 🎯 Key Differentiators
+```bash
+# Build and deploy to Kubernetes
+./scripts/deploy_fastmcp_k8s.sh
 
-### ✅ Correct Implementation
-- **User Experience**: Natural conversation with one AI
-- **Architecture**: Proper A2A/MCP design patterns
-- **Intelligence**: LLM makes orchestration decisions
-- **Integration**: MCP tools for enterprise connectivity
-- **Response**: Complete solutions automatically
+# Check deployment status
+./scripts/check_fastmcp_deployment.sh
 
-### ❌ Anti-Patterns Avoided
-- ❌ Manual action selection in UI
-- ❌ Direct API calls from frontend
-- ❌ Multi-service selection dropdowns
-- ❌ Partial responses requiring manual steps
-- ❌ Technical configuration exposed to users
+# Access services via port-forward
+kubectl port-forward svc/fastmcp-data-agent 8004:8004
+```
 
-## 🌐 Access Points
+## 🔧 Service Architecture
 
-| Service | URL | Purpose |
-|---------|-----|---------|
-| **Main Chatbot** | **http://localhost:8503** | **Primary user interface** |
-| Claims Agent API | http://localhost:8000 | Backend domain agent |
+### FastMCP Services
 
-## 🎉 Success Metrics
+Each service implements dual-mode operation:
+- **FastMCP Mode** (`USE_FASTMCP=true`): Exposes MCP tools via streamable HTTP
+- **FastAPI Mode** (`USE_FASTMCP=false`): Standard REST API endpoints
 
-✅ **Proper A2A/MCP Architecture**: Complete implementation  
-✅ **Single User Interface**: One chatbot for all needs  
-✅ **Intelligent Orchestration**: AI-driven agent coordination  
-✅ **Enterprise Integration**: MCP tools for system access  
-✅ **User Experience**: Natural language conversations  
-✅ **Comprehensive Responses**: Complete solutions automatically  
+#### Service Capabilities
 
----
+| Service | FastMCP Tools | REST Endpoints | Purpose |
+|---------|---------------|----------------|---------|
+| User Service | `get_user`, `authenticate_user`, `list_users` | `/users`, `/login`, `/health` | User management & auth |
+| Claims Service | `get_claim`, `create_claim`, `list_claims` | `/claims`, `/claims/{id}` | Claims processing |
+| Policy Service | `get_policy`, `calculate_quote`, `list_policies` | `/policies`, `/quotes` | Policy management |
+| Analytics Service | `generate_report`, `get_metrics` | `/analytics`, `/reports` | Business intelligence |
 
-**🚀 Experience intelligent insurance assistance with proper A2A/MCP architecture at http://localhost:8503** 
+### A2A Domain Agents
+
+Domain Agents implement business logic and orchestration:
+
+```python
+# Example: Claims Agent orchestrating a claim evaluation
+class ClaimsAgent(A2ABaseAgent):
+    async def evaluate_claim(self, claim_id: str) -> Dict[str, Any]:
+        # 1. Authenticate via Technical Agent
+        auth_result = await self.call_agent("technical_auth", {"action": "verify"})
+        
+        # 2. Gather claim data via Technical Agent  
+        claim_data = await self.call_agent("technical_data", {
+            "tool": "get_claim", 
+            "params": {"claim_id": claim_id}
+        })
+        
+        # 3. Apply business rules and return decision
+        return {"decision": "approved", "confidence": 0.95}
+```
+
+### Technical Agents
+
+Technical Agents bridge A2A protocol to FastMCP services:
+
+```python
+# FastMCP Data Agent - A2A to MCP Bridge
+class FastMCPDataAgent:
+    async def handle_a2a_request(self, task: A2ATask) -> A2AResponse:
+        # Convert A2A task to MCP tool call
+        mcp_request = self.convert_a2a_to_mcp(task)
+        
+        # Execute via FastMCP client
+        result = await self.mcp_client.call_tool(
+            mcp_request["tool"], 
+            **mcp_request["params"]
+        )
+        
+        # Convert back to A2A response
+        return self.convert_mcp_to_a2a(result)
+```
+
+## 🔍 Testing Strategy
+
+### Running Tests
+
+```bash
+# Unit tests
+uv run pytest tests/unit/ -v
+
+# Integration tests  
+uv run pytest tests/integration/ -v
+
+# End-to-end tests
+uv run pytest tests/e2e/ -v
+
+# All tests with coverage
+uv run pytest --cov=services --cov=agents tests/
+```
+
+### Test Categories
+
+- **Unit Tests**: Individual service/agent logic
+- **Integration Tests**: Cross-service communication
+- **Contract Tests**: API schema validation  
+- **E2E Tests**: Complete user workflows
+
+## 📊 Monitoring & Observability
+
+### Metrics Collection
+- **Prometheus**: Service metrics and custom business metrics
+- **Grafana**: Operational dashboards and alerting
+
+### Distributed Tracing  
+- **Jaeger**: Request flow visualization across services
+- **OpenTelemetry**: Automatic instrumentation
+
+### Key Metrics Tracked
+- A2A task processing rates and latency
+- MCP tool invocation success/failure rates
+- Business metrics (claims processed, policies issued)
+- Resource utilization (CPU, memory, request rates)
+
+## 🔒 Security
+
+### Authentication & Authorization
+- **OAuth2/OIDC**: Centralized authentication via Keycloak
+- **JWT Tokens**: Service-to-service communication
+- **RBAC**: Role-based access control
+
+### Secrets Management
+- **Kubernetes Secrets**: Encrypted credential storage
+- **External Secrets Operator**: Integration with external secret stores
+
+## 🛠️ Development Workflow
+
+### Adding New FastMCP Service
+
+1. Create service directory under `services/`
+2. Implement FastAPI app with MCP tool decorators
+3. Add Kubernetes deployment to `k8s/`
+4. Update integration tests
+5. Deploy and validate
+
+### Adding New A2A Agent
+
+1. Create agent class extending `A2ABaseAgent`
+2. Implement business logic and A2A communication
+3. Register agent endpoints and capabilities  
+4. Add unit and integration tests
+5. Deploy and validate
+
+## 🚢 Deployment
+
+### Local Development
+```bash
+python scripts/start_fastmcp_services.py
+```
+
+### Kubernetes Production
+```bash
+./scripts/deploy_fastmcp_k8s.sh
+```
+
+### Health Checking
+```bash
+./scripts/check_fastmcp_deployment.sh
+```
+
+## 📝 API Documentation
+
+### FastMCP Services
+- MCP protocol endpoints: `/mcp/`
+- Standard REST endpoints: Service-specific paths
+- Health checks: `/health`
+- Metrics: `/metrics`
+
+### A2A Agents  
+- Agent cards: `/.well-known/agent.json`
+- Task endpoints: `/tasks/send`
+- Status endpoints: `/status`
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Write tests for your changes
+4. Ensure all tests pass (`uv run pytest`)
+5. Commit changes (`git commit -m 'Add amazing feature'`)
+6. Push to branch (`git push origin feature/amazing-feature`)
+7. Create Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🔗 References
+
+- [Anthropic Model Context Protocol (MCP)](https://www.anthropic.com/news/model-context-protocol)
+- [Google Agent-to-Agent (A2A) Protocol](https://developers.google.com/agents/a2a)
+- [FastMCP Framework](https://github.com/jlowin/fastmcp)
+- [Kubernetes Documentation](https://kubernetes.io/docs/) 

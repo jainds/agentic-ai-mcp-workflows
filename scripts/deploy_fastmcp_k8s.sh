@@ -41,6 +41,9 @@ docker build -f Dockerfile.fastmcp-services --target analytics-service -t insura
 echo "  Building FastMCP Data Agent..."
 docker build -f Dockerfile.fastmcp-services --target fastmcp-data-agent -t insurance-ai/fastmcp-data-agent:latest .
 
+echo "  Building Streamlit UI..."
+docker build -f Dockerfile.streamlit-ui -t insurance-ai/streamlit-ui:latest .
+
 echo "✅ All images built successfully"
 
 # Create namespace and secrets if they don't exist
@@ -59,6 +62,9 @@ fi
 echo "🚀 Deploying FastMCP services to Kubernetes..."
 kubectl apply -f k8s/fastmcp-services-deployment.yaml
 
+echo "🌐 Deploying Streamlit UI..."
+kubectl apply -f k8s/streamlit-ui-deployment.yaml
+
 # Wait for deployments to be ready
 echo "⏳ Waiting for services to be ready..."
 kubectl wait --for=condition=available deployment/user-service -n cursor-insurance-ai-poc --timeout=300s
@@ -66,18 +72,22 @@ kubectl wait --for=condition=available deployment/claims-service -n cursor-insur
 kubectl wait --for=condition=available deployment/policy-service -n cursor-insurance-ai-poc --timeout=300s
 kubectl wait --for=condition=available deployment/analytics-service -n cursor-insurance-ai-poc --timeout=300s
 kubectl wait --for=condition=available deployment/fastmcp-data-agent -n cursor-insurance-ai-poc --timeout=300s
+kubectl wait --for=condition=available deployment/streamlit-ui -n cursor-insurance-ai-poc --timeout=300s
 
 # Check deployment status
 echo "📊 Deployment Status:"
 kubectl get deployments -n cursor-insurance-ai-poc -l component=fastmcp-service
 kubectl get deployments -n cursor-insurance-ai-poc -l component=technical-agent
+kubectl get deployments -n cursor-insurance-ai-poc -l component=ui
 
 echo "📋 Service Status:"
 kubectl get services -n cursor-insurance-ai-poc -l component=fastmcp-service
+kubectl get services -n cursor-insurance-ai-poc -l component=ui
 
 echo "🌐 Pod Status:"
 kubectl get pods -n cursor-insurance-ai-poc -l component=fastmcp-service
 kubectl get pods -n cursor-insurance-ai-poc -l component=technical-agent
+kubectl get pods -n cursor-insurance-ai-poc -l component=ui
 
 # Port forward for testing (optional)
 echo ""
@@ -87,7 +97,10 @@ echo "  kubectl port-forward svc/claims-service 8001:8001 -n cursor-insurance-ai
 echo "  kubectl port-forward svc/policy-service 8002:8002 -n cursor-insurance-ai-poc"
 echo "  kubectl port-forward svc/analytics-service 8003:8003 -n cursor-insurance-ai-poc"
 echo "  kubectl port-forward svc/fastmcp-data-agent 8004:8004 -n cursor-insurance-ai-poc"
+echo "  kubectl port-forward svc/streamlit-ui 8501:8501 -n cursor-insurance-ai-poc"
 
 echo ""
-echo "🎉 FastMCP services deployed successfully!"
-echo "📝 Check logs with: kubectl logs -f deployment/user-service -n cursor-insurance-ai-poc" 
+echo "🎉 Insurance AI PoC deployed successfully!"
+echo "🌐 Streamlit UI: http://localhost:8501 (after port forwarding)"
+echo "📊 FastMCP Data Agent: http://localhost:8004 (after port forwarding)"
+echo "📝 Check logs with: kubectl logs -f deployment/streamlit-ui -n cursor-insurance-ai-poc" 

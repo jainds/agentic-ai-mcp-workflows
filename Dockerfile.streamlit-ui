@@ -1,3 +1,4 @@
+# Insurance AI PoC - Modular Streamlit UI Dockerfile
 FROM python:3.13-slim
 
 # Set working directory
@@ -5,30 +6,39 @@ WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
+# Copy requirements
 COPY requirements-streamlit.txt .
+
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements-streamlit.txt
 
-# Copy UI application
-COPY ui/ ui/
+# Copy UI source code
+COPY ui/ ./ui/
+
+# Set Python path to include ui directory
+ENV PYTHONPATH=/app:$PYTHONPATH
+
+# Environment variables for feature toggles (defaults to advanced mode)
+ENV UI_MODE=advanced
+ENV ENABLE_ADVANCED_FEATURES=true
+ENV ENABLE_SYSTEM_MONITORING=true
+ENV ENABLE_API_MONITORING=true
+ENV ENABLE_THINKING_STEPS=true
+ENV ENABLE_ORCHESTRATION_VIEW=true
+
+# Create a simple launcher script
+RUN echo '#!/bin/bash\necho "Starting Insurance AI UI in $UI_MODE mode..."\necho "Features: Advanced=$ENABLE_ADVANCED_FEATURES, Monitoring=$ENABLE_SYSTEM_MONITORING, API=$ENABLE_API_MONITORING, Thinking=$ENABLE_THINKING_STEPS, Orchestration=$ENABLE_ORCHESTRATION_VIEW"\nstreamlit run ui/streamlit_app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true' > /app/start.sh \
+    && chmod +x /app/start.sh
 
 # Expose Streamlit port
 EXPOSE 8501
 
-# Set environment variables
-ENV STREAMLIT_SERVER_PORT=8501
-ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
-ENV STREAMLIT_SERVER_HEADLESS=true
-ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
-
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8501/_stcore/health || exit 1
 
-# Run Streamlit app
-CMD ["streamlit", "run", "ui/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"] 
+# Start the application
+CMD ["/app/start.sh"] 

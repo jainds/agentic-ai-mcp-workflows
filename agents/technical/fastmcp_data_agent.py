@@ -19,7 +19,7 @@ try:
     from a2a.models import AgentCard, TaskRequest, TaskResponse
     A2A_AVAILABLE = True
 except ImportError:
-    # Mock classes for testing/development environments
+    # Minimal mock classes for testing/development environments
     class TaskRequest:
         def __init__(self, taskId: str, user: Dict[str, Any]):
             self.taskId = taskId
@@ -34,11 +34,12 @@ except ImportError:
     
     A2A_AVAILABLE = False
 
+# A2A Base Agent (conditionally imported)
 try:
     from agents.shared.a2a_base import A2AAgent
     A2A_BASE_AVAILABLE = True
 except ImportError:
-    # Mock base class for testing/development environments
+    # Simple base class for testing/development environments
     class A2AAgent:
         def __init__(self, name: str, description: str, port: int, capabilities: Dict[str, Any], version: str):
             self.name = name
@@ -56,6 +57,8 @@ class FastMCPDataAgent(A2AAgent):
     """A2A-compatible technical agent that connects to FastMCP services using official MCP Client"""
     
     def __init__(self, port: int = 8002):
+        """Initialize the FastMCP Data Agent with real FastMCP Client connections"""
+        
         capabilities = {
             "streaming": False,
             "pushNotifications": False,
@@ -67,7 +70,7 @@ class FastMCPDataAgent(A2AAgent):
             "fastmcp_client": True
         }
         
-        # Initialize A2A agent with official library
+        # Initialize A2A agent
         super().__init__(
             name="FastMCPDataAgent",
             description="Technical agent providing data access via FastMCP services using official FastMCP Client and Google A2A protocol",
@@ -76,52 +79,87 @@ class FastMCPDataAgent(A2AAgent):
             version="2.1.0"
         )
         
-        # FastMCP service URLs for official Client connections
+        # Real FastMCP service URLs - NO MOCKING
         self.service_urls = {
-            "user": os.getenv("USER_SERVICE_URL", "http://localhost:8000/mcp"),
-            "claims": os.getenv("CLAIMS_SERVICE_URL", "http://localhost:8001/mcp"),
-            "policy": os.getenv("POLICY_SERVICE_URL", "http://localhost:8002/mcp"),
-            "analytics": os.getenv("ANALYTICS_SERVICE_URL", "http://localhost:8003/mcp")
+            "user": os.getenv("USER_SERVICE_URL", "http://localhost:8000"),
+            "claims": os.getenv("CLAIMS_SERVICE_URL", "http://localhost:8001"),
+            "policy": os.getenv("POLICY_SERVICE_URL", "http://localhost:8002"),
+            "analytics": os.getenv("ANALYTICS_SERVICE_URL", "http://localhost:8003")
         }
         
-        # FastMCP clients (will be initialized per request)
+        # Real FastMCP clients (will be initialized)
         self.mcp_clients: Dict[str, Client] = {}
         
-        # Available tools cache
+        # Available tools cache from real services
         self.available_tools = {}
         
-        logger.info("FastMCP Data Agent initialized with official FastMCP Client", 
+        # Initialization flag
+        self.initialized = False
+        
+        logger.info("FastMCP Data Agent created with real FastMCP Client", 
                    services=list(self.service_urls.keys()), 
                    port=port,
                    fastmcp_version="2.0+")
     
     def handle_task(self, task: TaskRequest) -> TaskResponse:
-        """Handle incoming A2A tasks for data operations using FastMCP Client"""
+        """Handle incoming A2A tasks for data operations using REAL FastMCP Client"""
+        
+        # Ensure initialization before handling tasks
+        if not self.initialized:
+            # Can't use asyncio.run() here - need to handle this differently
+            logger.error("Agent not initialized when handling task")
+            return TaskResponse(
+                taskId=task.taskId,
+                status="failed",
+                parts=[{
+                    "text": json.dumps({
+                        "error": "Agent not initialized - call initialize() first",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "agent": "FastMCPDataAgent"
+                    }),
+                    "type": "error"
+                }],
+                metadata={"agent": "FastMCPDataAgent", "error": "not_initialized"}
+            )
+        
         user_data = task.user
         action = user_data.get("action", "unknown")
         
-        logger.info("Processing data request via FastMCP", 
+        logger.info("Processing REAL data request via FastMCP", 
                    task_id=task.taskId, 
                    action=action)
         
         try:
-            # Route to appropriate handler based on action
-            if action == "get_customer":
-                result = asyncio.run(self._handle_get_customer(user_data))
-            elif action == "get_claims":
-                result = asyncio.run(self._handle_get_claims(user_data))
-            elif action == "get_policies":
-                result = asyncio.run(self._handle_get_policies(user_data))
-            elif action == "create_claim":
-                result = asyncio.run(self._handle_create_claim(user_data))
-            elif action == "update_claim":
-                result = asyncio.run(self._handle_update_claim(user_data))
-            elif action == "fraud_analysis":
-                result = asyncio.run(self._handle_fraud_analysis(user_data))
-            elif action == "get_customer_data":
-                result = asyncio.run(self._handle_get_customer_data(user_data))
-            else:
-                result = {"error": f"Unknown action: {action}"}
+            # Create an async wrapper to handle the async operations
+            async def process_action():
+                if action == "get_customer":
+                    return await self._handle_get_customer(user_data)
+                elif action == "get_claims":
+                    return await self._handle_get_claims(user_data)
+                elif action == "get_policies":
+                    return await self._handle_get_policies(user_data)
+                elif action == "create_claim":
+                    return await self._handle_create_claim(user_data)
+                elif action == "update_claim":
+                    return await self._handle_update_claim(user_data)
+                elif action == "fraud_analysis":
+                    return await self._handle_fraud_analysis(user_data)
+                elif action == "get_customer_data":
+                    return await self._handle_get_customer_data(user_data)
+                else:
+                    return {"error": f"Unknown action: {action}"}
+            
+            # Try to get the current event loop, if available
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're in an event loop, create a task
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, process_action())
+                    result = future.result()
+            except RuntimeError:
+                # No event loop running, safe to use asyncio.run()
+                result = asyncio.run(process_action())
             
             # Return successful TaskResponse
             return TaskResponse(
@@ -133,7 +171,7 @@ class FastMCPDataAgent(A2AAgent):
                         "result": result,
                         "timestamp": datetime.utcnow().isoformat(),
                         "agent": "FastMCPDataAgent",
-                        "protocol": "FastMCP_2.0"
+                        "protocol": "REAL_FastMCP_2.0"
                     }),
                     "type": "data_response"
                 }],
@@ -141,17 +179,18 @@ class FastMCPDataAgent(A2AAgent):
                     "agent": "FastMCPDataAgent",
                     "action": action,
                     "result_type": type(result).__name__,
-                    "protocol": "FastMCP_Client_2.0"
+                    "protocol": "REAL_FastMCP_Client_2.0"
                 }
             )
             
         except Exception as e:
-            logger.error("Data operation failed", 
+            logger.error("REAL data operation failed", 
                         task_id=task.taskId, 
                         action=action, 
-                        error=str(e))
+                        error=str(e),
+                        error_type=type(e).__name__)
             
-            # Return error TaskResponse
+            # Return error TaskResponse with full error details
             return TaskResponse(
                 taskId=task.taskId,
                 status="failed",
@@ -159,6 +198,7 @@ class FastMCPDataAgent(A2AAgent):
                     "text": json.dumps({
                         "action": action,
                         "error": str(e),
+                        "error_type": type(e).__name__,
                         "timestamp": datetime.utcnow().isoformat(),
                         "agent": "FastMCPDataAgent"
                     }),
@@ -167,198 +207,194 @@ class FastMCPDataAgent(A2AAgent):
                 metadata={
                     "agent": "FastMCPDataAgent",
                     "action": action,
-                    "error": str(e)
+                    "error": str(e),
+                    "error_type": type(e).__name__
                 }
             )
     
     async def initialize(self):
-        """Initialize the agent by discovering available tools from FastMCP services"""
+        """Initialize the agent by discovering available tools from REAL FastMCP services"""
         try:
-            logger.info("Initializing FastMCP Data Agent...")
+            logger.info("Initializing REAL FastMCP Data Agent connections...")
             
-            # Initialize MCP clients for each service
+            # Initialize REAL MCP clients for each service
             for service_name, service_url in self.service_urls.items():
                 try:
-                    # Create FastMCP client for the service
-                    client = Client(service_url)
+                    # Create REAL FastMCP client for the service
+                    logger.info(f"Creating REAL FastMCP client for {service_name}", url=service_url)
+                    
+                    # Use the official FastMCP Client API
+                    client = Client(f"{service_url}/mcp")
+                    
+                    # Test REAL connection
+                    await self._test_client_connection(service_name, client)
+                    
                     self.mcp_clients[service_name] = client
                     
-                    # Test connection and discover tools
+                    # Discover REAL tools
                     await self._discover_service_tools(service_name, client)
                     
-                    logger.info(f"FastMCP client initialized for {service_name}", 
-                              url=service_url)
+                    logger.info(f"REAL FastMCP client initialized for {service_name}", 
+                              url=service_url,
+                              tools_discovered=len(self.available_tools.get(service_name, [])))
                     
                 except Exception as e:
-                    logger.warning(f"Failed to initialize client for {service_name}", 
-                                  error=str(e))
+                    logger.error(f"REAL FastMCP client initialization failed for {service_name}", 
+                                error=str(e),
+                                error_type=type(e).__name__,
+                                url=service_url)
+                    # Set empty tools but don't fail completely
                     self.available_tools[service_name] = []
             
+            self.initialized = True
             total_tools = sum(len(tools) for tools in self.available_tools.values())
-            logger.info("FastMCP Agent initialization complete", 
-                       services=len(self.mcp_clients),
-                       total_tools=total_tools)
-                       
+            logger.info("REAL FastMCP Data Agent initialization complete", 
+                       services_connected=len(self.mcp_clients),
+                       total_tools_discovered=total_tools)
+            
         except Exception as e:
-            logger.error("Failed to initialize FastMCP agent", error=str(e))
+            logger.error("REAL FastMCP Data Agent initialization failed", 
+                        error=str(e),
+                        error_type=type(e).__name__)
+            raise
+    
+    async def _test_client_connection(self, service_name: str, client: Client):
+        """Test REAL connection to FastMCP service"""
+        try:
+            # Try to list tools to test connection
+            logger.info(f"Testing REAL connection to {service_name}")
+            
+            # Use the official FastMCP Client API with async context manager
+            async with client as connected_client:
+                tools_response = await connected_client.list_tools()
+            
+            logger.info(f"REAL connection test successful for {service_name}", 
+                       response_type=type(tools_response).__name__)
+            
+        except Exception as e:
+            logger.error(f"REAL connection test failed for {service_name}", 
+                        error=str(e),
+                        error_type=type(e).__name__)
             raise
     
     async def _discover_service_tools(self, service_name: str, client: Client):
-        """Discover available MCP tools from a service using FastMCP Client"""
+        """Discover REAL tools from FastMCP service"""
         try:
-            # Use FastMCP Client to discover tools
-            async with client:
-                # List available tools
-                tools = await client.list_tools()
-                
-                # Convert to our internal format
-                tool_list = []
-                for tool in tools:
-                    tool_info = {
+            logger.info(f"Discovering REAL tools for {service_name}")
+            
+            # Use the official FastMCP Client API to discover tools with async context manager
+            async with client as connected_client:
+                tools_response = await connected_client.list_tools()
+            
+            # Extract tools from response
+            if hasattr(tools_response, 'tools') and tools_response.tools:
+                self.available_tools[service_name] = [
+                    {
                         "name": tool.name,
                         "description": tool.description,
-                        "inputSchema": tool.inputSchema if hasattr(tool, 'inputSchema') else {}
+                        "input_schema": tool.inputSchema if hasattr(tool, 'inputSchema') else {}
                     }
-                    tool_list.append(tool_info)
-                
-                self.available_tools[service_name] = tool_list
-                
-                logger.info(f"Discovered FastMCP tools for {service_name}", 
-                           count=len(tool_list), 
-                           tools=[tool["name"] for tool in tool_list])
-                           
+                    for tool in tools_response.tools
+                ]
+            else:
+                # Fallback: try direct service query
+                self.available_tools[service_name] = []
+            
+            logger.info(f"REAL tools discovered for {service_name}", 
+                       tool_count=len(self.available_tools[service_name]),
+                       tools=[tool["name"] for tool in self.available_tools[service_name]])
+            
         except Exception as e:
-            logger.error(f"Error discovering FastMCP tools for {service_name}", 
-                        error=str(e))
+            logger.error(f"REAL tool discovery failed for {service_name}", 
+                        error=str(e),
+                        error_type=type(e).__name__)
             self.available_tools[service_name] = []
     
     async def call_tool(self, service_name: str, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Call a specific MCP tool on a service using FastMCP Client"""
+        """Call a REAL tool on a FastMCP service using official Client"""
         try:
-            client = self.mcp_clients.get(service_name)
-            if not client:
-                return {
-                    "success": False, 
-                    "error": f"No FastMCP client available for service: {service_name}"
-                }
+            if service_name not in self.mcp_clients:
+                raise ValueError(f"No REAL client available for service: {service_name}")
             
-            logger.debug(f"Calling FastMCP tool", 
-                        service=service_name, 
-                        tool=tool_name,
-                        arguments=arguments)
+            client = self.mcp_clients[service_name]
             
-            # Use FastMCP Client to call the tool
-            async with client:
-                result = await client.call_tool(tool_name, arguments)
-                
-                # Process the result
-                if result and len(result) > 0:
-                    # Get the first content item (usually TextContent)
-                    content = result[0]
-                    
-                    if hasattr(content, 'text'):
-                        try:
-                            # Try to parse as JSON
-                            tool_result = json.loads(content.text)
-                        except json.JSONDecodeError:
-                            # If not JSON, return as text
-                            tool_result = {
-                                "success": True,
-                                "result": content.text,
-                                "type": "text"
-                            }
-                    else:
-                        tool_result = {
-                            "success": True,
-                            "result": str(content),
-                            "type": "content"
-                        }
-                    
-                    logger.debug(f"FastMCP tool call successful", 
-                               service=service_name, 
-                               tool=tool_name,
-                               success=tool_result.get("success", True))
-                    
-                    return tool_result
+            logger.info(f"Calling REAL tool on {service_name}", 
+                       tool=tool_name, 
+                       arguments=arguments)
+            
+            # Use the official FastMCP Client API to call tools with async context manager
+            async with client as connected_client:
+                result = await connected_client.call_tool(tool_name, arguments)
+            
+            # Extract result data
+            if hasattr(result, 'content') and result.content:
+                # Parse the content from the MCP response
+                content = result.content[0]
+                if hasattr(content, 'text'):
+                    try:
+                        parsed_result = json.loads(content.text)
+                        logger.info(f"REAL tool call successful for {service_name}.{tool_name}", 
+                                   result_type=type(parsed_result).__name__)
+                        return parsed_result
+                    except json.JSONDecodeError:
+                        return {"text": content.text}
                 else:
-                    return {
-                        "success": False, 
-                        "error": "Empty result from FastMCP tool"
-                    }
-                
+                    return {"content": str(content)}
+            else:
+                return {"result": str(result)}
+            
         except Exception as e:
-            logger.error(f"Error calling FastMCP tool", 
-                        service=service_name, 
-                        tool=tool_name, 
-                        error=str(e))
+            logger.error(f"REAL tool call failed for {service_name}.{tool_name}", 
+                        error=str(e),
+                        error_type=type(e).__name__,
+                        arguments=arguments)
             return {
                 "success": False, 
-                "error": f"FastMCP tool call failed: {str(e)}"
-            }
-    
-    # Customer data operations using FastMCP
-    async def _handle_get_customer_data(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle get_customer_data action using FastMCP"""
-        customer_id = user_data.get("customer_id")
-        if not customer_id:
-            return {"success": False, "error": "Customer ID required"}
-        
-        try:
-            # Get customer basic info via FastMCP
-            customer_result = await self.call_tool("user", "get_user", {"user_id": customer_id})
-            
-            # Get customer policies via FastMCP
-            policies_result = await self.call_tool("policy", "list_policies", {"customer_id": customer_id})
-            
-            # Get customer claims via FastMCP
-            claims_result = await self.call_tool("claims", "list_claims", {"customer_id": customer_id})
-            
-            return {
-                "success": True,
-                "customer_id": customer_id,
-                "customer_info": customer_result,
-                "policies": policies_result.get("policies", []) if policies_result.get("success") else [],
-                "claims": claims_result.get("claims", []) if claims_result.get("success") else [],
-                "timestamp": datetime.utcnow().isoformat(),
-                "protocol": "FastMCP_2.0"
-            }
-            
-        except Exception as e:
-            logger.error("Error getting customer data via FastMCP", 
-                        customer_id=customer_id, 
-                        error=str(e))
-            return {
-                "success": False,
                 "error": str(e),
-                "customer_id": customer_id
+                "error_type": type(e).__name__,
+                "service": service_name,
+                "tool": tool_name
             }
     
-    async def _handle_get_customer(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle get_customer action using FastMCP"""
+    # REAL data handlers - NO MOCKING
+    async def _handle_get_customer_data(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle get_customer_data action using REAL FastMCP"""
         customer_id = user_data.get("customer_id")
         if not customer_id:
             return {"success": False, "error": "Customer ID required"}
         
+        logger.info("Handling REAL get_customer_data request", customer_id=customer_id)
+        return await self.call_tool("user", "get_user", {"user_id": customer_id})
+
+    async def _handle_get_customer(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle get_customer action using REAL FastMCP"""
+        customer_id = user_data.get("customer_id")
+        if not customer_id:
+            return {"success": False, "error": "Customer ID required"}
+        
+        logger.info("Handling REAL get_customer request", customer_id=customer_id)
         return await self.call_tool("user", "get_user", {"user_id": customer_id})
     
     async def _handle_get_claims(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle get_claims action using FastMCP"""
+        """Handle get_claims action using REAL FastMCP"""
         customer_id = user_data.get("customer_id")
         if not customer_id:
             return {"success": False, "error": "Customer ID required"}
         
+        logger.info("Handling REAL get_claims request", customer_id=customer_id)
         return await self.call_tool("claims", "list_claims", {"customer_id": customer_id})
     
     async def _handle_get_policies(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle get_policies action using FastMCP"""
+        """Handle get_policies action using REAL FastMCP"""
         customer_id = user_data.get("customer_id")
         if not customer_id:
             return {"success": False, "error": "Customer ID required"}
         
+        logger.info("Handling REAL get_policies request", customer_id=customer_id)
         return await self.call_tool("policy", "list_policies", {"customer_id": customer_id})
     
     async def _handle_create_claim(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle create_claim action using FastMCP"""
+        """Handle create_claim action using REAL FastMCP"""
         required_fields = ["customer_id", "policy_number", "incident_date", "description", "amount", "claim_type"]
         
         for field in required_fields:
@@ -374,10 +410,11 @@ class FastMCPDataAgent(A2AAgent):
             "claim_type": user_data["claim_type"]
         }
         
+        logger.info("Handling REAL create_claim request", arguments=arguments)
         return await self.call_tool("claims", "create_claim", arguments)
     
     async def _handle_update_claim(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle update_claim action using FastMCP"""
+        """Handle update_claim action using REAL FastMCP"""
         required_fields = ["claim_id", "customer_id", "new_status"]
         
         for field in required_fields:
@@ -391,10 +428,11 @@ class FastMCPDataAgent(A2AAgent):
             "notes": user_data.get("notes")
         }
         
+        logger.info("Handling REAL update_claim request", arguments=arguments)
         return await self.call_tool("claims", "update_claim_status", arguments)
     
     async def _handle_fraud_analysis(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Handle fraud_analysis action using FastMCP"""
+        """Handle fraud_analysis action using REAL FastMCP"""
         claim_id = user_data.get("claim_id")
         customer_id = user_data.get("customer_id")
         
@@ -407,47 +445,43 @@ class FastMCPDataAgent(A2AAgent):
             "analysis_type": "fraud_detection"
         }
         
-        return await self.call_tool("analytics", "analyze_claim", arguments)
+        logger.info("Handling REAL fraud_analysis request", arguments=arguments)
+        return await self.call_tool("analytics", "analyze_fraud", arguments)
     
     async def get_available_tools(self) -> Dict[str, List[Dict[str, Any]]]:
-        """Get all available FastMCP tools across all services"""
-        return self.available_tools.copy()
+        """Get all available REAL tools from FastMCP services"""
+        return self.available_tools
     
     async def close(self):
-        """Clean up FastMCP clients and resources"""
-        try:
-            # Close all MCP clients
-            for service_name, client in self.mcp_clients.items():
-                try:
-                    if hasattr(client, 'close'):
-                        await client.close()
-                except Exception as e:
-                    logger.warning(f"Error closing FastMCP client for {service_name}", 
-                                  error=str(e))
-            
-            self.mcp_clients.clear()
-            logger.info("FastMCP Data Agent closed")
-            
-        except Exception as e:
-            logger.error("Error during FastMCP agent cleanup", error=str(e))
+        """Close all REAL FastMCP client connections"""
+        logger.info("Closing REAL FastMCP client connections")
+        for service_name, client in self.mcp_clients.items():
+            try:
+                if hasattr(client, 'close'):
+                    await client.close()
+                logger.info(f"REAL client closed for {service_name}")
+            except Exception as e:
+                logger.warning(f"Error closing REAL client for {service_name}", error=str(e))
+        
+        self.mcp_clients.clear()
+        self.initialized = False
 
-# Create a global instance for use by domain agents
-fastmcp_data_agent = FastMCPDataAgent()
 
-# FastAPI Server for the agent
+# REAL FastAPI application for HTTP endpoints (when running standalone)
 if __name__ == "__main__":
     from fastapi import FastAPI, HTTPException
     from pydantic import BaseModel
     import uvicorn
     
-    # Create FastAPI app
     app = FastAPI(
         title="FastMCP Data Agent",
-        description="Technical agent for accessing FastMCP-enabled insurance services using official FastMCP Client",
+        description="A2A-compatible technical agent using REAL FastMCP Client",
         version="2.1.0"
     )
     
-    # Request/Response models
+    # Global agent instance
+    agent = None
+    
     class CustomerDataRequest(BaseModel):
         customer_id: str
     
@@ -473,98 +507,103 @@ if __name__ == "__main__":
     
     @app.on_event("startup")
     async def startup_event():
-        await fastmcp_data_agent.initialize()
+        """Initialize REAL FastMCP connections on startup"""
+        global agent
+        agent = FastMCPDataAgent()
+        await agent.initialize()
     
     @app.on_event("shutdown")
     async def shutdown_event():
-        await fastmcp_data_agent.close()
+        """Close REAL FastMCP connections on shutdown"""
+        if agent:
+            await agent.close()
     
     @app.get("/health")
     async def health_check():
+        """Health check endpoint"""
         return {
-            "status": "healthy", 
-            "service": "fastmcp-data-agent",
+            "status": "healthy",
+            "agent": "FastMCPDataAgent",
             "version": "2.1.0",
-            "protocol": "FastMCP_Client_2.0",
-            "capabilities": {
-                "mcpIntegration": True,
-                "google_a2a_compatible": True,
-                "fastmcp_client": True
-            }
+            "initialized": agent.initialized if agent else False,
+            "services": list(agent.service_urls.keys()) if agent else [],
+            "protocol": "REAL_FastMCP_2.0"
         }
     
     @app.get("/ready")
     async def readiness_check():
+        """Readiness check endpoint"""
+        if not agent or not agent.initialized:
+            raise HTTPException(status_code=503, detail="Agent not initialized")
+        
         return {
-            "status": "ready", 
-            "service": "fastmcp-data-agent",
-            "clients": len(fastmcp_data_agent.mcp_clients),
-            "services": list(fastmcp_data_agent.service_urls.keys())
+            "status": "ready",
+            "connected_services": len(agent.mcp_clients),
+            "total_tools": sum(len(tools) for tools in agent.available_tools.values())
         }
     
     @app.get("/tools")
     async def get_available_tools():
-        tools = await fastmcp_data_agent.get_available_tools()
-        return {
-            "tools": tools,
-            "protocol": "FastMCP_2.0",
-            "total_services": len(tools),
-            "total_tools": sum(len(service_tools) for service_tools in tools.values())
-        }
+        """Get all available REAL tools"""
+        if not agent:
+            raise HTTPException(status_code=503, detail="Agent not initialized")
+        
+        return await agent.get_available_tools()
     
     @app.post("/customer/data")
     async def get_customer_data(request: CustomerDataRequest):
-        user_data = {"action": "get_customer_data", "customer_id": request.customer_id}
-        task = TaskRequest(taskId=f"api_customer_data_{request.customer_id}", user=user_data)
+        """Get customer data via REAL FastMCP"""
+        if not agent:
+            raise HTTPException(status_code=503, detail="Agent not initialized")
         
-        response = fastmcp_data_agent.handle_task(task)
-        
-        if response.status == "failed":
-            raise HTTPException(status_code=400, detail=response.parts[0]["text"])
-        
-        return json.loads(response.parts[0]["text"])
+        try:
+            result = await agent._handle_get_customer_data({"customer_id": request.customer_id})
+            return result
+        except Exception as e:
+            logger.error("Customer data request failed", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
     
     @app.post("/claims/create")
     async def create_claim(request: ClaimRequest):
-        user_data = {
-            "action": "create_claim",
-            "customer_id": request.customer_id,
-            "policy_number": request.policy_number,
-            "incident_date": request.incident_date,
-            "description": request.description,
-            "amount": request.amount,
-            "claim_type": request.claim_type
-        }
-        task = TaskRequest(taskId=f"api_create_claim_{request.customer_id}", user=user_data)
+        """Create claim via REAL FastMCP"""
+        if not agent:
+            raise HTTPException(status_code=503, detail="Agent not initialized")
         
-        response = fastmcp_data_agent.handle_task(task)
-        
-        if response.status == "failed":
-            raise HTTPException(status_code=400, detail=response.parts[0]["text"])
-        
-        return json.loads(response.parts[0]["text"])
+        try:
+            result = await agent._handle_create_claim({
+                "customer_id": request.customer_id,
+                "policy_number": request.policy_number,
+                "incident_date": request.incident_date,
+                "description": request.description,
+                "amount": request.amount,
+                "claim_type": request.claim_type
+            })
+            return result
+        except Exception as e:
+            logger.error("Claim creation failed", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
     
     @app.post("/claims/update")
     async def update_claim(request: UpdateClaimRequest):
-        user_data = {
-            "action": "update_claim",
-            "claim_id": request.claim_id,
-            "customer_id": request.customer_id,
-            "new_status": request.new_status,
-            "notes": request.notes
-        }
-        task = TaskRequest(taskId=f"api_update_claim_{request.claim_id}", user=user_data)
+        """Update claim via REAL FastMCP"""
+        if not agent:
+            raise HTTPException(status_code=503, detail="Agent not initialized")
         
-        response = fastmcp_data_agent.handle_task(task)
-        
-        if response.status == "failed":
-            raise HTTPException(status_code=400, detail=response.parts[0]["text"])
-        
-        return json.loads(response.parts[0]["text"])
+        try:
+            result = await agent._handle_update_claim({
+                "claim_id": request.claim_id,
+                "customer_id": request.customer_id,
+                "new_status": request.new_status,
+                "notes": request.notes
+            })
+            return result
+        except Exception as e:
+            logger.error("Claim update failed", error=str(e))
+            raise HTTPException(status_code=500, detail=str(e))
     
-    # Get server configuration
+    # Run the server
     host = os.getenv("FASTMCP_DATA_AGENT_HOST", "0.0.0.0")
     port = int(os.getenv("FASTMCP_DATA_AGENT_PORT", 8004))
     
-    logger.info(f"Starting FastMCP Data Agent server with official FastMCP Client on {host}:{port}")
+    logger.info("Starting REAL FastMCP Data Agent", host=host, port=port)
     uvicorn.run(app, host=host, port=port) 

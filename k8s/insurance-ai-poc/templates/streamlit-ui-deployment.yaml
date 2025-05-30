@@ -1,0 +1,62 @@
+{{- if .Values.streamlitUI.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "insurance-ai-poc.fullname" . }}-streamlit-ui
+  namespace: insurance-ai-agentic
+  labels:
+    {{- include "insurance-ai-poc.labels" . | nindent 4 }}
+    component: streamlit-ui
+spec:
+  replicas: {{ .Values.streamlitUI.replicas }}
+  selector:
+    matchLabels:
+      {{- include "insurance-ai-poc.selectorLabels" . | nindent 6 }}
+      component: streamlit-ui
+  template:
+    metadata:
+      labels:
+        {{- include "insurance-ai-poc.selectorLabels" . | nindent 8 }}
+        component: streamlit-ui
+    spec:
+      serviceAccountName: {{ include "insurance-ai-poc.serviceAccountName" . }}
+      containers:
+        - name: streamlit-ui
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.streamlitUI.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "insurance-ai-poc.fullname" . }}-config
+          workingDir: /app
+          command: ["streamlit", "run", "main_ui.py", "--server.port={{ .Values.streamlitUI.port }}", "--server.address=0.0.0.0"]
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.streamlitUI.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }} 

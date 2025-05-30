@@ -1,0 +1,20 @@
+{{- if .Values.domainAgent.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "insurance-ai-poc.fullname" . }}-domain-agent
+  namespace: insurance-ai-agentic
+  labels:
+    {{- include "insurance-ai-poc.labels" . | nindent 4 }}
+    component: domain-agent
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.domainAgent.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "insurance-ai-poc.selectorLabels" . | nindent 4 }}
+    component: domain-agent
+{{- end }} 

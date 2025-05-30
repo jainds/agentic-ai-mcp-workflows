@@ -148,29 +148,34 @@ Is there any specific aspect you'd like me to explain in more detail?"""
 
     def setup_llm_client(self):
         """Setup LLM client for intent analysis and response generation"""
-        try:
-            # Try OpenRouter first, fall back to OpenAI
-            openrouter_key = os.getenv('OPENROUTER_API_KEY')
-            openai_key = os.getenv('OPENAI_API_KEY')
-            
-            if openrouter_key:
+        # Try OpenRouter first, fall back to OpenAI
+        openrouter_key = os.getenv('OPENROUTER_API_KEY')
+        openai_key = os.getenv('OPENAI_API_KEY')
+        model_name = os.getenv('PRIMARY_MODEL_NAME') or os.getenv('SECONDARY_MODEL_NAME')
+        
+        if openrouter_key:
+            try:
                 self.llm_client = OpenAI(
                     base_url="https://openrouter.ai/api/v1",
                     api_key=openrouter_key
                 )
-                self.model_name = "anthropic/claude-3.5-sonnet"
+                self.model_name = model_name
                 logger.info("LLM client configured with OpenRouter")
-            elif openai_key:
-                self.llm_client = OpenAI(api_key=openai_key)
-                self.model_name = "gpt-4"
-                logger.info("LLM client configured with OpenAI")
-            else:
-                logger.warning("No LLM API key found, using mock responses")
+            except Exception as e:
+                logger.error(f"Failed to setup OpenRouter client: {e}")
                 self.llm_client = None
                 self.model_name = None
-                
-        except Exception as e:
-            logger.error(f"Failed to setup LLM client: {e}")
+        elif openai_key:
+            try:
+                self.llm_client = OpenAI(api_key=openai_key)
+                self.model_name = model_name
+                logger.info("LLM client configured with OpenAI")
+            except Exception as e:
+                logger.error(f"Failed to setup OpenAI client: {e}")
+                self.llm_client = None
+                self.model_name = None
+        else:
+            logger.warning("No LLM API key found - domain agent will fail on intent analysis")
             self.llm_client = None
             self.model_name = None
 
@@ -268,56 +273,47 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         """
         Role 1: Understand user intent and extract key information
         """
-        try:
-            prompt = f"""
-            As an insurance domain expert, analyze this user request and extract:
-            1. Primary intent (claim_filing, policy_inquiry, billing_question, etc.)
-            2. Secondary intents (if any)
-            3. Key entities (policy numbers, claim IDs, dates, amounts, etc.)
-            4. Required information gathering
-            5. Urgency level
-            6. Complexity assessment
-            
-            User Request: "{user_text}"
-            
-            Respond in JSON format:
-            {{
-                "primary_intent": "string",
-                "secondary_intents": ["string"],
-                "entities": {{"entity_type": "value"}},
-                "required_info": ["info_needed"],
-                "urgency": "low|medium|high",
-                "complexity": "simple|moderate|complex",
-                "confidence": 0.0-1.0
-            }}
-            """
-            
-            response = self.llm_client.chat.completions.create(
-                model=self.model_name,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1
-            )
-            
-            intent_text = response.choices[0].message.content
-            intent_analysis = json.loads(intent_text)
-            
-            logger.info("Intent analysis completed", 
-                       primary_intent=intent_analysis.get("primary_intent"),
-                       confidence=intent_analysis.get("confidence"))
-            
-            return intent_analysis
-            
-        except Exception as e:
-            logger.error("Failed to understand intent", error=str(e))
-            return {
-                "primary_intent": "general_inquiry",
-                "secondary_intents": [],
-                "entities": {},
-                "required_info": [],
-                "urgency": "medium",
-                "complexity": "simple",
-                "confidence": 0.5
-            }
+        prompt = f"""
+        As an insurance domain expert, analyze this user request and extract:
+        1. Primary intent (claim_filing, policy_inquiry, billing_question, claim_status, quote_request)
+        2. Secondary intents (if any)
+        3. Key entities (policy numbers, claim IDs, dates, amounts, etc.)
+        4. Required information gathering
+        5. Urgency level
+        6. Complexity assessment
+        
+        User Request: "{user_text}"
+        
+        Respond in JSON format:
+        {{
+            "primary_intent": "string",
+            "secondary_intents": ["string"],
+            "entities": {{"entity_type": "value"}},
+            "required_info": ["info_needed"],
+            "urgency": "low|medium|high",
+            "complexity": "simple|moderate|complex",
+            "confidence": 0.0-1.0
+        }}
+        """
+        
+        response = self.llm_client.chat.completions.create(
+            model=self.model_name,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+        
+        intent_text = response.choices[0].message.content
+        intent_analysis = json.loads(intent_text)
+        
+        logger.info("Intent analysis completed", 
+                   primary_intent=intent_analysis.get("primary_intent"),
+                   confidence=intent_analysis.get("confidence"))
+        
+        return intent_analysis
+    
+    def _rule_based_intent_analysis(self, user_text: str) -> Dict[str, Any]:
+        """REMOVED: Rule-based intent analysis - now throws error instead"""
+        raise RuntimeError("Rule-based intent analysis removed - LLM required for proper intent understanding")
     
     def create_execution_plan(self, intent_analysis: Dict[str, Any], user_text: str) -> Dict[str, Any]:
         """
@@ -429,62 +425,33 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         step_results = []
         
         for i, step in enumerate(steps):
-            try:
-                agent_name = step["agent"]
-                action = step["action"]
-                
-                logger.info("Executing step", step_number=i+1, agent=agent_name, action=action)
-                
-                # Route task to appropriate agent
-                if self.ai_router:
-                    # Use AI router for intelligent routing
-                    selected_agent, confidence = self.ai_router.route_query(
-                        f"Execute {action} for {execution_plan['intent']}"
-                    )
-                    agent_name = selected_agent if confidence > 0.7 else agent_name
-                
-                # Prepare task data
-                task_data = {
-                    "action": action,
-                    "plan_context": execution_plan,
-                    "step_info": step,
-                    "previous_results": step_results
-                }
-                
-                # Call the agent
-                if agent_name in self.agent_registry:
-                    result = self.call_registered_agent(agent_name, json.dumps(task_data))
-                    
-                    step_result = {
-                        "step_number": i + 1,
-                        "agent": agent_name,
-                        "action": action,
-                        "status": "completed",
-                        "result": result,
-                        "executed_at": datetime.utcnow().isoformat()
-                    }
-                else:
-                    step_result = {
-                        "step_number": i + 1,
-                        "agent": agent_name,
-                        "action": action,
-                        "status": "failed",
-                        "error": f"Agent {agent_name} not registered",
-                        "executed_at": datetime.utcnow().isoformat()
-                    }
-                
-                step_results.append(step_result)
-                
-            except Exception as e:
-                logger.error("Step execution failed", step_number=i+1, error=str(e))
-                step_results.append({
-                    "step_number": i + 1,
-                    "agent": step.get("agent", "unknown"),
-                    "action": step.get("action", "unknown"),
-                    "status": "failed",
-                    "error": str(e),
-                    "executed_at": datetime.utcnow().isoformat()
-                })
+            # Call the agent
+            agent_name = step["agent"]
+            action = step["action"]
+            
+            logger.info("Executing step", step_number=i+1, agent=agent_name, action=action)
+            
+            # Prepare task data
+            task_data = {
+                "action": action,
+                "plan_context": execution_plan,
+                "step_info": step,
+                "previous_results": step_results
+            }
+            
+            # Call the registered agent directly
+            result = self.call_registered_agent(agent_name, json.dumps(task_data))
+            
+            step_result = {
+                "step_number": i + 1,
+                "agent": agent_name,
+                "action": action,
+                "status": "completed",
+                "result": result,
+                "executed_at": datetime.utcnow().isoformat()
+            }
+            
+            step_results.append(step_result)
         
         return step_results
     
@@ -526,6 +493,9 @@ Is there any specific aspect you'd like me to explain in more detail?"""
                 "aggregated_data": aggregated_data
             }
             
+            if not self.llm_client:
+                raise RuntimeError("LLM client not configured - cannot generate professional responses. Please configure OPENAI_API_KEY or OPENROUTER_API_KEY environment variable.")
+            
             enhanced_prompt = f"""
             As a professional insurance assistant, prepare a comprehensive and structured response to the user.
             
@@ -553,20 +523,14 @@ Is there any specific aspect you'd like me to explain in more detail?"""
             Response:
             """
             
-            if self.llm_client:
-                response = self.llm_client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[{"role": "user", "content": enhanced_prompt}],
-                    temperature=0.3,
-                    max_tokens=1000
-                )
-                
-                final_response = response.choices[0].message.content
-            else:
-                # Enhanced fallback response
-                final_response = self._generate_enhanced_fallback_response(
-                    primary_intent, execution_status, aggregated_data, user_text
-                )
+            response = self.llm_client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": enhanced_prompt}],
+                temperature=0.3,
+                max_tokens=1000
+            )
+            
+            final_response = response.choices[0].message.content
             
             logger.info("Enhanced response prepared", 
                        intent=primary_intent,
@@ -854,56 +818,41 @@ Please let me know how else I can help you, or feel free to try your request aga
 
     async def process_user_message(self, message: str, customer_id: str = "default-customer") -> Dict[str, Any]:
         """Process user message through the enhanced domain agent workflow"""
-        try:
-            # Role 1: Intent Understanding & Planning
-            intent_analysis = self.understand_intent(message)
-            
-            # Role 2: Create and execute plan
-            execution_plan = self.create_execution_plan(intent_analysis, message)
-            execution_results = self.execute_plan(execution_plan, customer_id)
-            
-            # Role 3: Prepare professional response
-            response = self.prepare_response(intent_analysis, execution_results, message)
-            
-            return {
-                "response": response,
-                "intent": intent_analysis.get("primary_intent"),
-                "confidence": intent_analysis.get("confidence"),
-                "thinking_steps": [],  # Could be enhanced with actual thinking steps
-                "orchestration_events": [
-                    {
-                        "event": "intent_analysis",
-                        "data": intent_analysis,
-                        "timestamp": datetime.utcnow().isoformat()
-                    },
-                    {
-                        "event": "execution_plan",
-                        "data": execution_plan,
-                        "timestamp": datetime.utcnow().isoformat()
-                    },
-                    {
-                        "event": "execution_results", 
-                        "data": execution_results,
-                        "timestamp": datetime.utcnow().isoformat()
-                    }
-                ],
-                "api_calls": [],  # Could be enhanced with actual API call tracking
-                "timestamp": datetime.utcnow().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error("Failed to process user message", error=str(e))
-            return {
-                "response": self._generate_error_response(
-                    {"primary_intent": "unknown"}, message, str(e)
-                ),
-                "intent": "error",
-                "confidence": 0.0,
-                "thinking_steps": [],
-                "orchestration_events": [],
-                "api_calls": [],
-                "timestamp": datetime.utcnow().isoformat()
-            }
+        # Role 1: Intent Understanding & Planning - NO ERROR HANDLING, LET ERRORS PROPAGATE
+        intent_analysis = self.understand_intent(message)
+        
+        # Role 2: Create and execute plan - NO ERROR HANDLING, LET ERRORS PROPAGATE  
+        execution_plan = self.create_execution_plan(intent_analysis, message)
+        execution_results = self.execute_plan(execution_plan, customer_id)
+        
+        # Role 3: Prepare professional response - NO ERROR HANDLING, LET ERRORS PROPAGATE
+        response = self.prepare_response(intent_analysis, execution_results, message)
+        
+        return {
+            "response": response,
+            "intent": intent_analysis.get("primary_intent"),
+            "confidence": intent_analysis.get("confidence"),
+            "thinking_steps": [],  # Could be enhanced with actual thinking steps
+            "orchestration_events": [
+                {
+                    "event": "intent_analysis",
+                    "data": intent_analysis,
+                    "timestamp": datetime.utcnow().isoformat()
+                },
+                {
+                    "event": "execution_plan",
+                    "data": execution_plan,
+                    "timestamp": datetime.utcnow().isoformat()
+                },
+                {
+                    "event": "execution_results", 
+                    "data": execution_results,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            ],
+            "api_calls": [],  # Could be enhanced with actual API call tracking
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
     def run_http_server(self, host: str = "0.0.0.0", port: int = 8000):
         """Run the HTTP server for Kubernetes deployment"""

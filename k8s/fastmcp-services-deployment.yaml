@@ -1,108 +1,253 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cursor-insurance-ai-poc
+---
+# User Service with FastMCP
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: user-service
+  name: user-service-fastmcp
   namespace: cursor-insurance-ai-poc
   labels:
-    app: user-service
+    app: user-service-fastmcp
     component: fastmcp-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: user-service
+      app: user-service-fastmcp
   template:
     metadata:
       labels:
-        app: user-service
+        app: user-service-fastmcp
         component: fastmcp-service
     spec:
       containers:
-      - name: user-service
-        image: insurance-ai/fastmcp-user-service:latest
+      - name: user-service-fastmcp
+        image: insurance-ai-poc/fastmcp-services:latest
         imagePullPolicy: Never
         ports:
         - containerPort: 8000
         env:
-        - name: USER_SERVICE_HOST
-          value: "0.0.0.0"
-        - name: USER_SERVICE_PORT
+        - name: SERVICE_NAME
+          value: "user-service"
+        - name: SERVICE_PORT
           value: "8000"
         - name: USE_FASTMCP
           value: "true"
-        - name: JWT_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: llm-secrets
-              key: jwt-secret-key
-              optional: true
+        - name: MCP_SERVER_NAME
+          value: "user-mcp-server"
+        - name: DATABASE_URL
+          value: "sqlite:///app/data/users.db"
         resources:
-          requests:
-            memory: "256Mi"
-            cpu: "200m"
           limits:
             memory: "512Mi"
-            cpu: "400m"
-
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
 ---
+# Claims Service with FastMCP
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claims-service-fastmcp
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: claims-service-fastmcp
+    component: fastmcp-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: claims-service-fastmcp
+  template:
+    metadata:
+      labels:
+        app: claims-service-fastmcp
+        component: fastmcp-service
+    spec:
+      containers:
+      - name: claims-service-fastmcp
+        image: insurance-ai-poc/fastmcp-services:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8001
+        env:
+        - name: SERVICE_NAME
+          value: "claims-service"
+        - name: SERVICE_PORT
+          value: "8001"
+        - name: USE_FASTMCP
+          value: "true"
+        - name: MCP_SERVER_NAME
+          value: "claims-mcp-server"
+        - name: DATABASE_URL
+          value: "sqlite:///app/data/claims.db"
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+# Policy Service with FastMCP
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: policy-service-fastmcp
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: policy-service-fastmcp
+    component: fastmcp-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: policy-service-fastmcp
+  template:
+    metadata:
+      labels:
+        app: policy-service-fastmcp
+        component: fastmcp-service
+    spec:
+      containers:
+      - name: policy-service-fastmcp
+        image: insurance-ai-poc/fastmcp-services:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8002
+        env:
+        - name: SERVICE_NAME
+          value: "policy-service"
+        - name: SERVICE_PORT
+          value: "8002"
+        - name: USE_FASTMCP
+          value: "true"
+        - name: MCP_SERVER_NAME
+          value: "policy-mcp-server"
+        - name: DATABASE_URL
+          value: "sqlite:///app/data/policies.db"
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8002
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8002
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+# Analytics Service with FastMCP
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service-fastmcp
+  namespace: cursor-insurance-ai-poc
+  labels:
+    app: analytics-service-fastmcp
+    component: fastmcp-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service-fastmcp
+  template:
+    metadata:
+      labels:
+        app: analytics-service-fastmcp
+        component: fastmcp-service
+    spec:
+      containers:
+      - name: analytics-service-fastmcp
+        image: insurance-ai-poc/fastmcp-services:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8003
+        env:
+        - name: SERVICE_NAME
+          value: "analytics-service"
+        - name: SERVICE_PORT
+          value: "8003"
+        - name: USE_FASTMCP
+          value: "true"
+        - name: MCP_SERVER_NAME
+          value: "analytics-mcp-server"
+        - name: DATABASE_URL
+          value: "sqlite:///app/data/analytics.db"
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+# Services for FastMCP microservices
 apiVersion: v1
 kind: Service
 metadata:
   name: user-service
   namespace: cursor-insurance-ai-poc
   labels:
-    app: user-service
+    app: user-service-fastmcp
 spec:
   selector:
-    app: user-service
+    app: user-service-fastmcp
   ports:
-  - port: 8000
+  - name: http
+    port: 8000
     targetPort: 8000
     protocol: TCP
-    name: mcp
   type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: claims-service
-  namespace: cursor-insurance-ai-poc
-  labels:
-    app: claims-service
-    component: fastmcp-service
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: claims-service
-  template:
-    metadata:
-      labels:
-        app: claims-service
-        component: fastmcp-service
-    spec:
-      containers:
-      - name: claims-service
-        image: insurance-ai/fastmcp-claims-service:latest
-        imagePullPolicy: Never
-        ports:
-        - containerPort: 8001
-        env:
-        - name: CLAIMS_SERVICE_HOST
-          value: "0.0.0.0"
-        - name: CLAIMS_SERVICE_PORT
-          value: "8001"
-        - name: USE_FASTMCP
-          value: "true"
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "200m"
-          limits:
-            memory: "512Mi"
-            cpu: "400m"
-
 ---
 apiVersion: v1
 kind: Service
@@ -110,58 +255,16 @@ metadata:
   name: claims-service
   namespace: cursor-insurance-ai-poc
   labels:
-    app: claims-service
+    app: claims-service-fastmcp
 spec:
   selector:
-    app: claims-service
+    app: claims-service-fastmcp
   ports:
-  - port: 8001
+  - name: http
+    port: 8001
     targetPort: 8001
     protocol: TCP
-    name: mcp
   type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: policy-service
-  namespace: cursor-insurance-ai-poc
-  labels:
-    app: policy-service
-    component: fastmcp-service
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: policy-service
-  template:
-    metadata:
-      labels:
-        app: policy-service
-        component: fastmcp-service
-    spec:
-      containers:
-      - name: policy-service
-        image: insurance-ai/fastmcp-policy-service:latest
-        imagePullPolicy: Never
-        ports:
-        - containerPort: 8002
-        env:
-        - name: POLICY_SERVICE_HOST
-          value: "0.0.0.0"
-        - name: POLICY_SERVICE_PORT
-          value: "8002"
-        - name: USE_FASTMCP
-          value: "true"
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "200m"
-          limits:
-            memory: "512Mi"
-            cpu: "400m"
-
 ---
 apiVersion: v1
 kind: Service
@@ -169,58 +272,16 @@ metadata:
   name: policy-service
   namespace: cursor-insurance-ai-poc
   labels:
-    app: policy-service
+    app: policy-service-fastmcp
 spec:
   selector:
-    app: policy-service
+    app: policy-service-fastmcp
   ports:
-  - port: 8002
+  - name: http
+    port: 8002
     targetPort: 8002
     protocol: TCP
-    name: mcp
   type: ClusterIP
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: analytics-service
-  namespace: cursor-insurance-ai-poc
-  labels:
-    app: analytics-service
-    component: fastmcp-service
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: analytics-service
-  template:
-    metadata:
-      labels:
-        app: analytics-service
-        component: fastmcp-service
-    spec:
-      containers:
-      - name: analytics-service
-        image: insurance-ai/fastmcp-analytics-service:latest
-        imagePullPolicy: Never
-        ports:
-        - containerPort: 8003
-        env:
-        - name: ANALYTICS_SERVICE_HOST
-          value: "0.0.0.0"
-        - name: ANALYTICS_SERVICE_PORT
-          value: "8003"
-        - name: USE_FASTMCP
-          value: "true"
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "200m"
-          limits:
-            memory: "512Mi"
-            cpu: "400m"
-
 ---
 apiVersion: v1
 kind: Service
@@ -228,15 +289,15 @@ metadata:
   name: analytics-service
   namespace: cursor-insurance-ai-poc
   labels:
-    app: analytics-service
+    app: analytics-service-fastmcp
 spec:
   selector:
-    app: analytics-service
+    app: analytics-service-fastmcp
   ports:
-  - port: 8003
+  - name: http
+    port: 8003
     targetPort: 8003
     protocol: TCP
-    name: mcp
   type: ClusterIP
 
 ---

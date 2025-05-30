@@ -13,11 +13,41 @@ import structlog
 # FastMCP Client imports (official FastMCP 2.0)
 from fastmcp import Client
 
-# Official Google A2A Library imports (a2a-sdk)
-from a2a import A2AServer, run_server
-from a2a.models import AgentCard, TaskRequest, TaskResponse
+# Official Google A2A Library imports (a2a-sdk) - conditional import
+try:
+    from a2a import A2AServer, run_server
+    from a2a.models import AgentCard, TaskRequest, TaskResponse
+    A2A_AVAILABLE = True
+except ImportError:
+    # Mock classes for testing/development environments
+    class TaskRequest:
+        def __init__(self, taskId: str, user: Dict[str, Any]):
+            self.taskId = taskId
+            self.user = user
+    
+    class TaskResponse:
+        def __init__(self, taskId: str, status: str, parts: List[Dict[str, Any]], metadata: Dict[str, Any]):
+            self.taskId = taskId
+            self.status = status
+            self.parts = parts
+            self.metadata = metadata
+    
+    A2A_AVAILABLE = False
 
-from agents.shared.a2a_base import A2AAgent
+try:
+    from agents.shared.a2a_base import A2AAgent
+    A2A_BASE_AVAILABLE = True
+except ImportError:
+    # Mock base class for testing/development environments
+    class A2AAgent:
+        def __init__(self, name: str, description: str, port: int, capabilities: Dict[str, Any], version: str):
+            self.name = name
+            self.description = description
+            self.port = port
+            self.capabilities = capabilities
+            self.version = version
+    
+    A2A_BASE_AVAILABLE = False
 
 logger = structlog.get_logger(__name__)
 

@@ -68,10 +68,10 @@ class IntegrationTester:
             print("\n🔗 Testing Policy Server <-> Technical Agent Integration")
             
             # First verify both services are up
-            policy_health = self.session.get("http://localhost:8001/health")
+            policy_health = self.session.get("http://localhost:8001/mcp")
             technical_health = self.session.get("http://localhost:8002/agent.json")
             
-            if policy_health.status_code != 200:
+            if policy_health.status_code not in [200, 405, 406]:
                 print(f"❌ Policy Server not responding: {policy_health.status_code}")
                 return False
                 
@@ -185,14 +185,19 @@ class IntegrationTester:
                 ("UI", "http://localhost:8080/"),
                 ("Domain Agent", "http://localhost:8003/agent.json"),
                 ("Technical Agent", "http://localhost:8002/agent.json"),
-                ("Policy Server", "http://localhost:8001/health")
+                ("Policy Server", "http://localhost:8001/mcp")
             ]
             
             for service_name, url in services:
                 response = self.session.get(url)
-                if response.status_code not in [200, 201]:
-                    print(f"❌ {service_name} not responding: {response.status_code}")
-                    return False
+                if service_name == "Policy Server":
+                    if response.status_code not in [200, 201, 405, 406]:
+                        print(f"❌ {service_name} not responding: {response.status_code}")
+                        return False
+                else:
+                    if response.status_code not in [200, 201]:
+                        print(f"❌ {service_name} not responding: {response.status_code}")
+                        return False
                 print(f"   ✅ {service_name}: OK")
             
             print("✅ Full Chain Connectivity: All services responding")
@@ -241,6 +246,102 @@ class IntegrationTester:
             print(f"❌ Concurrent Request Test Failed: {e}")
             return False
 
+    def test_ui_domain_agent_real_communication(self) -> bool:
+        """Test real UI to Domain Agent communication using actual UI mechanism"""
+        try:
+            print("\n🔗 Testing Real UI <-> Domain Agent Communication")
+            
+            # Get UI pod name
+            import subprocess
+            try:
+                ui_pod_name = subprocess.check_output([
+                    "kubectl", "get", "pods", "-n", "insurance-ai-agentic", 
+                    "-l", "component=streamlit-ui", 
+                    "-o", "jsonpath={.items[0].metadata.name}"
+                ], text=True).strip()
+                
+                if not ui_pod_name:
+                    print("❌ No UI pod found")
+                    return False
+                
+                # Test if UI can connect to domain agent using the exact same method the UI uses
+                test_cmd = [
+                    "kubectl", "exec", "-n", "insurance-ai-agentic", ui_pod_name, "--",
+                    "python3", "-c", """
+import requests
+import json
+import os
+
+# Use the same configuration as the UI
+domain_agent_url = os.getenv('DOMAIN_AGENT_URL', 'http://insurance-ai-poc-domain-agent:8003')
+print(f"Testing connection to: {domain_agent_url}")
+
+try:
+    # Test agent.json endpoint (what UI uses for discovery)
+    response = requests.get(f"{domain_agent_url}/agent.json", timeout=5)
+    print(f"Agent discovery: {response.status_code}")
+    
+    if response.status_code == 200:
+        # Test A2A task send (what UI uses for communication)
+        payload = {
+            "message": {
+                "content": {
+                    "type": "text", 
+                    "text": "Test message from UI integration test"
+                },
+                "role": "user"
+            }
+        }
+        
+        task_response = requests.post(
+            f"{domain_agent_url}/tasks/send",
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
+        
+        print(f"A2A task send: {task_response.status_code}")
+        if task_response.status_code == 200:
+            result = task_response.json()
+            print(f"Task ID: {result.get('id', 'Unknown')}")
+            print("SUCCESS: UI can communicate with Domain Agent")
+        else:
+            print(f"FAILED: A2A task failed with {task_response.status_code}")
+    else:
+        print(f"FAILED: Agent discovery failed with {response.status_code}")
+        
+except Exception as e:
+    print(f"FAILED: {str(e)}")
+"""
+                ]
+                
+                result = subprocess.run(test_cmd, capture_output=True, text=True, timeout=20)
+                
+                print(f"   UI->Domain Agent Test Output:")
+                for line in result.stdout.strip().split('\n'):
+                    if line.strip():
+                        print(f"     {line}")
+                
+                if result.stderr:
+                    print(f"   Errors: {result.stderr}")
+                
+                # Check if test was successful
+                success = "SUCCESS: UI can communicate with Domain Agent" in result.stdout
+                if success:
+                    print("✅ Real UI <-> Domain Agent Communication: WORKING")
+                else:
+                    print("❌ Real UI <-> Domain Agent Communication: FAILED")
+                
+                return success
+                
+            except Exception as e:
+                print(f"❌ Failed to test real UI communication: {e}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Real UI <-> Domain Agent Communication Test Failed: {e}")
+            return False
+
     def run_all_tests(self) -> Dict[str, bool]:
         """Run all integration tests"""
         print("🧪 Running Kubernetes Integration Tests")
@@ -255,7 +356,8 @@ class IntegrationTester:
                 "technical_agent_domain_agent": self.test_technical_agent_domain_agent(),
                 "domain_agent_ui": self.test_domain_agent_ui(),
                 "full_chain_connectivity": self.test_full_chain_connectivity(),
-                "concurrent_requests": self.test_concurrent_requests()
+                "concurrent_requests": self.test_concurrent_requests(),
+                "ui_domain_agent_real_communication": self.test_ui_domain_agent_real_communication()
             }
             
             print("\n📊 Integration Test Results:")

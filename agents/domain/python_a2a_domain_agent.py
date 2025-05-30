@@ -467,81 +467,73 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         Role 3: Prepare professional response using structured templates
         Enhanced with template-based formatting and professional presentation
         """
-        try:
-            # Extract key information for response preparation
-            primary_intent = intent_analysis.get("primary_intent", "general_inquiry")
-            step_results = execution_results.get("step_results", [])
-            execution_status = execution_results.get("status", "unknown")
-            entities = intent_analysis.get("entities", {})
-            
-            # Aggregate data from step results
-            aggregated_data = self._aggregate_step_results(step_results)
-            
-            # Use professional template if enabled
-            if self.template_enhancement_enabled and self.response_template:
-                return self._generate_template_response(
-                    intent_analysis, execution_results, user_text, aggregated_data
-                )
-            
-            # Enhanced LLM-based response preparation
-            context = {
-                "user_request": user_text,
-                "intent": primary_intent,
-                "execution_status": execution_status,
-                "step_results": step_results,
-                "entities": entities,
-                "aggregated_data": aggregated_data
-            }
-            
-            if not self.llm_client:
-                raise RuntimeError("LLM client not configured - cannot generate professional responses. Please configure OPENAI_API_KEY or OPENROUTER_API_KEY environment variable.")
-            
-            enhanced_prompt = f"""
-            As a professional insurance assistant, prepare a comprehensive and structured response to the user.
-            
-            User Request: "{user_text}"
-            Intent: {primary_intent}
-            Execution Status: {execution_status}
-            
-            Available Data:
-            {json.dumps(aggregated_data, indent=2)}
-            
-            Guidelines for Professional Response:
-            1. Start with a professional acknowledgment
-            2. Provide specific status and findings
-            3. Include detailed analysis with clear sections
-            4. Add account overview with metrics
-            5. Provide clear next steps and timeline
-            6. Maintain professional, helpful tone
-            7. Structure with clear headers and bullet points
-            8. Include contact information
-            9. End with offer for additional assistance
-            10. Use ** for emphasis and • for bullet points
-            
-            Format the response professionally with clear sections and specific data points.
-            
-            Response:
-            """
-            
-            response = self.llm_client.chat.completions.create(
-                model=self.model_name,
-                messages=[{"role": "user", "content": enhanced_prompt}],
-                temperature=0.3,
-                max_tokens=1000
+        # Extract key information for response preparation
+        primary_intent = intent_analysis.get("primary_intent", "general_inquiry")
+        step_results = execution_results.get("step_results", [])
+        execution_status = execution_results.get("status", "unknown")
+        entities = intent_analysis.get("entities", {})
+        
+        # Aggregate data from step results
+        aggregated_data = self._aggregate_step_results(step_results)
+        
+        # Use professional template if enabled
+        if self.template_enhancement_enabled and self.response_template:
+            return self._generate_template_response(
+                intent_analysis, execution_results, user_text, aggregated_data
             )
-            
-            final_response = response.choices[0].message.content
-            
-            logger.info("Enhanced response prepared", 
-                       intent=primary_intent,
-                       status=execution_status,
-                       template_used=self.template_enhancement_enabled)
-            
-            return final_response
-            
-        except Exception as e:
-            logger.error("Failed to prepare enhanced response", error=str(e))
-            return self._generate_error_response(intent_analysis, user_text, str(e))
+        
+        # Enhanced LLM-based response preparation
+        context = {
+            "user_request": user_text,
+            "intent": primary_intent,
+            "execution_status": execution_status,
+            "step_results": step_results,
+            "entities": entities,
+            "aggregated_data": aggregated_data
+        }
+        
+        enhanced_prompt = f"""
+        As a professional insurance assistant, prepare a comprehensive and structured response to the user.
+        
+        User Request: "{user_text}"
+        Intent: {primary_intent}
+        Execution Status: {execution_status}
+        
+        Available Data:
+        {json.dumps(aggregated_data, indent=2)}
+        
+        Guidelines for Professional Response:
+        1. Start with a professional acknowledgment
+        2. Provide specific status and findings
+        3. Include detailed analysis with clear sections
+        4. Add account overview with metrics
+        5. Provide clear next steps and timeline
+        6. Maintain professional, helpful tone
+        7. Structure with clear headers and bullet points
+        8. Include contact information
+        9. End with offer for additional assistance
+        10. Use ** for emphasis and • for bullet points
+        
+        Format the response professionally with clear sections and specific data points.
+        
+        Response:
+        """
+        
+        response = self.llm_client.chat.completions.create(
+            model=self.model_name,
+            messages=[{"role": "user", "content": enhanced_prompt}],
+            temperature=0.3,
+            max_tokens=1000
+        )
+        
+        final_response = response.choices[0].message.content
+        
+        logger.info("Response prepared", 
+                   intent=primary_intent,
+                   status=execution_status,
+                   template_used=self.template_enhancement_enabled)
+        
+        return final_response
 
     def _aggregate_step_results(self, step_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Aggregate data from step results for template population"""

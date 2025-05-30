@@ -1,726 +1,620 @@
 """
-Streamlit UI for Insurance AI PoC
-Interactive dashboard for agent communication and real-time flow visualization
+Insurance AI PoC - Streamlit UI Interface
+Simple visual interface for domain agent communication
 """
 
 import streamlit as st
 import requests
 import json
 import time
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
+import uuid
+import subprocess
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
-import asyncio
-import httpx
+import logging
 
-# Page configuration
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Configure page
 st.set_page_config(
     page_title="Insurance AI PoC",
-    page_icon="🏢",
+    page_icon="🏥",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .agent-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-    }
-    .status-success {
-        color: #28a745;
-        font-weight: bold;
-    }
-    .status-error {
-        color: #dc3545;
-        font-weight: bold;
-    }
-    .status-processing {
-        color: #ffc107;
-        font-weight: bold;
-    }
-    .metric-card {
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 5px;
-        border-left: 4px solid #1f77b4;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Initialize session state
+if 'customer_authenticated' not in st.session_state:
+    st.session_state.customer_authenticated = False
+if 'customer_data' not in st.session_state:
+    st.session_state.customer_data = {}
+if 'conversation_history' not in st.session_state:
+    st.session_state.conversation_history = []
+if 'api_calls' not in st.session_state:
+    st.session_state.api_calls = []
+if 'thinking_steps' not in st.session_state:
+    st.session_state.thinking_steps = []
+if 'orchestration_data' not in st.session_state:
+    st.session_state.orchestration_data = []
 
-# Configuration
-AGENT_ENDPOINTS = {
-    "Claims Agent": "http://localhost:8000",
-    "Data Agent": "http://localhost:8002", 
-    "Support Agent": "http://localhost:8003",
-    "Policy Agent": "http://localhost:8004",
-    "Notification Agent": "http://localhost:8005",
-    "Integration Agent": "http://localhost:8006"
-}
 
-DEMO_TOKEN = "demo-token-for-testing-please-change-in-production"
-
-# Session state initialization
-if 'agent_registry' not in st.session_state:
-    st.session_state.agent_registry = {}
-
-if 'task_history' not in st.session_state:
-    st.session_state.task_history = []
-
-if 'communication_flow' not in st.session_state:
-    st.session_state.communication_flow = []
-
-if 'auto_refresh' not in st.session_state:
-    st.session_state.auto_refresh = False
-
-# Utility functions
-def make_request(url: str, method: str = "GET", data: Dict = None, headers: Dict = None) -> Optional[Dict]:
-    """Make HTTP request with error handling"""
-    try:
-        if headers is None:
-            headers = {"Authorization": f"Bearer {DEMO_TOKEN}"}
-        
-        if method == "GET":
-            response = requests.get(url, headers=headers, timeout=10)
-        elif method == "POST":
-            response = requests.post(url, json=data, headers=headers, timeout=10)
-        else:
-            return None
-        
-        if response.status_code == 200:
-            return response.json()
-        else:
-            st.error(f"Request failed: {response.status_code} - {response.text}")
-            return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"Request error: {str(e)}")
-        return None
-
-def discover_agents():
-    """Discover available agents"""
-    agents = {}
+class CustomerValidator:
+    """Handles customer authentication for demo purposes"""
     
-    for agent_name, endpoint in AGENT_ENDPOINTS.items():
+    DEMO_CUSTOMERS = {
+        "CUST-001": {"name": "John Smith", "status": "Active", "type": "Premium"},
+        "CUST-002": {"name": "Jane Doe", "status": "Active", "type": "Standard"},
+        "CUST-003": {"name": "Bob Johnson", "status": "Active", "type": "Basic"},
+        "TEST-CUSTOMER": {"name": "Test User", "status": "Active", "type": "Demo"}
+    }
+    
+    @classmethod
+    def validate_customer(cls, customer_id: str) -> Dict[str, Any]:
+        """Validate customer authentication"""
+        if customer_id in cls.DEMO_CUSTOMERS:
+            return {
+                "valid": True,
+                "customer_data": {
+                    "customer_id": customer_id,
+                    **cls.DEMO_CUSTOMERS[customer_id]
+                }
+            }
+        return {"valid": False, "error": "Customer ID not found"}
+
+
+class DomainAgentClient:
+    """Client to communicate with actual domain agent"""
+    
+    def __init__(self):
+        # Use Kubernetes service names since everything runs in K8s
+        self.possible_endpoints = [
+            "http://claims-agent:8000",  # Kubernetes service name for domain agent (proper architecture)
+            "http://localhost:8000",  # Fallback for local testing
+            "http://127.0.0.1:8000"  # Additional fallback
+        ]
+        self.base_url = None
+        self._find_active_endpoint()
+    
+    def _find_active_endpoint(self):
+        """Find the active domain agent endpoint"""
+        for endpoint in self.possible_endpoints:
+            try:
+                response = requests.get(f"{endpoint}/health", timeout=2)
+                if response.status_code == 200:
+                    self.base_url = endpoint
+                    logger.info(f"Connected to domain agent at {endpoint}")
+                    return
+            except requests.RequestException:
+                continue
+        
+        logger.warning("No active domain agent endpoint found")
+    
+    def send_message(self, message: str, customer_id: str) -> Dict[str, Any]:
+        """Send message to real domain agent"""
+        if not self.base_url:
+            return {
+                "response": "❌ Domain agent is not available. Please check system health.",
+                "error": "No active domain agent endpoint",
+                "thinking_steps": [],
+                "orchestration_events": [],
+                "api_calls": []
+            }
+        
         try:
-            agent_card = make_request(f"{endpoint}/.well-known/agent.json")
-            if agent_card:
-                agents[agent_name] = {
-                    "endpoint": endpoint,
-                    "card": agent_card,
-                    "status": "online"
-                }
+            # Log the outgoing API call
+            call_start = time.time()
+            
+            payload = {
+                "message": message,
+                "customer_id": customer_id,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/chat",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=30
+            )
+            
+            call_duration = time.time() - call_start
+            
+            # Log this API call for monitoring
+            self._log_api_call(
+                "Domain Agent",
+                "/chat",
+                "POST",
+                payload,
+                response.json() if response.status_code == 200 else {"error": response.text},
+                response.status_code,
+                call_duration
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                
+                # Extract real orchestration data from agent response
+                if "thinking_steps" in result:
+                    st.session_state.thinking_steps.extend(result["thinking_steps"])
+                
+                if "orchestration_events" in result:
+                    st.session_state.orchestration_data.extend(result["orchestration_events"])
+                
+                if "api_calls" in result:
+                    st.session_state.api_calls.extend(result["api_calls"])
+                
+                return result
             else:
-                agents[agent_name] = {
-                    "endpoint": endpoint,
-                    "card": None,
-                    "status": "offline"
+                error_msg = f"Domain agent error: HTTP {response.status_code}"
+                logger.error(error_msg)
+                return {
+                    "response": f"❌ {error_msg}",
+                    "error": error_msg,
+                    "thinking_steps": [],
+                    "orchestration_events": [],
+                    "api_calls": []
                 }
-        except Exception as e:
-            agents[agent_name] = {
-                "endpoint": endpoint,
-                "card": None,
-                "status": "error",
-                "error": str(e)
+                
+        except requests.RequestException as e:
+            error_msg = f"Failed to communicate with domain agent: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "response": f"❌ {error_msg}",
+                "error": error_msg,
+                "thinking_steps": [],
+                "orchestration_events": [],
+                "api_calls": []
             }
     
-    return agents
+    def _log_api_call(self, service: str, endpoint: str, method: str, 
+                     request_data: Dict = None, response_data: Dict = None, 
+                     status_code: int = 200, response_time: float = 0.0):
+        """Log API call for monitoring"""
+        call_id = str(uuid.uuid4())[:8]
+        api_call = {
+            "call_id": call_id,
+            "timestamp": datetime.now(),
+            "service": service,
+            "endpoint": endpoint,
+            "method": method,
+            "request_data": request_data or {},
+            "response_data": response_data or {},
+            "status_code": status_code,
+            "response_time_ms": round(response_time * 1000, 2),
+            "success": 200 <= status_code < 400
+        }
+        
+        st.session_state.api_calls.append(api_call)
+        
+        # Keep only last 50 API calls
+        if len(st.session_state.api_calls) > 50:
+            st.session_state.api_calls = st.session_state.api_calls[-50:]
 
-def send_task_to_agent(agent_endpoint: str, task_data: Dict) -> Optional[Dict]:
-    """Send task to agent via A2A protocol"""
-    task_request = {
-        "taskId": f"task-{int(time.time())}",
-        "user": task_data,
-        "context": {"source": "streamlit_ui"},
-        "metadata": {"timestamp": datetime.utcnow().isoformat()}
-    }
-    
-    response = make_request(
-        f"{agent_endpoint}/tasks/send",
-        method="POST",
-        data=task_request
-    )
-    
-    if response:
-        # Add to task history
-        st.session_state.task_history.append({
-            "timestamp": datetime.utcnow().isoformat(),
-            "agent": agent_endpoint,
-            "task": task_request,
-            "response": response
-        })
-        
-        # Add to communication flow
-        st.session_state.communication_flow.append({
-            "timestamp": datetime.utcnow().isoformat(),
-            "source": "User",
-            "target": agent_endpoint.split("//")[1] if "//" in agent_endpoint else agent_endpoint,
-            "task_id": task_request["taskId"],
-            "task_type": task_data.get("type", "unknown"),
-            "status": response.get("status", "unknown")
-        })
-    
-    return response
 
-def format_task_response(response: Dict) -> str:
-    """Format task response for display"""
-    if not response:
-        return "No response"
+class SystemHealthMonitor:
+    """Monitors system health and connectivity"""
     
-    parts = response.get("parts", [])
-    if parts:
-        return "\n".join(part.get("text", "") for part in parts)
-    else:
-        return json.dumps(response, indent=2)
-
-# Main UI
-def main():
-    st.markdown('<h1 class="main-header">🏢 Insurance AI PoC</h1>', unsafe_allow_html=True)
-    st.markdown("### Kubernetes-Native A2A/MCP Microservices Architecture")
-    
-    # Sidebar
-    with st.sidebar:
-        st.header("🎛️ Control Panel")
+    @staticmethod
+    def check_fastmcp_services() -> Dict[str, Any]:
+        """Check FastMCP services health in Kubernetes"""
+        # Use Kubernetes service names since everything runs in K8s
+        services = {
+            "Claims Agent (Domain)": "http://claims-agent:8000/health",
+            "User Service (FastMCP)": "http://user-service:8000/mcp/",
+            "Claims Service (FastMCP)": "http://claims-service:8001/mcp/", 
+            "Policy Service (FastMCP)": "http://policy-service:8002/mcp/",
+            "Analytics Service (FastMCP)": "http://analytics-service:8003/mcp/",
+            "FastMCP Data Agent": "http://fastmcp-data-agent:8004/health"
+        }
         
-        # Auto-refresh toggle
-        st.session_state.auto_refresh = st.checkbox("Auto-refresh", value=st.session_state.auto_refresh)
-        
-        if st.button("🔄 Discover Agents"):
-            with st.spinner("Discovering agents..."):
-                st.session_state.agent_registry = discover_agents()
-        
-        if st.button("🗑️ Clear History"):
-            st.session_state.task_history = []
-            st.session_state.communication_flow = []
-            st.success("History cleared!")
-        
-        # Agent status
-        st.subheader("🤖 Agent Status")
-        if st.session_state.agent_registry:
-            for agent_name, agent_info in st.session_state.agent_registry.items():
-                status = agent_info["status"]
-                if status == "online":
-                    st.markdown(f"🟢 {agent_name}")
-                elif status == "offline":
-                    st.markdown(f"🔴 {agent_name}")
-                else:
-                    st.markdown(f"🟡 {agent_name}")
-        else:
-            st.info("Click 'Discover Agents' to check status")
-    
-    # Main content tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🎯 Agent Interaction", 
-        "📊 Agent Registry", 
-        "🌊 Communication Flow", 
-        "📈 Analytics", 
-        "🔍 System Monitoring"
-    ])
-    
-    with tab1:
-        agent_interaction_tab()
-    
-    with tab2:
-        agent_registry_tab()
-    
-    with tab3:
-        communication_flow_tab()
-    
-    with tab4:
-        analytics_tab()
-    
-    with tab5:
-        monitoring_tab()
-    
-    # Auto-refresh
-    if st.session_state.auto_refresh:
-        time.sleep(5)
-        st.rerun()
-
-def agent_interaction_tab():
-    """Agent interaction interface"""
-    st.header("🎯 Agent Interaction")
-    
-    # Agent selection
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        if st.session_state.agent_registry:
-            online_agents = [
-                name for name, info in st.session_state.agent_registry.items() 
-                if info["status"] == "online"
-            ]
-            
-            if online_agents:
-                selected_agent = st.selectbox("Select Agent", online_agents)
-                agent_endpoint = st.session_state.agent_registry[selected_agent]["endpoint"]
-                
-                # Task type selection based on agent capabilities
-                agent_card = st.session_state.agent_registry[selected_agent]["card"]
-                if agent_card:
-                    capabilities = agent_card.get("capabilities", {})
-                    st.info(f"**Agent:** {agent_card.get('name', 'Unknown')}")
-                    st.info(f"**Description:** {agent_card.get('description', 'No description')}")
-                    
-                    # Show capabilities
-                    if capabilities:
-                        st.write("**Capabilities:**")
-                        for cap, enabled in capabilities.items():
-                            if enabled:
-                                st.write(f"✅ {cap.replace('_', ' ').title()}")
-            else:
-                st.warning("No online agents found. Please discover agents first.")
-                return
-        else:
-            st.warning("No agents discovered. Please discover agents first.")
-            return
-    
-    with col2:
-        st.subheader("Task Configuration")
-        
-        # Task type based on selected agent
-        if selected_agent == "Claims Agent":
-            task_type = st.selectbox("Task Type", [
-                "process_claim", "analyze_claim", "fraud_detection", 
-                "claim_status", "approve_claim", "reject_claim"
-            ])
-            
-            if task_type == "process_claim":
-                st.subheader("Process New Claim")
-                claim_id = st.text_input("Claim ID", value=f"CLM-{int(time.time())}")
-                policy_number = st.text_input("Policy Number", value="POL-001")
-                description = st.text_area("Incident Description")
-                amount = st.number_input("Claim Amount", min_value=0.0, value=1000.0)
-                
-                task_data = {
-                    "type": task_type,
-                    "claim": {
-                        "claim_id": claim_id,
-                        "policy_number": policy_number,
-                        "description": description,
-                        "amount": amount
-                    }
-                }
-            
-            elif task_type in ["analyze_claim", "fraud_detection", "claim_status"]:
-                claim_id = st.text_input("Claim ID", value="CLM-001")
-                task_data = {
-                    "type": task_type,
-                    "claim_id": claim_id
-                }
-            
-            elif task_type in ["approve_claim", "reject_claim"]:
-                claim_id = st.text_input("Claim ID", value="CLM-001")
-                approver = st.text_input("Approver", value="admin")
-                reason = st.text_area("Reason (for rejection)", "") if task_type == "reject_claim" else ""
-                
-                task_data = {
-                    "type": task_type,
-                    "claim_id": claim_id,
-                    "approver": approver
-                }
-                if reason:
-                    task_data["reason"] = reason
-        
-        elif selected_agent == "Data Agent":
-            task_type = st.selectbox("Task Type", ["data_query", "analytics", "report"])
-            
-            if task_type == "data_query":
-                query_type = st.selectbox("Query Type", [
-                    "get_policy", "get_customer", "get_recent_claims"
-                ])
-                
-                if query_type == "get_policy":
-                    policy_number = st.text_input("Policy Number", value="POL-001")
-                    task_data = {
-                        "type": task_type,
-                        "query_type": query_type,
-                        "params": {"policy_number": policy_number}
-                    }
-                elif query_type == "get_customer":
-                    customer_id = st.text_input("Customer ID", value="CUST-001")
-                    task_data = {
-                        "type": task_type,
-                        "query_type": query_type,
-                        "params": {"customer_id": customer_id}
-                    }
-                elif query_type == "get_recent_claims":
-                    customer_id = st.text_input("Customer ID", value="CUST-001")
-                    days = st.number_input("Days", min_value=1, value=90)
-                    task_data = {
-                        "type": task_type,
-                        "query_type": query_type,
-                        "params": {"customer_id": customer_id, "days": days}
-                    }
-            
-            elif task_type == "analytics":
-                analysis_type = st.selectbox("Analysis Type", ["fraud_risk", "claim_statistics"])
-                task_data = {
-                    "type": task_type,
-                    "analysis_type": analysis_type,
-                    "params": {}
-                }
-            
-            elif task_type == "report":
-                report_type = st.selectbox("Report Type", [
-                    "claims_summary", "fraud_analysis", "customer_risk"
-                ])
-                task_data = {
-                    "type": task_type,
-                    "report_type": report_type,
-                    "filters": {}
-                }
-        
-        else:
-            # Generic task interface
-            task_type = st.text_input("Task Type", value="generic_task")
-            custom_data = st.text_area("Custom Task Data (JSON)", value="{}")
-            
+        results = {}
+        for service_name, endpoint in services.items():
             try:
-                custom_json = json.loads(custom_data) if custom_data else {}
-                task_data = {
-                    "type": task_type,
-                    **custom_json
-                }
-            except json.JSONDecodeError:
-                st.error("Invalid JSON in custom task data")
-                return
+                start_time = time.time()
+                response = requests.get(endpoint, timeout=3)
+                response_time = time.time() - start_time
         
-        # Send task button
-        if st.button("🚀 Send Task", type="primary"):
-            with st.spinner("Sending task..."):
-                response = send_task_to_agent(agent_endpoint, task_data)
-                
-                if response:
-                    st.success("Task sent successfully!")
-                    
-                    # Display response
-                    st.subheader("Response")
-                    
-                    status = response.get("status", "unknown")
-                    if status == "completed":
-                        st.markdown('<span class="status-success">✅ Completed</span>', unsafe_allow_html=True)
-                    elif status == "failed":
-                        st.markdown('<span class="status-error">❌ Failed</span>', unsafe_allow_html=True)
-                    else:
-                        st.markdown('<span class="status-processing">⏳ Processing</span>', unsafe_allow_html=True)
-                    
-                    # Response content
-                    response_text = format_task_response(response)
-                    st.code(response_text, language="json")
-                    
-                    # Show metadata
-                    if response.get("metadata"):
-                        with st.expander("Response Metadata"):
-                            st.json(response["metadata"])
-                else:
-                    st.error("Failed to send task")
-
-def agent_registry_tab():
-    """Agent registry and capabilities display"""
-    st.header("📊 Agent Registry")
+        if response.status_code == 200:
+                    results[service_name] = {
+                        "status": "healthy",
+                        "response_time": round(response_time * 1000, 2),
+                        "message": "Service responding"
+                    }
+        else:
+                    results[service_name] = {
+                        "status": "unhealthy",
+                        "response_time": round(response_time * 1000, 2),
+                        "message": f"HTTP {response.status_code}"
+                    }
+            except requests.RequestException as e:
+                results[service_name] = {
+                    "status": "offline",
+                    "response_time": 0,
+                    "message": f"Connection failed: {str(e)}"
+                }
+        
+        return results
     
-    if not st.session_state.agent_registry:
-        st.info("No agents discovered. Please discover agents first.")
+    @staticmethod
+    def check_kubernetes_pods() -> Dict[str, Any]:
+        """Check Kubernetes pods status"""
+        try:
+            result = subprocess.run(
+                ["kubectl", "get", "pods", "-n", "cursor-insurance-ai-poc", "--no-headers"],
+                capture_output=True, text=True, timeout=5
+            )
+            
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                total_pods = len([line for line in lines if line.strip()])
+                running_pods = len([line for line in lines if "Running" in line])
+                
+                return {
+                    "status": "healthy" if running_pods == total_pods else "degraded",
+                    "running": running_pods,
+                    "total": total_pods,
+                    "message": f"{running_pods}/{total_pods} pods running"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "running": 0,
+                    "total": 0,
+                    "message": "kubectl command failed"
+                }
+        except Exception as e:
+            return {
+                "status": "unknown",
+                "running": 0,
+                "total": 0,
+                "message": str(e)
+            }
+
+
+def render_authentication():
+    """Render authentication interface"""
+    with st.sidebar:
+        st.header("🔐 Customer Authentication")
+        
+        if not st.session_state.customer_authenticated:
+            customer_id = st.text_input("Customer ID", placeholder="Enter your Customer ID")
+            
+            if st.button("Authenticate", type="primary"):
+                if customer_id:
+                    auth_result = CustomerValidator.validate_customer(customer_id)
+                    if auth_result["valid"]:
+                        st.session_state.customer_authenticated = True
+                        st.session_state.customer_data = auth_result["customer_data"]
+                        st.success(f"✅ Welcome, {auth_result['customer_data']['name']}")
+                        st.rerun()
+                    else:
+                        st.error("❌ Authentication failed")
+                else:
+                    st.error("Please enter a Customer ID")
+            
+            # Show demo customer IDs
+            with st.expander("Demo Customer IDs"):
+                for cust_id, data in CustomerValidator.DEMO_CUSTOMERS.items():
+                    st.code(f"{cust_id} - {data['name']}")
+        
+        else:
+            # Show authenticated user
+            st.success(f"✅ {st.session_state.customer_data['name']}")
+            st.write(f"**Status:** {st.session_state.customer_data['status']}")
+            st.write(f"**Type:** {st.session_state.customer_data['type']}")
+            
+            if st.button("Logout"):
+                st.session_state.customer_authenticated = False
+                st.session_state.customer_data = {}
+                st.session_state.conversation_history = []
+                st.session_state.api_calls = []
+                st.session_state.thinking_steps = []
+                st.session_state.orchestration_data = []
+                st.rerun()
+
+
+def render_chat_interface():
+    """Render chat interface - communicates with real domain agent"""
+    st.header("💬 Chat with Domain Agent")
+    
+    if not st.session_state.customer_authenticated:
+        st.warning("Please authenticate to access the chat interface.")
         return
     
-    # Overview metrics
-    total_agents = len(st.session_state.agent_registry)
-    online_agents = sum(1 for info in st.session_state.agent_registry.values() if info["status"] == "online")
-    offline_agents = total_agents - online_agents
+    # Initialize domain agent client
+    domain_agent = DomainAgentClient()
+    
+    # Chat input
+    user_message = st.text_area("Your message:", placeholder="How can I help you with your insurance needs today?")
+    
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("Send", type="primary", disabled=not user_message):
+            if user_message:
+                # Add user message to history
+                st.session_state.conversation_history.append({
+                    "role": "user",
+                    "message": user_message,
+                    "timestamp": datetime.now()
+                })
+                
+                # Send to real domain agent
+                with st.spinner("Communicating with domain agent..."):
+                    try:
+                        result = domain_agent.send_message(
+                            user_message, 
+                            st.session_state.customer_data['customer_id']
+                        )
+                        
+                        # Add agent response to history
+                        st.session_state.conversation_history.append({
+                            "role": "agent",
+                            "message": result.get("response", "No response received"),
+                            "timestamp": datetime.now(),
+                            "metadata": {
+                                "thinking_steps": len(result.get("thinking_steps", [])),
+                                "orchestration_events": len(result.get("orchestration_events", [])),
+                                "api_calls": len(result.get("api_calls", [])),
+                                "has_error": "error" in result
+                            }
+                        })
+                    except Exception as e:
+                        st.error(f"Error communicating with domain agent: {str(e)}")
+                        logger.error(f"Chat error: {e}")
+                
+                st.rerun()
+    
+    with col2:
+        if st.button("Clear Chat"):
+            st.session_state.conversation_history = []
+            st.rerun()
+    
+    # Display conversation history
+    if st.session_state.conversation_history:
+        st.markdown("### Conversation History")
+        for msg in reversed(st.session_state.conversation_history[-10:]):  # Show last 10 messages
+            timestamp = msg["timestamp"].strftime("%H:%M:%S")
+            
+            if msg["role"] == "user":
+                st.markdown(f"**👤 You ({timestamp}):** {msg['message']}")
+            else:
+                st.markdown(f"**🤖 Domain Agent ({timestamp}):** {msg['message']}")
+                
+                # Show metadata for agent responses
+                if "metadata" in msg:
+                    meta = msg["metadata"]
+                    status_icon = "❌" if meta.get("has_error") else "✅"
+                    st.caption(f"{status_icon} Thinking Steps: {meta['thinking_steps']} | Orchestration Events: {meta['orchestration_events']} | API Calls: {meta['api_calls']}")
+            
+            st.markdown("---")
+
+
+def render_thinking_steps():
+    """Render thinking steps from real domain/technical agents"""
+    st.header("🧠 Thinking Steps & Orchestration")
+    
+    if not st.session_state.thinking_steps and not st.session_state.orchestration_data:
+        st.info("No thinking steps recorded yet. Send a message in the chat to see real agent orchestration.")
+        return
+    
+    # Show real thinking steps from agents
+    if st.session_state.thinking_steps:
+        st.subheader("🔄 Agent Thinking Steps")
+        for step in reversed(st.session_state.thinking_steps[-10:]):
+            timestamp = step.get("timestamp", datetime.now()).strftime("%H:%M:%S") if isinstance(step.get("timestamp"), datetime) else step.get("timestamp", "Unknown")
+            
+            with st.expander(f"🧠 {step.get('type', 'Unknown').title().replace('_', ' ')} ({timestamp})"):
+                st.write(f"**Description:** {step.get('description', 'No description')}")
+                st.write(f"**Agent:** {step.get('agent', 'Unknown')}")
+                if step.get('duration_ms'):
+                    st.write(f"**Duration:** {step['duration_ms']}ms")
+                
+                if step.get('details'):
+                    st.write("**Details:**")
+                    st.json(step['details'])
+    
+    # Show real orchestration events from agents
+    if st.session_state.orchestration_data:
+        st.subheader("🤝 Agent Orchestration Events")
+        for event in reversed(st.session_state.orchestration_data[-10:]):
+            timestamp = event.get("timestamp", datetime.now()).strftime("%H:%M:%S") if isinstance(event.get("timestamp"), datetime) else event.get("timestamp", "Unknown")
+            agent_type = event.get("agent_type", "unknown")
+            event_type = event.get("event_type", "unknown")
+            
+            # Color coding for agent types
+            if agent_type == "domain":
+                icon = "🧠"
+                color = "#E3F2FD"
+            elif agent_type == "technical":
+                icon = "⚙️"
+                color = "#E1F5FE"
+        else:
+                icon = "🔄"
+                color = "#F5F5F5"
+            
+            with st.container():
+                st.markdown(f"""
+                <div style="background-color: {color}; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                    <strong>{icon} {agent_type.title()} Agent - {event_type.title().replace('_', ' ')} ({timestamp})</strong><br>
+                    <small>{event.get('description', 'No description')}</small>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if event.get('details'):
+                    with st.expander(f"Details - {event.get('event_id', 'Unknown')}"):
+                        st.json(event['details'])
+
+
+def render_system_health():
+    """Render system health monitoring"""
+    st.header("⚕️ System Health")
+    
+    # Check FastMCP services
+    st.subheader("🔧 FastMCP Services")
+    services_health = SystemHealthMonitor.check_fastmcp_services()
+    
+    # Create columns for service status
+    service_cols = st.columns(len(services_health))
+    for idx, (service_name, health) in enumerate(services_health.items()):
+        with service_cols[idx]:
+            if health["status"] == "healthy":
+                st.metric(
+                    service_name.replace(" Service", ""),
+                    "✅ Online",
+                    f"{health['response_time']}ms"
+                )
+            elif health["status"] == "unhealthy":
+                st.metric(
+                    service_name.replace(" Service", ""),
+                    "⚠️ Issues",
+                    health["message"]
+                )
+            else:
+                st.metric(
+                    service_name.replace(" Service", ""),
+                    "❌ Offline",
+                    "No response"
+                )
+    
+    # Check Kubernetes pods
+    st.subheader("☸️ Kubernetes Cluster")
+    k8s_health = SystemHealthMonitor.check_kubernetes_pods()
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Total Agents", total_agents)
+        if k8s_health["status"] == "healthy":
+            st.metric("Pod Status", f"✅ {k8s_health['running']}/{k8s_health['total']}", "All running")
+        else:
+            st.metric("Pod Status", f"⚠️ {k8s_health['running']}/{k8s_health['total']}", k8s_health["message"])
+    
     with col2:
-        st.metric("Online", online_agents)
+        st.metric("Cluster", "✅ Connected", "kubectl working")
+    
     with col3:
-        st.metric("Offline", offline_agents)
-    
-    # Agent cards
-    for agent_name, agent_info in st.session_state.agent_registry.items():
-        with st.expander(f"🤖 {agent_name}", expanded=agent_info["status"] == "online"):
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                if agent_info["card"]:
-                    card = agent_info["card"]
-                    st.write(f"**Name:** {card.get('name', 'Unknown')}")
-                    st.write(f"**Description:** {card.get('description', 'No description')}")
-                    st.write(f"**Version:** {card.get('version', 'Unknown')}")
-                    st.write(f"**URL:** {card.get('url', 'Unknown')}")
-                    
-                    # Capabilities
-                    capabilities = card.get("capabilities", {})
-                    if capabilities:
-                        st.write("**Capabilities:**")
-                        cap_cols = st.columns(3)
-                        for i, (cap, enabled) in enumerate(capabilities.items()):
-                            with cap_cols[i % 3]:
-                                icon = "✅" if enabled else "❌"
-                                st.write(f"{icon} {cap.replace('_', ' ').title()}")
-                    
-                    # Endpoints
-                    endpoints = card.get("endpoints", {})
-                    if endpoints:
-                        st.write("**Endpoints:**")
-                        for endpoint, path in endpoints.items():
-                            st.code(f"{endpoint}: {path}")
-                else:
-                    st.warning("Agent card not available")
-            
-            with col2:
-                status = agent_info["status"]
-                if status == "online":
-                    st.success("🟢 Online")
-                elif status == "offline":
-                    st.error("🔴 Offline")
-                else:
-                    st.warning("🟡 Error")
-                    if "error" in agent_info:
-                        st.error(agent_info["error"])
-                
-                st.write(f"**Endpoint:** {agent_info['endpoint']}")
-                
-                # Health check button
-                if st.button(f"Health Check", key=f"health_{agent_name}"):
-                    health = make_request(f"{agent_info['endpoint']}/health")
-                    if health:
-                        st.json(health)
-                    else:
-                        st.error("Health check failed")
+        st.metric("Namespace", "cursor-insurance-ai-poc", "Active")
 
-def communication_flow_tab():
-    """Real-time communication flow visualization"""
-    st.header("🌊 Communication Flow")
+
+def render_api_monitor():
+    """Render API monitoring interface"""
+    st.header("📊 API Monitor")
     
-    if not st.session_state.communication_flow:
-        st.info("No communication flows recorded. Interact with agents to see flows.")
+    if not st.session_state.api_calls:
+        st.info("No API calls recorded yet. Send a message in the chat to see real API interactions.")
         return
     
-    # Flow metrics
+    # API call statistics
     col1, col2, col3, col4 = st.columns(4)
     
+    total_calls = len(st.session_state.api_calls)
+    successful_calls = len([call for call in st.session_state.api_calls if call.get("success", False)])
+    avg_response_time = sum(call.get("response_time_ms", 0) for call in st.session_state.api_calls) / total_calls if total_calls > 0 else 0
+    recent_calls = len([call for call in st.session_state.api_calls if (datetime.now() - call.get("timestamp", datetime.now())).seconds < 60])
+    
     with col1:
-        st.metric("Total Messages", len(st.session_state.communication_flow))
+        st.metric("Total API Calls", total_calls)
     
     with col2:
-        recent_flows = [f for f in st.session_state.communication_flow 
-                       if datetime.fromisoformat(f["timestamp"]) > datetime.utcnow() - timedelta(minutes=5)]
-        st.metric("Last 5 mins", len(recent_flows))
+        st.metric("Success Rate", f"{(successful_calls/total_calls*100):.1f}%" if total_calls > 0 else "0%")
     
     with col3:
-        task_types = [f["task_type"] for f in st.session_state.communication_flow]
-        unique_types = len(set(task_types))
-        st.metric("Task Types", unique_types)
+        st.metric("Avg Response Time", f"{avg_response_time:.1f}ms")
     
     with col4:
-        success_count = sum(1 for f in st.session_state.communication_flow if f["status"] == "completed")
-        success_rate = (success_count / len(st.session_state.communication_flow)) * 100 if st.session_state.communication_flow else 0
-        st.metric("Success Rate", f"{success_rate:.1f}%")
+        st.metric("Calls (Last 1min)", recent_calls)
     
-    # Flow visualization
-    st.subheader("Flow Diagram")
+    # Recent API calls
+    st.subheader("Recent API Calls")
     
-    # Create flow diagram data
-    flow_data = []
-    for flow in st.session_state.communication_flow[-20:]:  # Last 20 flows
-        flow_data.append({
-            "timestamp": flow["timestamp"],
-            "source": flow["source"],
-            "target": flow["target"],
-            "task_type": flow["task_type"],
-            "status": flow["status"],
-            "task_id": flow["task_id"]
-        })
-    
-    if flow_data:
-        df = pd.DataFrame(flow_data)
+    for call in reversed(st.session_state.api_calls[-10:]):  # Show last 10 calls
+        timestamp = call.get("timestamp", datetime.now())
+        if isinstance(timestamp, datetime):
+            timestamp_str = timestamp.strftime("%H:%M:%S")
+        else:
+            timestamp_str = str(timestamp)
         
-        # Timeline chart
-        fig = px.timeline(
-            df,
-            x_start="timestamp",
-            x_end="timestamp",
-            y="target",
-            color="status",
-            hover_data=["task_type", "task_id"],
-            title="Agent Communication Timeline"
-        )
-        fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        status_icon = "✅" if call.get("success", False) else "❌"
         
-        # Flow table
-        st.subheader("Recent Flows")
-        st.dataframe(
-            df[["timestamp", "source", "target", "task_type", "status", "task_id"]],
-            use_container_width=True
-        )
-    
-    # Task history
-    if st.session_state.task_history:
-        st.subheader("Task History")
-        
-        for i, task in enumerate(reversed(st.session_state.task_history[-10:])):  # Last 10 tasks
-            with st.expander(f"Task {task['task']['taskId']} - {task['response'].get('status', 'unknown')}"):
-                col1, col2 = st.columns(2)
+        with st.expander(f"{status_icon} {call.get('service', 'Unknown')} - {call.get('method', 'GET')} ({timestamp_str})"):
+            col_a, col_b = st.columns(2)
+            
+            with col_a:
+                st.write(f"**Service:** {call.get('service', 'Unknown')}")
+                st.write(f"**Endpoint:** {call.get('endpoint', 'Unknown')}")
+                st.write(f"**Method:** {call.get('method', 'GET')}")
+                st.write(f"**Status Code:** {call.get('status_code', 'Unknown')}")
+                st.write(f"**Response Time:** {call.get('response_time_ms', 0)}ms")
+            
+            with col_b:
+                if call.get("request_data"):
+                    st.write("**Request Data:**")
+                    st.json(call["request_data"])
                 
-                with col1:
-                    st.write("**Request:**")
-                    st.json(task['task'])
-                
-                with col2:
-                    st.write("**Response:**")
-                    st.json(task['response'])
+                if call.get("response_data"):
+                    st.write("**Response Data:**")
+                    st.json(call["response_data"])
 
-def analytics_tab():
-    """Analytics and metrics dashboard"""
-    st.header("📈 Analytics Dashboard")
-    
-    # Mock analytics data (in production, fetch from analytics service)
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Task Performance")
-        
-        if st.session_state.communication_flow:
-            # Task type distribution
-            task_types = [f["task_type"] for f in st.session_state.communication_flow]
-            task_type_counts = pd.Series(task_types).value_counts()
-            
-            fig = px.pie(
-                values=task_type_counts.values,
-                names=task_type_counts.index,
-                title="Task Type Distribution"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Status distribution
-            statuses = [f["status"] for f in st.session_state.communication_flow]
-            status_counts = pd.Series(statuses).value_counts()
-            
-            fig = px.bar(
-                x=status_counts.index,
-                y=status_counts.values,
-                title="Task Status Distribution"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        st.subheader("Agent Activity")
-        
-        if st.session_state.communication_flow:
-            # Agent activity
-            targets = [f["target"] for f in st.session_state.communication_flow]
-            target_counts = pd.Series(targets).value_counts()
-            
-            fig = px.bar(
-                x=target_counts.values,
-                y=target_counts.index,
-                orientation='h',
-                title="Agent Activity Levels"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Time series of tasks
-            if len(st.session_state.communication_flow) > 1:
-                df = pd.DataFrame(st.session_state.communication_flow)
-                df['timestamp'] = pd.to_datetime(df['timestamp'])
-                df['hour'] = df['timestamp'].dt.floor('H')
-                
-                hourly_counts = df.groupby('hour').size().reset_index(name='count')
-                
-                fig = px.line(
-                    hourly_counts,
-                    x='hour',
-                    y='count',
-                    title="Task Volume Over Time"
-                )
-                st.plotly_chart(fig, use_container_width=True)
 
-def monitoring_tab():
-    """System monitoring and health checks"""
-    st.header("🔍 System Monitoring")
+def main():
+    """Main application"""
+    st.title("🏥 Insurance AI PoC")
+    st.markdown("**Visual Interface for Domain Agent Orchestration**")
+    st.markdown("---")
     
-    # System health overview
-    col1, col2, col3 = st.columns(3)
+    # Authentication (always visible in sidebar)
+    render_authentication()
     
-    with col1:
-        st.subheader("Service Health")
+    # Main tabs (only show if authenticated)
+    if st.session_state.customer_authenticated:
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "💬 Chat Interface", 
+            "🧠 Thinking & Orchestration",
+            "⚕️ System Health", 
+            "📊 API Monitor",
+            "ℹ️ About"
+        ])
         
-        services = ["Claims Service", "User Service", "Policy Service", "Analytics Service"]
-        service_ports = [8000, 8001, 8002, 8003]
+        with tab1:
+            render_chat_interface()
         
-        for service, port in zip(services, service_ports):
-            try:
-                health = make_request(f"http://localhost:{port}/health")
-                if health:
-                    st.success(f"✅ {service}")
-                    with st.expander(f"{service} Details"):
-                        st.json(health)
-                else:
-                    st.error(f"❌ {service}")
-            except:
-                st.error(f"❌ {service} (Connection Error)")
+        with tab2:
+            render_thinking_steps()
+        
+        with tab3:
+            render_system_health()
+        
+        with tab4:
+            render_api_monitor()
+        
+        with tab5:
+            st.markdown("### About This Interface")
+            st.markdown("""
+            This Streamlit UI provides a visual interface to interact with the Insurance AI PoC domain agents.
+            
+            **Key Features:**
+            - **Real Communication**: Directly communicates with FastMCP domain and technical agents
+            - **Live Orchestration**: Shows real thinking steps and orchestration from agents
+            - **System Monitoring**: Real-time health monitoring of all services
+            - **API Transparency**: Captures and displays all API calls between components
+            
+            **Architecture:**
+            - Domain agents handle business logic and customer interaction
+            - Technical agents manage system orchestration and service calls
+            - This UI simply provides visualization and interaction capabilities
+            """)
     
-    with col2:
-        st.subheader("Resource Usage")
-        
-        # Mock resource usage data
-        import random
-        
-        resources = {
-            "CPU Usage": f"{random.randint(10, 80)}%",
-            "Memory Usage": f"{random.randint(30, 70)}%",
-            "Disk Usage": f"{random.randint(20, 60)}%",
-            "Network I/O": f"{random.randint(5, 25)} MB/s"
-        }
-        
-        for resource, value in resources.items():
-            st.metric(resource, value)
-    
-    with col3:
-        st.subheader("Error Rates")
-        
-        # Mock error data
-        error_rates = {
-            "HTTP 4xx": f"{random.uniform(0.1, 2.0):.1f}%",
-            "HTTP 5xx": f"{random.uniform(0.0, 0.5):.1f}%",
-            "Timeouts": f"{random.uniform(0.0, 1.0):.1f}%",
-            "Failed Tasks": f"{random.uniform(0.0, 3.0):.1f}%"
-        }
-        
-        for error_type, rate in error_rates.items():
-            st.metric(error_type, rate)
-    
-    # Logs viewer
-    st.subheader("Recent Logs")
-    
-    if st.session_state.task_history:
-        log_entries = []
-        for task in st.session_state.task_history[-5:]:
-            log_entries.append({
-                "timestamp": task["timestamp"],
-                "level": "INFO" if task["response"].get("status") == "completed" else "ERROR",
-                "message": f"Task {task['task']['taskId']} - {task['response'].get('status', 'unknown')}",
-                "agent": task["agent"]
-            })
-        
-        log_df = pd.DataFrame(log_entries)
-        st.dataframe(log_df, use_container_width=True)
     else:
-        st.info("No recent logs available")
+        # Not authenticated - show welcome
+        st.info("👋 Please authenticate using the sidebar to access the Insurance AI PoC features.")
+        
+        st.markdown("### Available Features:")
+        st.markdown("- **💬 Chat Interface**: Communicate directly with domain agents")
+        st.markdown("- **🧠 Thinking & Orchestration**: View real agent thinking and orchestration")
+        st.markdown("- **⚕️ System Health**: Monitor all FastMCP services and Kubernetes")
+        st.markdown("- **📊 API Monitor**: Track real API calls between systems")
+
 
 if __name__ == "__main__":
     main() 

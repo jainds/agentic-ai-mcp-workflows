@@ -1,14 +1,20 @@
 """
 Claims Agent - Domain agent for processing insurance claims using LLM.
-Processes customer queries and orchestrates technical agent calls via A2A protocol.
+Processes customer queries and orchestrates technical agent calls via official Google A2A protocol.
 """
 
 import os
 import asyncio
 from typing import Dict, Any, List
 from datetime import datetime
+import uuid
+import time
 
-from agents.shared.a2a_base import A2AAgent, TaskRequest, TaskResponse
+# Official Google A2A Library imports
+from python_a2a import A2AServer, TaskRequest, TaskResponse, Message, TextContent, MessageRole
+from python_a2a.models import TaskStatus, TaskState
+
+from agents.shared.a2a_base import A2AAgent, A2AClientWrapper
 from agents.shared.auth import service_auth
 import structlog
 import openai
@@ -17,7 +23,7 @@ logger = structlog.get_logger(__name__)
 
 
 class ClaimsAgent(A2AAgent):
-    """Domain agent for insurance claims processing with LLM intelligence"""
+    """Domain agent for insurance claims processing with LLM intelligence using official Google A2A"""
     
     def __init__(self, port: int = 8000):
         capabilities = {
@@ -27,15 +33,17 @@ class ClaimsAgent(A2AAgent):
             "messageHistory": True,
             "claimsProcessing": True,
             "documentAnalysis": True,
-            "llmEnabled": True
+            "llmEnabled": True,
+            "google_a2a_compatible": True  # Official A2A compatibility
         }
         
-        # Initialize A2A agent
+        # Initialize A2A agent with official library
         super().__init__(
             name="ClaimsAgent",
-            description="LLM-powered agent for processing insurance claims with AI analysis and fraud detection",
+            description="LLM-powered agent for processing insurance queries with AI analysis and fraud detection using official Google A2A protocol",
             port=port,
-            capabilities=capabilities
+            capabilities=capabilities,
+            version="2.0.0"  # Updated version for official A2A
         )
         
         # Initialize OpenRouter client (compatible with OpenAI client)
@@ -77,9 +85,71 @@ class ClaimsAgent(A2AAgent):
         }
         
         logger.info("Claims Agent initialized with LLM capabilities", port=port)
+        
+        # Add HTTP endpoints for UI communication
+        self._setup_ui_endpoints()
     
-    async def process_task(self, task: TaskRequest) -> TaskResponse:
-        """Process incoming A2A tasks using LLM intelligence"""
+    def _setup_ui_endpoints(self):
+        """Setup HTTP endpoints for Streamlit UI communication"""
+        
+        @self.app.get("/health")
+        async def health_check():
+            """Health check endpoint for UI"""
+            return {
+                "status": "healthy",
+                "agent": "ClaimsAgent",
+                "version": "1.0.0",
+                "capabilities": self.capabilities
+            }
+        
+        @self.app.post("/chat")
+        async def chat_endpoint(request: dict):
+            """Chat endpoint for UI communication using official A2A format"""
+            message = request.get("message", "")
+            customer_id = request.get("customer_id", "anonymous")
+            
+            # Create A2A task from UI request using official format
+            task = TaskRequest(
+                taskId=str(uuid.uuid4()),
+                user={
+                    "user_id": customer_id,
+                    "message": message,
+                    "conversation_id": f"ui_{customer_id}_{int(time.time())}"
+                }
+            )
+            
+            # Process through official A2A handle_task method
+            processed_task = self.handle_task(task)
+            
+            # Extract response from official A2A format
+            main_response = "I'm here to help with your insurance needs."
+            
+            if processed_task.status and processed_task.status.message:
+                status_message = processed_task.status.message
+                if isinstance(status_message, dict):
+                    content = status_message.get("content", {})
+                    if isinstance(content, dict):
+                        main_response = content.get("text", main_response)
+                    else:
+                        main_response = str(content)
+            
+            # Extract metadata from processed task
+            metadata = processed_task.metadata or {}
+            thinking_steps = metadata.get("thinking_steps", [])
+            orchestration_events = metadata.get("orchestration_events", [])
+            api_calls = metadata.get("api_calls", [])
+            intent = metadata.get("intent", "unknown")
+            actions_taken = metadata.get("actions_taken", [])
+            
+            return {
+                "response": main_response,
+                "thinking_steps": thinking_steps,
+                "orchestration_events": orchestration_events,
+                "api_calls": api_calls
+            }
+    
+    def handle_task(self, task: TaskRequest) -> TaskResponse:
+        """Handle incoming A2A tasks using official Google A2A library format"""
         user_data = task.user
         user_message = user_data.get("message", "")
         user_id = user_data.get("user_id", "anonymous")
@@ -88,6 +158,14 @@ class ClaimsAgent(A2AAgent):
         logger.info("Processing customer query", task_id=task.taskId, user_id=user_id, message=user_message[:100])
         
         try:
+            # Initialize tracking for this task
+            self.current_thinking_steps = []
+            self.current_orchestration_events = []
+            self.current_api_calls = []
+            
+            self._add_thinking_step(f"Received customer query: '{user_message[:50]}...'")
+            self._add_orchestration_event("task_started", {"task_id": task.taskId, "user_id": user_id})
+            
             # Add to conversation history
             if conversation_id not in self.conversation_history:
                 self.conversation_history[conversation_id] = []
@@ -98,11 +176,19 @@ class ClaimsAgent(A2AAgent):
                 "timestamp": datetime.utcnow().isoformat()
             })
             
+            self._add_thinking_step("Analyzing user intent and determining required actions")
+            
             # Use LLM to understand intent and plan actions
-            intent_analysis = await self._analyze_user_intent(user_message, conversation_id)
+            intent_analysis = asyncio.run(self._analyze_user_intent(user_message, conversation_id))
+            
+            self._add_thinking_step(f"Intent identified: {intent_analysis.get('intent', 'unknown')} (confidence: {intent_analysis.get('confidence', 0):.2f})")
+            self._add_orchestration_event("intent_analyzed", intent_analysis)
             
             # Execute the planned actions by orchestrating technical agents
-            response_content = await self._execute_plan(intent_analysis, user_data, task.taskId)
+            self._add_thinking_step("Orchestrating technical agents to gather required information")
+            response_content = asyncio.run(self._execute_plan(intent_analysis, user_data, task.taskId))
+            
+            self._add_thinking_step("Generating comprehensive response based on gathered data")
             
             # Add assistant response to history
             self.conversation_history[conversation_id].append({
@@ -111,25 +197,63 @@ class ClaimsAgent(A2AAgent):
                 "timestamp": datetime.utcnow().isoformat()
             })
             
-            return TaskResponse(
-                taskId=task.taskId,
-                parts=[{"text": response_content, "type": "claims_response"}],
-                status="completed",
-                metadata={
-                    "agent": "ClaimsAgent",
-                    "intent": intent_analysis.get("intent"),
-                    "actions_taken": intent_analysis.get("actions", [])
+            self._add_orchestration_event("task_completed", {"response_length": len(response_content)})
+            
+            # Set task status using official A2A format
+            task.status = TaskStatus(
+                state=TaskState.COMPLETED,
+                message={
+                    "role": "agent",
+                    "content": {
+                        "type": "text",
+                        "text": response_content
+                    }
                 }
             )
             
+            # Set task artifacts using official A2A format
+            task.artifacts = [{
+                "parts": [{
+                    "type": "text", 
+                    "text": response_content
+                }]
+            }]
+            
+            # Add metadata for tracking
+            task.metadata = {
+                "agent": "ClaimsAgent",
+                "intent": intent_analysis.get("intent"),
+                "thinking_steps": self.current_thinking_steps,
+                "orchestration_events": self.current_orchestration_events,
+                "api_calls": self.current_api_calls,
+                "actions_taken": intent_analysis.get("technical_actions", [])
+            }
+            
+            return task
+            
         except Exception as e:
             logger.error("Task processing failed", task_id=task.taskId, error=str(e))
-            return TaskResponse(
-                taskId=task.taskId,
-                parts=[{"text": f"I apologize, but I encountered an error processing your request: {str(e)}", "type": "error"}],
-                status="failed",
-                metadata={"agent": "ClaimsAgent", "error": str(e)}
+            
+            # Set error status using official A2A format
+            task.status = TaskStatus(
+                state=TaskState.FAILED,
+                message={
+                    "role": "agent",
+                    "content": {
+                        "type": "text",
+                        "text": f"I apologize, but I encountered an error processing your request: {str(e)}"
+                    }
+                }
             )
+            
+            task.artifacts = [{
+                "parts": [{
+                    "type": "error",
+                    "text": f"Error: {str(e)}"
+                }]
+            }]
+            
+            return task
     
     async def _analyze_user_intent(self, user_message: str, conversation_id: str) -> Dict[str, Any]:
         """Use LLM to analyze user intent and plan actions"""
@@ -373,6 +497,8 @@ class ClaimsAgent(A2AAgent):
         - Policy information
         - General insurance questions
         - Next steps for customers
+        - Provide as much details as possible to the user, based on the question asked
+        - You are witty, posh and represent the company well
         
         Be professional, empathetic, and concise. If you can't answer something, direct them to appropriate resources.
         """
@@ -395,35 +521,53 @@ class ClaimsAgent(A2AAgent):
             return "I'm here to help with your insurance needs. Could you please rephrase your question?"
     
     async def _call_technical_agent(self, agent_name: str, task_data: Dict[str, Any]) -> Any:
-        """Call a technical agent via A2A protocol"""
+        """Call a technical agent via official Google A2A protocol"""
         
         if agent_name not in self.technical_agents:
             raise ValueError(f"Unknown technical agent: {agent_name}")
         
+        start_time = time.time()
+        endpoint = self.technical_agents[agent_name]
+        action = task_data.get("action", "unknown")
+        
+        self._add_thinking_step(f"Calling {agent_name} for action: {action}")
+        self._add_orchestration_event("technical_agent_call", {
+            "agent": agent_name, 
+            "action": action,
+            "endpoint": endpoint
+        })
+        
         try:
-            # Get service token for A2A communication
-            token = service_auth.get_service_token("claims-agent")
+            # Use official A2A client wrapper
+            client = A2AClientWrapper(endpoint)
             
-            # Create task request
-            task_request = TaskRequest(
-                taskId=f"{agent_name}_{datetime.utcnow().timestamp()}",
-                requestId=f"req_{datetime.utcnow().timestamp()}",
-                user=task_data
-            )
+            # Send task using official A2A protocol
+            response = await client.send_task(task_data)
             
-            # Send task to technical agent
-            result = await self.send_task_to_agent(
-                f"{agent_name.title().replace('_', '')}Agent",  # DataAgent, NotificationAgent
-                task_request.user,
-                token
-            )
+            # Track successful API call
+            duration_ms = (time.time() - start_time) * 1000
+            self._add_api_call(endpoint, "A2A_TASK", "success", duration_ms)
+            self._add_thinking_step(f"Successfully received response from {agent_name} ({duration_ms:.1f}ms)")
+            
+            # Close the client
+            await client.close()
             
             logger.info("Technical agent called successfully", agent=agent_name, action=task_data.get("action"))
-            return result
+            return response
             
         except Exception as e:
+            # Track failed API call
+            duration_ms = (time.time() - start_time) * 1000
+            self._add_api_call(endpoint, "A2A_TASK", "failed", duration_ms)
+            self._add_thinking_step(f"Failed to call {agent_name}: {str(e)}")
+            
             logger.error("Technical agent call failed", agent=agent_name, error=str(e))
-            return None
+            
+            # Return fallback response
+            return {
+                "error": f"Failed to contact {agent_name}: {str(e)}",
+                "fallback": True
+            }
     
     async def _extract_claim_information(self, message: str) -> Dict[str, Any]:
         """Extract structured claim information from user message using LLM"""
@@ -554,6 +698,40 @@ class ClaimsAgent(A2AAgent):
         except Exception as e:
             logger.error("Policy response generation failed", error=str(e))
             return "I'd be happy to help with your policy question. For detailed policy information, please refer to your policy documents or customer service."
+    
+    def _add_thinking_step(self, step: str):
+        """Add a thinking step to current tracking"""
+        if not hasattr(self, 'current_thinking_steps'):
+            self.current_thinking_steps = []
+        timestamp = datetime.utcnow().isoformat()
+        self.current_thinking_steps.append(f"[{timestamp}] {step}")
+        logger.info("Thinking step", step=step)
+    
+    def _add_orchestration_event(self, event: str, details: Dict[str, Any] = None):
+        """Add an orchestration event to current tracking"""
+        if not hasattr(self, 'current_orchestration_events'):
+            self.current_orchestration_events = []
+        event_data = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "event": event,
+            "details": details or {}
+        }
+        self.current_orchestration_events.append(event_data)
+        logger.info("Orchestration event", event_type=event, event_details=details)
+    
+    def _add_api_call(self, endpoint: str, method: str, status: str, duration_ms: float = None):
+        """Add an API call to current tracking"""
+        if not hasattr(self, 'current_api_calls'):
+            self.current_api_calls = []
+        api_call = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "endpoint": endpoint,
+            "method": method,
+            "status": status,
+            "duration_ms": duration_ms
+        }
+        self.current_api_calls.append(api_call)
+        logger.info("API call tracked", **api_call)
 
 
 # Main execution

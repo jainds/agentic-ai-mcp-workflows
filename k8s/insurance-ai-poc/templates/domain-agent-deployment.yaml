@@ -1,0 +1,55 @@
+{{- if .Values.domainAgent.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "insurance-ai-poc.fullname" . }}-domain-agent
+  namespace: insurance-ai-agentic
+  labels:
+    {{- include "insurance-ai-poc.labels" . | nindent 4 }}
+    component: domain-agent
+spec:
+  replicas: {{ .Values.domainAgent.replicas }}
+  selector:
+    matchLabels:
+      {{- include "insurance-ai-poc.selectorLabels" . | nindent 6 }}
+      component: domain-agent
+  template:
+    metadata:
+      labels:
+        {{- include "insurance-ai-poc.selectorLabels" . | nindent 8 }}
+        component: domain-agent
+    spec:
+      serviceAccountName: {{ include "insurance-ai-poc.serviceAccountName" . }}
+      containers:
+        - name: domain-agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.domainAgent.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "insurance-ai-poc.fullname" . }}-config
+          env:
+            - name: OPENAI_API_KEY
+              value: {{ .Values.env.OPENAI_API_KEY | quote }}
+            - name: ANTHROPIC_API_KEY
+              value: {{ .Values.env.ANTHROPIC_API_KEY | quote }}
+          workingDir: /app
+          command: ["python", "domain_agent/main.py"]
+          resources:
+            {{- toYaml .Values.domainAgent.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }} 

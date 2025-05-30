@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "insurance-ai-poc.fullname" . }}-config
+  namespace: insurance-ai-agentic
+  labels:
+    {{- include "insurance-ai-poc.labels" . | nindent 4 }}
+data:
+  # Domain Agent Configuration
+  DOMAIN_AGENT_HOST: {{ .Values.config.domainAgent.host | quote }}
+  DOMAIN_AGENT_PORT: {{ .Values.config.domainAgent.port | quote }}
+  TECHNICAL_AGENT_URL: {{ .Values.config.domainAgent.technicalAgentUrl | quote }}
+  POLICY_SERVER_URL: {{ .Values.config.domainAgent.policyServerUrl | quote }}
+  
+  # Technical Agent Configuration
+  TECHNICAL_AGENT_HOST: {{ .Values.config.technicalAgent.host | quote }}
+  TECHNICAL_AGENT_PORT: {{ .Values.config.technicalAgent.port | quote }}
+  
+  # Policy Server Configuration
+  POLICY_SERVER_HOST: {{ .Values.config.policyServer.host | quote }}
+  POLICY_SERVER_PORT: {{ .Values.config.policyServer.port | quote }}
+  POLICY_SERVER_DATA_PATH: {{ .Values.config.policyServer.dataPath | quote }}
+  
+  # Streamlit UI Configuration
+  STREAMLIT_HOST: {{ .Values.config.streamlitUI.host | quote }}
+  STREAMLIT_PORT: {{ .Values.config.streamlitUI.port | quote }}
+  DOMAIN_AGENT_URL: {{ .Values.config.streamlitUI.domainAgentUrl | quote }}
+  
+  # Environment Configuration
+  ENVIRONMENT: {{ .Values.env.ENVIRONMENT | quote }}
+  LOG_LEVEL: {{ .Values.env.LOG_LEVEL | quote }} 

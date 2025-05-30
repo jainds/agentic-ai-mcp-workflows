@@ -1,0 +1,135 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ui-config
+  namespace: cursor-insurance-ai-poc
+data:
+  # UI Mode: simple or advanced
+  UI_MODE: "advanced"
+  
+  # Feature toggles
+  ENABLE_ADVANCED_FEATURES: "true"
+  ENABLE_SYSTEM_MONITORING: "true"
+  ENABLE_API_MONITORING: "true"
+  ENABLE_THINKING_STEPS: "true"
+  ENABLE_ORCHESTRATION_VIEW: "true"
+
+---
+# Simple mode configuration (commented out)
+# To switch to simple mode, apply this instead:
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: ui-config
+#   namespace: cursor-insurance-ai-poc
+# data:
+#   UI_MODE: "simple"
+#   ENABLE_ADVANCED_FEATURES: "false"
+#   ENABLE_SYSTEM_MONITORING: "false"
+#   ENABLE_API_MONITORING: "false"
+#   ENABLE_THINKING_STEPS: "false"
+#   ENABLE_ORCHESTRATION_VIEW: "false"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamlit-ui-advanced
+  namespace: cursor-insurance-ai-poc
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: streamlit-ui
+      mode: advanced
+  template:
+    metadata:
+      labels:
+        app: streamlit-ui
+        mode: advanced
+    spec:
+      containers:
+      - name: streamlit-ui
+        image: insurance-ai-poc-streamlit-ui:modular
+        ports:
+        - containerPort: 8501
+        envFrom:
+        - configMapRef:
+            name: ui-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+# Simple mode deployment (disabled by default)
+# To deploy simple mode instead, change replicas from 0 to 2
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streamlit-ui-simple
+  namespace: cursor-insurance-ai-poc
+spec:
+  replicas: 0  # Set to 2 to enable simple mode
+  selector:
+    matchLabels:
+      app: streamlit-ui
+      mode: simple
+  template:
+    metadata:
+      labels:
+        app: streamlit-ui
+        mode: simple
+    spec:
+      containers:
+      - name: streamlit-ui
+        image: insurance-ai-poc-streamlit-ui:modular
+        ports:
+        - containerPort: 8501
+        env:
+        - name: UI_MODE
+          value: "simple"
+        - name: ENABLE_ADVANCED_FEATURES
+          value: "false"
+        - name: ENABLE_SYSTEM_MONITORING
+          value: "false"
+        - name: ENABLE_API_MONITORING
+          value: "false"
+        - name: ENABLE_THINKING_STEPS
+          value: "false"
+        - name: ENABLE_ORCHESTRATION_VIEW
+          value: "false"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /_stcore/health
+            port: 8501
+          initialDelaySeconds: 10
+          periodSeconds: 5 

@@ -381,7 +381,7 @@ if __name__ == "__main__":
             print(f"  MCP tools available: get_user, authenticate_user, list_users, create_user, update_user")
             mcp.run(transport="streamable-http", host=host, port=port)
         except Exception as e:
-            logger.error(f"Failed to start with MCP tools, falling back to regular FastAPI: {e}")
+            logger.error(f"Failed to start with MCP tools, falling back to regular FastAPI: {str(e)}")
             logger.info(f"Starting User Service as FastAPI on {host}:{port}")
             print(f"  Health check: http://{host}:{port}/health")
             print(f"  API docs: http://{host}:{port}/docs")

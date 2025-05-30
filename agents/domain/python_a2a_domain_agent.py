@@ -351,12 +351,85 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         """REMOVED: Rule-based intent analysis - now throws error instead"""
         raise RuntimeError("Rule-based intent analysis removed - LLM required for proper intent understanding")
     
-    def create_execution_plan(self, intent_analysis: Dict[str, Any], user_text: str, customer_id: str = "CUST-001") -> Dict[str, Any]:
+    def create_execution_plan(self, intent_analysis: Dict[str, Any], user_text: str, customer_id: str = None) -> Dict[str, Any]:
         """
         Create a detailed execution plan based on intent analysis
+        Handle missing information by identifying what questions to ask
         """
         primary_intent = intent_analysis.get("primary_intent", "general_inquiry")
         complexity = intent_analysis.get("complexity", "simple")
+        entities = intent_analysis.get("entities", {})
+        
+        # Check for missing critical information
+        missing_info = self._identify_missing_information(primary_intent, entities, customer_id)
+        
+        if missing_info:
+            return {
+                "type": "information_gathering",
+                "primary_intent": primary_intent,
+                "missing_information": missing_info,
+                "questions_to_ask": self._generate_clarifying_questions(missing_info, primary_intent),
+                "next_steps": "Collect required information before proceeding",
+                "status": "pending_information"
+            }
+        
+        # We have enough information to proceed
+        return self._create_execution_plan_with_info(intent_analysis, user_text, customer_id)
+    
+    def _identify_missing_information(self, intent: str, entities: Dict[str, Any], customer_id: str = None) -> List[str]:
+        """Identify what information is missing for the given intent"""
+        missing = []
+        
+        # Critical information requirements by intent
+        intent_requirements = {
+            "claim_filing": ["customer_id", "incident_details"],
+            "claim_status": ["customer_id"],  # claim_id is optional if we can find by customer
+            "policy_inquiry": ["customer_id"],
+            "billing_question": ["customer_id"],
+            "quote_request": ["coverage_type"],  # customer_id not required for quotes
+            "general_inquiry": []  # No specific requirements
+        }
+        
+        required_info = intent_requirements.get(intent, [])
+        
+        # Check each requirement
+        for requirement in required_info:
+            if requirement == "customer_id" and not customer_id:
+                missing.append("customer_id")
+            elif requirement == "incident_details" and not any(
+                key in entities for key in ["incident_date", "incident_type", "damage_description"]
+            ):
+                missing.append("incident_details")
+            elif requirement == "coverage_type" and not entities.get("coverage_type"):
+                missing.append("coverage_type")
+        
+        return missing
+    
+    def _generate_clarifying_questions(self, missing_info: List[str], intent: str) -> List[str]:
+        """Generate user-friendly questions to collect missing information"""
+        questions = []
+        
+        question_templates = {
+            "customer_id": "I'll need to look up your account. Could you provide your customer ID or policy number?",
+            "incident_details": "To help you file a claim, I need some details about the incident. When did it occur and what type of damage happened?",
+            "coverage_type": "What type of insurance coverage are you interested in? (Auto, Home, Life, etc.)",
+            "claim_id": "Do you have a specific claim number you'd like me to check?",
+            "policy_id": "Which specific policy are you asking about? You can provide a policy number if you have it."
+        }
+        
+        for info in missing_info:
+            if info in question_templates:
+                questions.append(question_templates[info])
+            else:
+                questions.append(f"I need more information about {info.replace('_', ' ')} to help you.")
+        
+        return questions
+    
+    def _create_execution_plan_with_info(self, intent_analysis: Dict[str, Any], user_text: str, customer_id: str) -> Dict[str, Any]:
+        """Create execution plan when we have sufficient information"""
+        primary_intent = intent_analysis.get("primary_intent", "general_inquiry")
+        complexity = intent_analysis.get("complexity", "simple")
+        entities = intent_analysis.get("entities", {})
         
         # Define plan templates based on intent
         plan_templates = {
@@ -369,14 +442,6 @@ Is there any specific aspect you'd like me to explain in more detail?"""
                 "parallel_execution": False
             },
             "claim_status": {
-                "steps": [
-                    {"agent": "data_agent", "action": "fetch_claim_status", "priority": 1},
-                    {"agent": "data_agent", "action": "fetch_claim_details", "priority": 2}
-                ],
-                "expected_duration": "2-3 minutes",
-                "parallel_execution": False
-            },
-            "claim_status_inquiry": {
                 "steps": [
                     {"agent": "data_agent", "action": "fetch_claim_status", "priority": 1},
                     {"agent": "data_agent", "action": "fetch_claim_details", "priority": 2}
@@ -397,59 +462,76 @@ Is there any specific aspect you'd like me to explain in more detail?"""
                     {"agent": "data_agent", "action": "fetch_billing_history", "priority": 1},
                     {"agent": "data_agent", "action": "calculate_outstanding_balance", "priority": 2}
                 ],
-                "expected_duration": "2-3 minutes",
+                "expected_duration": "3-5 minutes",
                 "parallel_execution": False
             },
             "quote_request": {
                 "steps": [
-                    {"agent": "data_agent", "action": "generate_quote", "priority": 1}
+                    {"agent": "data_agent", "action": "calculate_quote", "priority": 1},
+                    {"agent": "data_agent", "action": "fetch_available_options", "priority": 2}
                 ],
-                "expected_duration": "3-5 minutes",
+                "expected_duration": "3-7 minutes",
                 "parallel_execution": False
             },
             "general_inquiry": {
                 "steps": [
-                    {"agent": "data_agent", "action": "general_information_lookup", "priority": 1}
+                    {"agent": "data_agent", "action": "general_information_retrieval", "priority": 1}
                 ],
-                "expected_duration": "1-2 minutes",
+                "expected_duration": "1-3 minutes",
                 "parallel_execution": False
             }
         }
         
-        # Get plan template or create custom plan
-        plan = plan_templates.get(primary_intent, plan_templates["general_inquiry"]).copy()
+        base_plan = plan_templates.get(primary_intent, plan_templates["general_inquiry"])
         
-        # Enhance plan with context and customer information
-        entities = intent_analysis.get("entities", {}).copy()
-        entities["customer_id"] = customer_id  # Ensure customer_id is in entities
-        
-        plan.update({
-            "intent": primary_intent,
-            "user_request": user_text,
+        # Enhance plan with context
+        enhanced_plan = {
+            **base_plan,
+            "type": "execution",
+            "primary_intent": primary_intent,
+            "customer_id": customer_id,
             "entities": entities,
-            "urgency": intent_analysis.get("urgency", "medium"),
             "complexity": complexity,
-            "plan_id": str(uuid.uuid4()),
-            "created_at": datetime.utcnow().isoformat(),
-            "customer_id": customer_id  # Also store at top level for easy access
-        })
+            "timestamp": datetime.now().isoformat(),
+            "status": "ready_to_execute"
+        }
         
-        logger.info("Execution plan created", 
-                   plan_id=plan["plan_id"],
-                   steps=len(plan["steps"]),
-                   intent=primary_intent,
-                   customer_id=customer_id)
+        # Add context to each step
+        for step in enhanced_plan["steps"]:
+            step["context"] = {
+                "customer_id": customer_id,
+                "entities": entities,
+                "user_text": user_text,
+                "intent": primary_intent
+            }
         
-        return plan
+        return enhanced_plan
     
     def execute_plan(self, execution_plan: Dict[str, Any], conversation_id: str) -> Dict[str, Any]:
         """
         Role 2: Execute the plan by routing tasks to technical agents
+        Handle both execution plans and information gathering scenarios
         """
+        plan_type = execution_plan.get("type", "execution")
+        
+        if plan_type == "information_gathering":
+            # Return information gathering response instead of executing tasks
+            return {
+                "type": "information_gathering",
+                "status": "pending_information",
+                "missing_information": execution_plan.get("missing_information", []),
+                "questions_to_ask": execution_plan.get("questions_to_ask", []),
+                "primary_intent": execution_plan.get("primary_intent", "general_inquiry"),
+                "next_steps": execution_plan.get("next_steps", ""),
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # Normal execution plan
         results = {
-            "plan_id": execution_plan["plan_id"],
+            "type": "execution",
+            "plan_id": execution_plan.get("plan_id", str(uuid.uuid4())),
             "execution_id": str(uuid.uuid4()),
-            "started_at": datetime.utcnow().isoformat(),
+            "started_at": datetime.now().isoformat(),
             "step_results": [],
             "status": "in_progress"
         }
@@ -465,7 +547,7 @@ Is there any specific aspect you'd like me to explain in more detail?"""
             results["step_results"] = self.execute_sequential_steps(steps, execution_plan)
         
         results["status"] = "completed"
-        results["completed_at"] = datetime.utcnow().isoformat()
+        results["completed_at"] = datetime.now().isoformat()
         
         logger.info("Plan execution completed", 
                    execution_id=results["execution_id"],
@@ -517,7 +599,7 @@ Is there any specific aspect you'd like me to explain in more detail?"""
                 "action": action,
                 "status": step_status,
                 "result": result,
-                "executed_at": datetime.utcnow().isoformat()
+                "executed_at": datetime.now().isoformat()
             }
             
             if error_msg:
@@ -538,7 +620,13 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         """
         Role 3: Prepare professional response using structured templates
         Enhanced with template-based formatting and professional presentation
+        Handle both execution results and information gathering scenarios
         """
+        # Check if this is an information gathering scenario
+        if execution_results.get("type") == "information_gathering":
+            return self._prepare_information_gathering_response(execution_results, intent_analysis, user_text)
+        
+        # Normal execution response preparation
         # Extract key information for response preparation
         primary_intent = intent_analysis.get("primary_intent", "general_inquiry")
         step_results = execution_results.get("step_results", [])
@@ -606,6 +694,49 @@ Is there any specific aspect you'd like me to explain in more detail?"""
                    template_used=self.template_enhancement_enabled)
         
         return final_response
+
+    def _prepare_information_gathering_response(self, execution_results: Dict[str, Any], 
+                                               intent_analysis: Dict[str, Any], 
+                                               user_text: str) -> str:
+        """Prepare a professional response when we need to gather more information"""
+        questions = execution_results.get("questions_to_ask", [])
+        missing_info = execution_results.get("missing_information", [])
+        primary_intent = execution_results.get("primary_intent", "general_inquiry")
+        
+        # Create a professional information gathering response
+        response_parts = []
+        
+        # Professional greeting and acknowledgment
+        response_parts.append("Thank you for contacting us. I'd be happy to help you with your request.")
+        
+        # Explain what we need
+        if len(questions) == 1:
+            response_parts.append(f"To provide you with the most accurate assistance, {questions[0]}")
+        else:
+            response_parts.append("To provide you with the most accurate assistance, I need some additional information:")
+            for i, question in enumerate(questions, 1):
+                if len(questions) > 1:
+                    response_parts.append(f"{i}. {question}")
+                else:
+                    response_parts.append(f"• {question}")
+        
+        # Add context about what we'll do next
+        intent_context = {
+            "claim_filing": "Once I have this information, I can guide you through the claim filing process.",
+            "claim_status": "Once I have this information, I can look up your claim status and provide detailed updates.",
+            "policy_inquiry": "Once I have this information, I can provide you with detailed policy information and benefits.",
+            "billing_question": "Once I have this information, I can review your billing history and answer your questions.",
+            "quote_request": "Once I have this information, I can provide you with personalized insurance quotes.",
+            "general_inquiry": "Once I have this information, I can provide you with the specific assistance you need."
+        }
+        
+        next_step_msg = intent_context.get(primary_intent, "Once I have this information, I can better assist you.")
+        response_parts.append(next_step_msg)
+        
+        # Professional closing
+        response_parts.append("Please provide the requested information, and I'll be glad to help you right away.")
+        
+        return " ".join(response_parts)
 
     def _aggregate_step_results(self, step_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Aggregate data from step results for template population"""

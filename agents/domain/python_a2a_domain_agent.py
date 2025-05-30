@@ -275,12 +275,21 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         """
         prompt = f"""
         As an insurance domain expert, analyze this user request and extract:
-        1. Primary intent (claim_filing, policy_inquiry, billing_question, claim_status, quote_request)
+        1. Primary intent - Choose ONE from: claim_filing, policy_inquiry, billing_question, claim_status, quote_request, general_inquiry
         2. Secondary intents (if any)
         3. Key entities (policy numbers, claim IDs, dates, amounts, etc.)
         4. Required information gathering
         5. Urgency level
         6. Complexity assessment
+        
+        IMPORTANT INTENT CLASSIFICATION RULES:
+        - If user mentions "claim" AND ("status", "check", "update", "progress") → claim_status
+        - If user mentions claim ID (like CLM-123456) → claim_status  
+        - If user wants to "file" or "submit" new claim → claim_filing
+        - If user asks about "policy" → policy_inquiry
+        - If user asks about "billing", "payment", "premium" → billing_question
+        - If user wants a "quote" or "rate" → quote_request
+        - Otherwise → general_inquiry
         
         User Request: "{user_text}"
         

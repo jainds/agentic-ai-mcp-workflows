@@ -151,33 +151,23 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         # Try OpenRouter first, fall back to OpenAI
         openrouter_key = os.getenv('OPENROUTER_API_KEY')
         openai_key = os.getenv('OPENAI_API_KEY')
-        model_name = os.getenv('PRIMARY_MODEL_NAME') or os.getenv('SECONDARY_MODEL_NAME')
+        model_name = os.getenv('LLM_MODEL') or os.getenv('PRIMARY_MODEL_NAME') or os.getenv('SECONDARY_MODEL_NAME') or "anthropic/claude-3.5-sonnet"
         
         if openrouter_key:
-            try:
-                self.llm_client = OpenAI(
-                    base_url="https://openrouter.ai/api/v1",
-                    api_key=openrouter_key
-                )
-                self.model_name = model_name
-                logger.info("LLM client configured with OpenRouter")
-            except Exception as e:
-                logger.error(f"Failed to setup OpenRouter client: {e}")
-                self.llm_client = None
-                self.model_name = None
+            self.llm_client = OpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=openrouter_key
+            )
+            self.model_name = model_name
+            logger.info("LLM client configured with OpenRouter", model=self.model_name)
         elif openai_key:
-            try:
-                self.llm_client = OpenAI(api_key=openai_key)
-                self.model_name = model_name
-                logger.info("LLM client configured with OpenAI")
-            except Exception as e:
-                logger.error(f"Failed to setup OpenAI client: {e}")
-                self.llm_client = None
-                self.model_name = None
+            self.llm_client = OpenAI(api_key=openai_key)
+            self.model_name = model_name
+            logger.info("LLM client configured with OpenAI", model=self.model_name)
         else:
-            logger.warning("No LLM API key found - domain agent will fail on intent analysis")
             self.llm_client = None
             self.model_name = None
+            logger.warning("No LLM client configured - OPENROUTER_API_KEY or OPENAI_API_KEY environment variable required")
 
     def setup_technical_agents(self):
         """Setup connections to technical agents via python-a2a"""

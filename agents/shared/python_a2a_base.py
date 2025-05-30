@@ -113,51 +113,51 @@ class PythonA2AAgent(A2AServer):
     
     async def call_agent_async(self, agent_url: str, message_text: str) -> str:
         """Call another A2A agent asynchronously"""
-        try:
-            client = A2AClient(agent_url)
-            
-            # Create message
-            message = Message(
-                content=TextContent(text=message_text),
-                role=MessageRole.USER
-            )
-            
-            # Send message using python-a2a client
-            response = client.send_message(message)
-            
-            logger.info("Successfully called A2A agent", 
-                       agent_url=agent_url, message_id=getattr(message, 'message_id', None))
-            
+        client = A2AClient(agent_url)
+        
+        # Create message
+        message = Message(
+            content=TextContent(text=message_text),
+            role=MessageRole.USER
+        )
+        
+        # Send message using python-a2a client
+        response = client.send_message(message)
+        
+        logger.info("Successfully called A2A agent", 
+                   agent_url=agent_url, message_id=getattr(message, 'message_id', None))
+        
+        # Handle different response types
+        if hasattr(response, 'content') and hasattr(response.content, 'text'):
             return response.content.text
-            
-        except Exception as e:
-            logger.error("Failed to call A2A agent", 
-                        agent_url=agent_url, error=str(e))
-            raise
+        elif hasattr(response, 'text'):
+            return response.text
+        else:
+            return str(response)
     
     def call_agent(self, agent_url: str, message_text: str) -> str:
         """Call another A2A agent synchronously"""
-        try:
-            client = A2AClient(agent_url)
-            
-            # Create message
-            message = Message(
-                content=TextContent(text=message_text),
-                role=MessageRole.USER
-            )
-            
-            # Send message using python-a2a client
-            response = client.send_message(message)
-            
-            logger.info("Successfully called A2A agent", 
-                       agent_url=agent_url, message_id=getattr(message, 'message_id', None))
-            
+        client = A2AClient(agent_url)
+        
+        # Create message
+        message = Message(
+            content=TextContent(text=message_text),
+            role=MessageRole.USER
+        )
+        
+        # Send message using python-a2a client
+        response = client.send_message(message)
+        
+        logger.info("Successfully called A2A agent", 
+                   agent_url=agent_url, message_id=getattr(message, 'message_id', None))
+        
+        # Handle different response types
+        if hasattr(response, 'content') and hasattr(response.content, 'text'):
             return response.content.text
-            
-        except Exception as e:
-            logger.error("Failed to call A2A agent", 
-                        agent_url=agent_url, error=str(e))
-            raise
+        elif hasattr(response, 'text'):
+            return response.text
+        else:
+            return str(response)
     
     def register_agent(self, agent_name: str, agent_url: str):
         """Register another agent for easy communication"""

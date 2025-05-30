@@ -179,28 +179,17 @@ Is there any specific aspect you'd like me to explain in more detail?"""
             self.agent_network = None
             logger.warning("AgentNetwork not available, using simple registry")
         
-        # Technical agent endpoints (these would be discovered in production)
-        data_agent_url = "http://localhost:8002"  # Technical Agent (Data)
-        notification_agent_url = "http://localhost:8003"  # Technical Agent (Notification)  
-        fastmcp_agent_url = "http://localhost:8004"  # Technical Agent (FastMCP)
+        # Register technical agents with the agent network
+        self.register_agent("data_agent", os.getenv('DATA_AGENT_URL', 'http://localhost:8002'))
+        # Temporarily disabled crashing agents for core functionality testing
+        # self.register_agent("notification_agent", os.getenv('NOTIFICATION_AGENT_URL', 'http://localhost:8003'))
+        # self.register_agent("fastmcp_agent", os.getenv('FASTMCP_AGENT_URL', 'http://localhost:8004'))
         
-        # Register agents in our registry
-        self.register_agent("data_agent", data_agent_url)
-        self.register_agent("notification_agent", notification_agent_url)
-        self.register_agent("fastmcp_agent", fastmcp_agent_url)
+        self.agent_network.add_agent("data_agent", os.getenv('DATA_AGENT_URL', 'http://localhost:8002'))
+        # self.agent_network.add_agent("notification_agent", os.getenv('NOTIFICATION_AGENT_URL', 'http://localhost:8003'))
+        # self.agent_network.add_agent("fastmcp_agent", os.getenv('FASTMCP_AGENT_URL', 'http://localhost:8004'))
         
-        # Add to agent network if available
-        if self.agent_network:
-            try:
-                self.agent_network.add("data_agent", data_agent_url)
-                self.agent_network.add("notification_agent", notification_agent_url)
-                self.agent_network.add("fastmcp_agent", fastmcp_agent_url)
-                logger.info("Technical agents registered in agent network")
-            except Exception as e:
-                logger.warning(f"Could not add agents to network: {e}")
-        
-        logger.info("Technical agents setup completed", 
-                   registered_agents=list(self.agent_registry.keys()))
+        logger.info("Technical agents registered in agent network")
 
     def setup_ai_router(self):
         """Setup AI-powered router for intelligent task routing"""
@@ -273,10 +262,11 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         6. Complexity assessment
         
         IMPORTANT INTENT CLASSIFICATION RULES:
-        - If user mentions "claim" AND ("status", "check", "update", "progress") → claim_status
+        - If user mentions "claim" AND ("status", "check", "update", "progress", "recent") → claim_status
         - If user mentions claim ID (like CLM-123456) → claim_status  
+        - If user asks about "claims" in plural → claim_status
         - If user wants to "file" or "submit" new claim → claim_filing
-        - If user asks about "policy" → policy_inquiry
+        - If user asks about "policy" or "policies" → policy_inquiry
         - If user asks about "billing", "payment", "premium" → billing_question
         - If user wants a "quote" or "rate" → quote_request
         - Otherwise → general_inquiry
@@ -337,12 +327,10 @@ Is there any specific aspect you'd like me to explain in more detail?"""
             "claim_filing": {
                 "steps": [
                     {"agent": "data_agent", "action": "validate_policy", "priority": 1},
-                    {"agent": "data_agent", "action": "create_claim_record", "priority": 2},
-                    {"agent": "fastmcp_agent", "action": "fraud_detection_check", "priority": 3},
-                    {"agent": "notification_agent", "action": "send_claim_confirmation", "priority": 4}
+                    {"agent": "data_agent", "action": "create_claim_record", "priority": 2}
                 ],
                 "expected_duration": "5-10 minutes",
-                "parallel_execution": True
+                "parallel_execution": False
             },
             "claim_status": {
                 "steps": [
@@ -370,8 +358,7 @@ Is there any specific aspect you'd like me to explain in more detail?"""
             },
             "quote_request": {
                 "steps": [
-                    {"agent": "data_agent", "action": "generate_quote", "priority": 1},
-                    {"agent": "fastmcp_agent", "action": "risk_assessment", "priority": 2}
+                    {"agent": "data_agent", "action": "generate_quote", "priority": 1}
                 ],
                 "expected_duration": "3-5 minutes",
                 "parallel_execution": False

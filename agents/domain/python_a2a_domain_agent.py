@@ -295,6 +295,8 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         }}
         """
         
+        logger.info("Intent analysis starting", user_text=user_text, model=self.model_name)
+        
         response = self.llm_client.chat.completions.create(
             model=self.model_name,
             messages=[{"role": "user", "content": prompt}],
@@ -302,11 +304,20 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         )
         
         intent_text = response.choices[0].message.content
+        logger.info("LLM raw response", response_text=intent_text)
+        
+        # Handle markdown code blocks around JSON
+        if intent_text.startswith("```json") and intent_text.endswith("```"):
+            intent_text = intent_text[7:-3].strip()
+        elif intent_text.startswith("```") and intent_text.endswith("```"):
+            intent_text = intent_text[3:-3].strip()
+        
         intent_analysis = json.loads(intent_text)
         
         logger.info("Intent analysis completed", 
                    primary_intent=intent_analysis.get("primary_intent"),
-                   confidence=intent_analysis.get("confidence"))
+                   confidence=intent_analysis.get("confidence"),
+                   entities=intent_analysis.get("entities"))
         
         return intent_analysis
     
@@ -813,6 +824,26 @@ Please let me know how else I can help you, or feel free to try your request aga
         async def get_agent_card_endpoint():
             """Get agent card endpoint"""
             return self.get_agent_card()
+        
+        @self.app.get("/test-llm")
+        async def test_llm_endpoint():
+            """Test LLM direct call"""
+            if not self.llm_client:
+                return {"error": "No LLM client configured"}
+            
+            try:
+                response = self.llm_client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[{"role": "user", "content": "Reply with exactly: claim_status"}],
+                    temperature=0.0
+                )
+                return {
+                    "model": self.model_name,
+                    "response": response.choices[0].message.content,
+                    "success": True
+                }
+            except Exception as e:
+                return {"error": str(e), "model": self.model_name}
 
     async def process_user_message(self, message: str, customer_id: str = "default-customer") -> Dict[str, Any]:
         """Process user message through the enhanced domain agent workflow"""

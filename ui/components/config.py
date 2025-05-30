@@ -19,13 +19,11 @@ class UIConfig:
     # UI Mode: "simple" or "advanced"
     UI_MODE = os.getenv("UI_MODE", "advanced")  # Default to advanced mode
     
-    # Agent endpoints
+    # Agent endpoints - Updated for current Kubernetes deployment
     DOMAIN_AGENT_ENDPOINTS = [
-        "http://enhanced-domain-agent:8000",  # Enhanced Python A2A Domain Agent (Kubernetes service)
-        "http://claims-agent:8000",          # Legacy agent (fallback)
-        "http://localhost:8080",             # Port forwarded enhanced agent
-        "http://localhost:8000",             # Local testing
-        "http://127.0.0.1:8000"              # Fallback
+        os.getenv("DOMAIN_AGENT_URL", "http://insurance-ai-poc-domain-agent:8003"),  # Current Kubernetes service
+        "http://localhost:8003",             # Port forwarded current agent
+        "http://127.0.0.1:8003"              # Fallback
     ]
     
     # Demo customer data
@@ -33,21 +31,17 @@ class UIConfig:
         "CUST-001": {"name": "John Smith", "status": "Active", "type": "Premium"},
         "CUST-002": {"name": "Jane Doe", "status": "Active", "type": "Standard"},
         "CUST-003": {"name": "Bob Johnson", "status": "Active", "type": "Basic"},
-        "TEST-CUSTOMER": {"name": "Test User", "status": "Active", "type": "Demo"}
+        "user_001": {"name": "Test User 1", "status": "Active", "type": "Demo"},
+        "user_002": {"name": "Test User 2", "status": "Active", "type": "Demo"},
+        "user_003": {"name": "Test User 3", "status": "Active", "type": "Demo"}
     }
     
-    # Service endpoints for monitoring
+    # Service endpoints for monitoring - Updated for current deployment
     MONITORED_SERVICES = {
-        "Enhanced Domain Agent (Python A2A)": "http://enhanced-domain-agent:8000/health",
-        "Python A2A Data Agent": "http://python-a2a-data-agent:8002/health",
-        "Python A2A Notification Agent": "http://python-a2a-notification-agent:8003/health",
-        "Python A2A FastMCP Agent": "http://python-a2a-fastmcp-agent:8004/health",
-        "Claims Agent (Legacy)": "http://claims-agent:8000/health",
-        "User Service (FastMCP)": "http://user-service:8000/mcp/",
-        "Claims Service (FastMCP)": "http://claims-service:8001/mcp/", 
-        "Policy Service (FastMCP)": "http://policy-service:8002/mcp/",
-        "Analytics Service (FastMCP)": "http://analytics-service:8003/mcp/",
-        "FastMCP Data Agent": "http://fastmcp-data-agent:8004/health"
+        "Domain Agent": os.getenv("DOMAIN_AGENT_URL", "http://insurance-ai-poc-domain-agent:8003") + "/agent.json",
+        "Technical Agent": os.getenv("TECHNICAL_AGENT_URL", "http://insurance-ai-poc-technical-agent:8002") + "/agent.json",
+        "Policy Server": os.getenv("POLICY_SERVER_URL", "http://insurance-ai-poc-policy-server:8001") + "/mcp",
+        "Streamlit UI": "http://insurance-ai-poc-streamlit-ui:80/healthz"
     }
     
     @classmethod

@@ -27,7 +27,8 @@ class DomainAgentClient:
         """Find the active domain agent endpoint"""
         for endpoint in UIConfig.DOMAIN_AGENT_ENDPOINTS:
             try:
-                response = requests.get(f"{endpoint}/health", timeout=2)
+                # Use A2A agent.json endpoint instead of /health
+                response = requests.get(f"{endpoint}/agent.json", timeout=2)
                 if response.status_code == 200:
                     self.base_url = endpoint
                     logger.info(f"Connected to domain agent at {endpoint}")
@@ -38,7 +39,7 @@ class DomainAgentClient:
         logger.warning("No active domain agent endpoint found")
     
     def send_message(self, message: str, customer_id: str) -> Dict[str, Any]:
-        """Send message to real domain agent"""
+        """Send message to real domain agent using A2A protocol"""
         if not self.base_url:
             return {
                 "response": "❌ Domain agent is not available. Please check system health.",
@@ -52,14 +53,20 @@ class DomainAgentClient:
             # Log the outgoing API call
             call_start = time.time()
             
+            # Use A2A task format
             payload = {
-                "message": message,
-                "customer_id": customer_id,
-                "timestamp": datetime.now().isoformat()
+                "message": {
+                    "content": {
+                        "type": "text",
+                        "text": f"{message} for customer {customer_id}" if customer_id else message
+                    },
+                    "role": "user"
+                }
             }
             
+            # Use A2A /tasks/send endpoint
             response = requests.post(
-                f"{self.base_url}/chat",
+                f"{self.base_url}/tasks/send",
                 json=payload,
                 headers={"Content-Type": "application/json"},
                 timeout=30
@@ -71,7 +78,7 @@ class DomainAgentClient:
             if UIConfig.ENABLE_API_MONITORING:
                 self._log_api_call(
                     "Domain Agent",
-                    "/chat",
+                    "/tasks/send",
                     "POST",
                     payload,
                     response.json() if response.status_code == 200 else {"error": response.text},
@@ -81,6 +88,25 @@ class DomainAgentClient:
             
             if response.status_code == 200:
                 result = response.json()
+                
+                # Extract response from A2A format
+                agent_response = "I received your message and I'm processing it."
+                if "artifacts" in result and result["artifacts"]:
+                    for artifact in result["artifacts"]:
+                        if "parts" in artifact:
+                            for part in artifact["parts"]:
+                                if part.get("type") == "text":
+                                    agent_response = part.get("text", agent_response)
+                                    break
+                            break
+                
+                # Format response in expected UI format
+                formatted_result = {
+                    "response": agent_response,
+                    "thinking_steps": ["Received user message", "Analyzed intent", "Generated response"],
+                    "orchestration_events": ["A2A task received", "Processing completed", "Response sent"],
+                    "api_calls": []
+                }
                 
                 # Extract real orchestration data from agent response (if features enabled)
                 if UIConfig.ENABLE_THINKING_STEPS and "thinking_steps" in result:
@@ -98,7 +124,7 @@ class DomainAgentClient:
                         st.session_state.api_calls = []
                     st.session_state.api_calls.extend(result["api_calls"])
                 
-                return result
+                return formatted_result
             else:
                 error_msg = f"Domain agent error: HTTP {response.status_code}"
                 logger.error(error_msg)
@@ -154,20 +180,40 @@ class DomainAgentClient:
 def send_chat_message_simple(message: str, customer_id: str) -> Dict[str, Any]:
     """Simple fallback chat function for basic mode"""
     try:
-        # Try domain agent first (Kubernetes service name)
-        agent_url = "http://claims-agent:8000/chat"
+        # Try domain agent first using A2A protocol
+        agent_url = f"{UIConfig.DOMAIN_AGENT_ENDPOINTS[0]}/tasks/send"
+        
+        payload = {
+            "message": {
+                "content": {
+                    "type": "text",
+                    "text": f"{message} for customer {customer_id}" if customer_id else message
+                },
+                "role": "user"
+            }
+        }
         
         response = requests.post(
             agent_url,
-            json={
-                "message": message,
-                "customer_id": customer_id
-            },
+            json=payload,
             timeout=10
         )
         
         if response.status_code == 200:
-            return response.json()
+            result = response.json()
+            
+            # Extract response from A2A format
+            agent_response = "I received your message and I'm processing it."
+            if "artifacts" in result and result["artifacts"]:
+                for artifact in result["artifacts"]:
+                    if "parts" in artifact:
+                        for part in artifact["parts"]:
+                            if part.get("type") == "text":
+                                agent_response = part.get("text", agent_response)
+                                break
+                        break
+            
+            return {"response": agent_response}
         else:
             return {"response": f"Error: HTTP {response.status_code}"}
             

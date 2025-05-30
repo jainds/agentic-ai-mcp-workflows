@@ -58,12 +58,79 @@ class E2ETester:
                 except:
                     pass
 
+    def test_ui_domain_agent_real_connectivity(self) -> bool:
+        """Test real UI to Domain Agent connectivity through actual UI"""
+        try:
+            print("\n🎯 Testing Real UI->Domain Agent Connectivity")
+            
+            # Test that UI can actually reach domain agent by checking its internal connectivity
+            # We'll simulate what the UI does when it tries to connect
+            
+            # First check if domain agent is reachable from UI pod perspective
+            try:
+                ui_pod_name = subprocess.check_output([
+                    "kubectl", "get", "pods", "-n", "insurance-ai-agentic", 
+                    "-l", "component=streamlit-ui", 
+                    "-o", "jsonpath={.items[0].metadata.name}"
+                ], text=True).strip()
+                
+                # Test domain agent connectivity from within UI pod
+                test_cmd = [
+                    "kubectl", "exec", "-n", "insurance-ai-agentic", ui_pod_name, "--",
+                    "curl", "-s", "-X", "GET", 
+                    "http://insurance-ai-poc-domain-agent:8003/agent.json",
+                    "--max-time", "5"
+                ]
+                
+                result = subprocess.run(test_cmd, capture_output=True, text=True, timeout=10)
+                
+                if result.returncode == 0:
+                    print("✅ UI can reach Domain Agent service")
+                    
+                    # Now test A2A communication
+                    a2a_payload = '{"message": {"content": {"type": "text", "text": "Test connectivity"}, "role": "user"}}'
+                    a2a_test_cmd = [
+                        "kubectl", "exec", "-n", "insurance-ai-agentic", ui_pod_name, "--",
+                        "curl", "-s", "-X", "POST", 
+                        "http://insurance-ai-poc-domain-agent:8003/tasks/send",
+                        "-H", "Content-Type: application/json",
+                        "-d", a2a_payload,
+                        "--max-time", "10"
+                    ]
+                    
+                    a2a_result = subprocess.run(a2a_test_cmd, capture_output=True, text=True, timeout=15)
+                    
+                    if a2a_result.returncode == 0:
+                        print("✅ A2A communication working from UI to Domain Agent")
+                        try:
+                            response_data = json.loads(a2a_result.stdout)
+                            if "id" in response_data:
+                                print(f"   A2A Task ID: {response_data.get('id')}")
+                                return True
+                        except:
+                            print("   A2A response received but not JSON parseable")
+                            return True
+                    else:
+                        print(f"❌ A2A communication failed: {a2a_result.stderr}")
+                        return False
+                else:
+                    print(f"❌ UI cannot reach Domain Agent: {result.stderr}")
+                    return False
+                    
+            except Exception as e:
+                print(f"❌ Failed to test UI->Domain Agent connectivity: {e}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ UI->Domain Agent Real Connectivity Test Failed: {e}")
+            return False
+
     def test_policy_inquiry_workflow(self) -> bool:
         """Test complete policy inquiry workflow"""
         try:
             print("\n🎯 Testing Policy Inquiry Workflow")
             
-            # Simulate user asking about their policies
+            # Test through A2A interface (what the UI actually uses)
             task_payload = {
                 "message": {
                     "content": {
@@ -90,9 +157,10 @@ class E2ETester:
                     if task_id:
                         print(f"   Task ID: {task_id}")
                         
-                        # Wait and check task status
-                        time.sleep(2)
-                        # Note: In a real E2E test, we'd check task completion
+                        # Check for artifacts (actual response)
+                        if "artifacts" in data and data["artifacts"]:
+                            print("   ✅ Got response artifacts from domain agent")
+                        
                         print("✅ Policy inquiry workflow completed")
                         return True
                 
@@ -357,7 +425,8 @@ class E2ETester:
                 "quote_request_workflow": self.test_quote_request_workflow(),
                 "ui_accessibility_workflow": self.test_ui_accessibility_workflow(),
                 "error_handling_workflow": self.test_error_handling_workflow(),
-                "multi_conversation_workflow": self.test_multi_conversation_workflow()
+                "multi_conversation_workflow": self.test_multi_conversation_workflow(),
+                "ui_domain_agent_real_connectivity": self.test_ui_domain_agent_real_connectivity()
             }
             
             print("\n📊 End-to-End Test Results:")

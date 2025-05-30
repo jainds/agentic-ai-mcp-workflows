@@ -179,17 +179,18 @@ Is there any specific aspect you'd like me to explain in more detail?"""
             self.agent_network = None
             logger.warning("AgentNetwork not available, using simple registry")
         
-        # Register technical agents with the agent network
-        self.register_agent("data_agent", os.getenv('DATA_AGENT_URL', 'http://localhost:8002'))
+        # Register technical agents with proper A2A URLs
+        self.register_agent("data_agent", os.getenv('DATA_AGENT_URL', 'http://python-a2a-data-agent:8002'))
         # Temporarily disabled crashing agents for core functionality testing
-        # self.register_agent("notification_agent", os.getenv('NOTIFICATION_AGENT_URL', 'http://localhost:8003'))
-        # self.register_agent("fastmcp_agent", os.getenv('FASTMCP_AGENT_URL', 'http://localhost:8004'))
+        # self.register_agent("notification_agent", os.getenv('NOTIFICATION_AGENT_URL', 'http://python-a2a-notification-agent:8003'))
+        # self.register_agent("fastmcp_agent", os.getenv('FASTMCP_AGENT_URL', 'http://python-a2a-fastmcp-agent:8004'))
         
         # Add to agent network using correct method
         if self.agent_network:
-            self.agent_network.add("data_agent", os.getenv('DATA_AGENT_URL', 'http://localhost:8002'))
+            self.agent_network.add("data_agent", os.getenv('DATA_AGENT_URL', 'http://python-a2a-data-agent:8002'))
         
-        logger.info("Technical agents registered in agent network")
+        logger.info("Technical agents registered for A2A communication", 
+                   registered_agents=list(self.agent_registry.keys()))
 
     def setup_ai_router(self):
         """Setup AI-powered router for intelligent task routing"""
@@ -207,7 +208,7 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         except Exception as e:
             logger.warning(f"AI router not available: {e}, using simple routing")
             self.ai_router = None
-    
+
     def handle_message(self, message: Message) -> Message:
         """
         Main message handler implementing the two-role functionality:

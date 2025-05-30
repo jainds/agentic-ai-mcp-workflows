@@ -179,6 +179,16 @@ async def generate_report(report_type: str = "monthly", current_user: dict = Dep
     else:
         raise HTTPException(status_code=400, detail="Invalid report type")
 
+# FastMCP Integration
+try:
+    from mcp_server import AnalyticsMCPServer
+    analytics_mcp = AnalyticsMCPServer(app)
+    logger.info("FastMCP server integrated successfully")
+except ImportError as e:
+    logger.warning(f"FastMCP not available, continuing without MCP integration: {e}")
+except Exception as e:
+    logger.error(f"Failed to initialize FastMCP server: {e}")
+
 if __name__ == "__main__":
     host = os.getenv("ANALYTICS_SERVICE_HOST", "0.0.0.0")
     
@@ -196,14 +206,26 @@ if __name__ == "__main__":
     use_fastmcp = os.getenv("USE_FASTMCP", "true").lower() == "true"
     
     if FASTMCP_AVAILABLE and use_fastmcp:
-        # Create an MCP server from the FastAPI app
-        mcp = FastMCP.from_fastapi(app=app)
-        print(f"Starting Analytics Service with FastMCP on {host}:{port}")
-        print(f"  FastMCP endpoints: http://{host}:{port}/mcp/")
-        print(f"  Note: Traditional HTTP endpoints not available in FastMCP mode")
-        mcp.run(transport="streamable-http", host=host, port=port)
+        # Use the properly configured AnalyticsMCPServer with real MCP tools
+        try:
+            from mcp_server import AnalyticsMCPServer
+            analytics_mcp_server = AnalyticsMCPServer(app)
+            
+            # Use the MCP server directly
+            mcp = analytics_mcp_server.mcp
+            
+            logger.info(f"Starting Analytics Service with FastMCP and proper MCP tools on {host}:{port}")
+            print(f"  FastMCP endpoints: http://{host}:{port}/mcp/")
+            print(f"  MCP tools available: generate_report, get_customer_metrics, calculate_risk_score")
+            mcp.run(transport="streamable-http", host=host, port=port)
+        except Exception as e:
+            logger.error(f"Failed to start with MCP tools, falling back to regular FastAPI: {e}")
+            logger.info(f"Starting Analytics Service as FastAPI on {host}:{port}")
+            print(f"  Health check: http://{host}:{port}/health")
+            print(f"  API docs: http://{host}:{port}/docs")
+            uvicorn.run(app, host=host, port=port)
     else:
-        print(f"Starting Analytics Service as FastAPI on {host}:{port}")
+        logger.info(f"Starting Analytics Service as FastAPI on {host}:{port}")
         print(f"  Health check: http://{host}:{port}/health")
         print(f"  API docs: http://{host}:{port}/docs")
         uvicorn.run(app, host=host, port=port) 

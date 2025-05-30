@@ -68,9 +68,10 @@ spec:
   ports:
   - port: 8501
     targetPort: 8501
+    nodePort: 30801
     protocol: TCP
     name: http
-  type: ClusterIP
+  type: NodePort
 
 ---
 apiVersion: networking.k8s.io/v1

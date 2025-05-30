@@ -37,6 +37,17 @@ spec:
           value: "http://python-a2a-notification-agent:8003"
         - name: FASTMCP_AGENT_URL
           value: "http://python-a2a-fastmcp-agent:8004"
+        # FastMCP service URLs for technical agent MCP integration
+        - name: USER_SERVICE_URL
+          value: "http://user-service-fastmcp:8000"
+        - name: CLAIMS_SERVICE_URL
+          value: "http://claims-service-fastmcp:8001"
+        - name: POLICY_SERVICE_URL
+          value: "http://policy-service-fastmcp:8002"
+        - name: ANALYTICS_SERVICE_URL
+          value: "http://analytics-service-fastmcp:8003"
+        - name: FASTMCP_BASE_URL
+          value: "http://fastmcp-services:8000"
         - name: OPENROUTER_API_KEY
           valueFrom:
             secretKeyRef:
@@ -50,7 +61,7 @@ spec:
               key: openai-api-key
               optional: true
         - name: LLM_MODEL
-          value: "openai/gpt-4o-mini"
+          value: "anthropic/claude-3.5-sonnet"
         - name: PYTHON_A2A_COMPATIBLE
           value: "true"
         - name: PROFESSIONAL_TEMPLATES_ENABLED
@@ -101,9 +112,10 @@ spec:
   ports:
   - port: 8000
     targetPort: 8000
+    nodePort: 30800
     protocol: TCP
     name: http
-  type: ClusterIP
+  type: NodePort
 
 ---
 apiVersion: apps/v1
@@ -140,6 +152,17 @@ spec:
           value: "data"
         - name: AGENT_HOST
           value: "0.0.0.0"
+        # FastMCP service URLs for MCP integration
+        - name: USER_SERVICE_URL
+          value: "http://user-service-fastmcp:8000"
+        - name: CLAIMS_SERVICE_URL
+          value: "http://claims-service-fastmcp:8001"
+        - name: POLICY_SERVICE_URL
+          value: "http://policy-service-fastmcp:8002"
+        - name: ANALYTICS_SERVICE_URL
+          value: "http://analytics-service-fastmcp:8003"
+        - name: FASTMCP_BASE_URL
+          value: "http://fastmcp-services:8000"
         resources:
           requests:
             memory: "256Mi"
@@ -213,6 +236,17 @@ spec:
           value: "notification"
         - name: AGENT_HOST
           value: "0.0.0.0"
+        # FastMCP service URLs for MCP integration
+        - name: USER_SERVICE_URL
+          value: "http://user-service-fastmcp:8000"
+        - name: CLAIMS_SERVICE_URL
+          value: "http://claims-service-fastmcp:8001"
+        - name: POLICY_SERVICE_URL
+          value: "http://policy-service-fastmcp:8002"
+        - name: ANALYTICS_SERVICE_URL
+          value: "http://analytics-service-fastmcp:8003"
+        - name: FASTMCP_BASE_URL
+          value: "http://fastmcp-services:8000"
         resources:
           requests:
             memory: "256Mi"
@@ -286,6 +320,17 @@ spec:
           value: "fastmcp"
         - name: AGENT_HOST
           value: "0.0.0.0"
+        # FastMCP service URLs for MCP integration
+        - name: USER_SERVICE_URL
+          value: "http://user-service-fastmcp:8000"
+        - name: CLAIMS_SERVICE_URL
+          value: "http://claims-service-fastmcp:8001"
+        - name: POLICY_SERVICE_URL
+          value: "http://policy-service-fastmcp:8002"
+        - name: ANALYTICS_SERVICE_URL
+          value: "http://analytics-service-fastmcp:8003"
+        - name: FASTMCP_BASE_URL
+          value: "http://fastmcp-services:8000"
         resources:
           requests:
             memory: "256Mi"

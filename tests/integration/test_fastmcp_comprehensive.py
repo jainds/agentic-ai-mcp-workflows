@@ -445,6 +445,7 @@ class TestFastMCPPerformance:
         
         for tool_name, params in tools_to_test:
             start_time = time.time()
+            result = None  # Initialize result
             if tool_name == "get_user":
                 result = service.get_user(**params)
             elif tool_name == "list_users":

@@ -1,177 +1,79 @@
 #!/usr/bin/env python3
+
 """
-Standalone FastMCP Server
-A complete FastMCP server implementation for insurance data operations
-Can be run independently for testing and development
+Legacy FastMCP Standalone Server
+
+This file is deprecated in favor of the modular FastMCP implementation.
+Use services/shared/fastmcp_server.py instead.
 """
 
-import asyncio
-import os
-import uvicorn
+import sys
+from pathlib import Path
 import structlog
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.routing import Mount
-from mcp.server.sse import SseServerTransport
-from .fastmcp_data_service import get_data_service
 
-# Setup logging
+# Add project root to path for imports
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+try:
+    from fastmcp import FastMCP
+    FASTMCP_AVAILABLE = True
+except ImportError:
+    print("❌ FastMCP not available. Please install: pip install fastmcp")
+    FASTMCP_AVAILABLE = False
+
+from services.shared.fastmcp_server import ModularFastMCPServer, create_fastmcp_server
+
 logger = structlog.get_logger(__name__)
 
-class StandaloneFastMCPServer:
-    """Standalone FastMCP server with proper SSE transport"""
+
+def create_fastmcp_server_legacy(data_file_path: str = None) -> FastMCP:
+    """
+    Legacy function for backward compatibility.
     
-    def __init__(self, port: int = 9000, host: str = "0.0.0.0"):
-        self.host = host
-        self.port = port
-        self.app = FastAPI(
-            title="FastMCP Insurance Server",
-            description="Insurance data service using FastMCP with proper MCP protocol",
-            version="1.0.0"
-        )
-        
-        # Initialize data service
-        self.data_service = get_data_service()
-        
-        # Setup SSE transport
-        self.sse = SseServerTransport("/messages/")
-        
-        # Setup FastAPI app
-        self._setup_app()
+    This function is deprecated. Use the modular FastMCP server instead:
+    from services.shared.fastmcp_server import create_fastmcp_server
+    """
+    logger.warning("Using deprecated legacy FastMCP server function. "
+                  "Please migrate to services.shared.fastmcp_server.create_fastmcp_server")
     
-    def _setup_app(self):
-        """Setup FastAPI application with proper MCP integration"""
-        
-        # Add CORS middleware
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-        
-        # Health check endpoint
-        @self.app.get("/health")
-        async def health_check():
-            """Health check endpoint"""
-            try:
-                tools_count = len(self.data_service.get_available_tools())
-                return JSONResponse({
-                    "status": "healthy",
-                    "service": "fastmcp-insurance-server",
-                    "tools_count": tools_count,
-                    "mcp_protocol": "sse"
-                })
-            except Exception as e:
-                logger.error(f"Health check failed: {e}")
-                return JSONResponse({
-                    "status": "unhealthy",
-                    "error": str(e)
-                }, status_code=503)
-        
-        # Root endpoint
-        @self.app.get("/")
-        async def root():
-            """Root endpoint with service information"""
-            return {
-                "service": "FastMCP Insurance Server",
-                "version": "1.0.0",
-                "mcp_protocol": "sse",
-                "endpoints": {
-                    "health": "/health",
-                    "sse": "/sse",
-                    "messages": "/messages/"
-                },
-                "tools_available": len(self.data_service.get_available_tools())
-            }
-        
-        # SSE endpoint for MCP protocol
-        @self.app.get("/sse")
-        async def handle_sse(request: Request):
-            """
-            SSE endpoint that connects to the MCP server
-            
-            This endpoint establishes a Server-Sent Events connection with the client
-            and forwards communication to the Model Context Protocol server.
-            """
-            logger.info("SSE connection requested")
-            
-            try:
-                # Get the MCP server instance
-                mcp_server = self.data_service.get_server()
-                if not mcp_server:
-                    logger.error("MCP server not available from data service")
-                    return JSONResponse({
-                        "error": "MCP server not available"
-                    }, status_code=503)
-                
-                # Use SSE transport to establish connection
-                async with self.sse.connect_sse(
-                    request.scope, 
-                    request.receive, 
-                    request._send
-                ) as (read_stream, write_stream):
-                    logger.info("SSE connection established, running MCP server")
-                    
-                    # Run the MCP server with the established streams
-                    await mcp_server._mcp_server.run(
-                        read_stream,
-                        write_stream,
-                        mcp_server._mcp_server.create_initialization_options(),
-                    )
-                    
-            except Exception as e:
-                logger.error(f"SSE connection failed: {e}", exc_info=True)
-                return JSONResponse({
-                    "error": f"SSE connection failed: {str(e)}"
-                }, status_code=500)
-        
-        # Mount the messages endpoint for SSE transport
-        self.app.router.routes.append(
-            Mount("/messages", app=self.sse.handle_post_message)
-        )
-        
-        logger.info("FastMCP server configured with proper SSE transport")
-    
-    def run(self):
-        """Run the server"""
-        logger.info(f"Starting FastMCP Insurance Server on {self.host}:{self.port}")
-        logger.info(f"Available Tools: {len(self.data_service.get_available_tools())}")
-        logger.info("Using proper MCP protocol with SSE transport")
-        
-        # List available tools for debugging
-        tools = self.data_service.get_available_tools()
-        for tool in tools:
-            logger.info(f"Tool available: {tool['name']} - {tool['description']}")
-        
-        uvicorn.run(
-            self.app,
-            host=self.host,
-            port=self.port,
-            log_level="info"
-        )
+    return create_fastmcp_server(data_file_path)
 
 
 def main():
-    """Main entry point"""
-    import argparse
+    """
+    Main entry point for legacy server.
     
-    parser = argparse.ArgumentParser(description="FastMCP Insurance Server with SSE")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
-    parser.add_argument("--port", type=int, default=9000, help="Port to bind to")
-    parser.add_argument("--data-file", help="Path to JSON data file")
+    This is deprecated. Use the modular server instead:
+    python services/shared/fastmcp_server.py
+    """
+    logger.warning("Running deprecated legacy FastMCP server. "
+                  "Please use the modular server: python services/shared/fastmcp_server.py")
     
-    args = parser.parse_args()
+    if not FASTMCP_AVAILABLE:
+        print("❌ FastMCP not available. Please install: pip install fastmcp")
+        sys.exit(1)
     
-    # Set data file if provided
-    if args.data_file:
-        os.environ["FASTMCP_DATA_FILE"] = args.data_file
-    
-    # Create and run server
-    server = StandaloneFastMCPServer(port=args.port, host=args.host)
-    server.run()
+    try:
+        # Create and run modular server
+        server = ModularFastMCPServer("Legacy Insurance Server")
+        
+        if not server.setup():
+            logger.error("Failed to setup FastMCP server")
+            sys.exit(1)
+        
+        logger.info("🚀 Starting Legacy FastMCP Insurance Server...")
+        logger.info("📝 Total tool modules: 5")
+        logger.info("📝 Total tools: 15")
+        
+        # Run server
+        server.run(transport="sse")
+        
+    except KeyboardInterrupt:
+        logger.info("Server stopped by user")
+    except Exception as e:
+        logger.error("Server failed", error=str(e), exc_info=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

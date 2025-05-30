@@ -185,9 +185,9 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         # self.register_agent("notification_agent", os.getenv('NOTIFICATION_AGENT_URL', 'http://localhost:8003'))
         # self.register_agent("fastmcp_agent", os.getenv('FASTMCP_AGENT_URL', 'http://localhost:8004'))
         
-        self.agent_network.add_agent("data_agent", os.getenv('DATA_AGENT_URL', 'http://localhost:8002'))
-        # self.agent_network.add_agent("notification_agent", os.getenv('NOTIFICATION_AGENT_URL', 'http://localhost:8003'))
-        # self.agent_network.add_agent("fastmcp_agent", os.getenv('FASTMCP_AGENT_URL', 'http://localhost:8004'))
+        # Add to agent network using correct method
+        if self.agent_network:
+            self.agent_network.add("data_agent", os.getenv('DATA_AGENT_URL', 'http://localhost:8002'))
         
         logger.info("Technical agents registered in agent network")
 
@@ -262,14 +262,21 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         6. Complexity assessment
         
         IMPORTANT INTENT CLASSIFICATION RULES:
+        - If user mentions "quote", "rate", "pricing", "cost", "estimate", "get a quote" → quote_request
+        - If user wants to buy/purchase insurance or asks about insurance options → quote_request
         - If user mentions "claim" AND ("status", "check", "update", "progress", "recent") → claim_status
         - If user mentions claim ID (like CLM-123456) → claim_status  
         - If user asks about "claims" in plural → claim_status
         - If user wants to "file" or "submit" new claim → claim_filing
         - If user asks about "policy" or "policies" → policy_inquiry
         - If user asks about "billing", "payment", "premium" → billing_question
-        - If user wants a "quote" or "rate" → quote_request
         - Otherwise → general_inquiry
+        
+        EXAMPLES:
+        - "I'd like to get a quote for auto insurance" → quote_request
+        - "What's the status of my claim?" → claim_status
+        - "I need to file a claim" → claim_filing
+        - "What's my policy details?" → policy_inquiry
         
         User Request: "{user_text}"
         
@@ -333,6 +340,14 @@ Is there any specific aspect you'd like me to explain in more detail?"""
                 "parallel_execution": False
             },
             "claim_status": {
+                "steps": [
+                    {"agent": "data_agent", "action": "fetch_claim_status", "priority": 1},
+                    {"agent": "data_agent", "action": "fetch_claim_details", "priority": 2}
+                ],
+                "expected_duration": "2-3 minutes",
+                "parallel_execution": False
+            },
+            "claim_status_inquiry": {
                 "steps": [
                     {"agent": "data_agent", "action": "fetch_claim_status", "priority": 1},
                     {"agent": "data_agent", "action": "fetch_claim_details", "priority": 2}
@@ -443,17 +458,28 @@ Is there any specific aspect you'd like me to explain in more detail?"""
                 "previous_results": step_results
             }
             
-            # Call the registered agent directly
-            result = self.call_registered_agent(agent_name, json.dumps(task_data))
-            
+            # Call the registered agent with error handling
+            try:
+                result = self.call_registered_agent(agent_name, json.dumps(task_data))
+                step_status = "completed"
+                error_msg = None
+            except Exception as e:
+                logger.error("Agent call failed", agent=agent_name, action=action, error=str(e))
+                result = f"Agent call failed: {str(e)}"
+                step_status = "failed"
+                error_msg = str(e)
+
             step_result = {
                 "step_number": i + 1,
                 "agent": agent_name,
                 "action": action,
-                "status": "completed",
+                "status": step_status,
                 "result": result,
                 "executed_at": datetime.utcnow().isoformat()
             }
+            
+            if error_msg:
+                step_result["error"] = error_msg
             
             step_results.append(step_result)
         

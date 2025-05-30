@@ -334,6 +334,14 @@ Is there any specific aspect you'd like me to explain in more detail?"""
                 "expected_duration": "5-10 minutes",
                 "parallel_execution": True
             },
+            "claim_status": {
+                "steps": [
+                    {"agent": "data_agent", "action": "fetch_claim_status", "priority": 1},
+                    {"agent": "data_agent", "action": "fetch_claim_details", "priority": 2}
+                ],
+                "expected_duration": "2-3 minutes",
+                "parallel_execution": False
+            },
             "policy_inquiry": {
                 "steps": [
                     {"agent": "data_agent", "action": "fetch_policy_details", "priority": 1},
@@ -348,6 +356,14 @@ Is there any specific aspect you'd like me to explain in more detail?"""
                     {"agent": "data_agent", "action": "calculate_outstanding_balance", "priority": 2}
                 ],
                 "expected_duration": "2-3 minutes",
+                "parallel_execution": False
+            },
+            "quote_request": {
+                "steps": [
+                    {"agent": "data_agent", "action": "generate_quote", "priority": 1},
+                    {"agent": "fastmcp_agent", "action": "risk_assessment", "priority": 2}
+                ],
+                "expected_duration": "3-5 minutes",
                 "parallel_execution": False
             },
             "general_inquiry": {
@@ -392,31 +408,22 @@ Is there any specific aspect you'd like me to explain in more detail?"""
             "status": "in_progress"
         }
         
-        try:
-            steps = execution_plan.get("steps", [])
-            parallel_execution = execution_plan.get("parallel_execution", False)
-            
-            if parallel_execution and len(steps) > 1:
-                # Execute steps in parallel where possible
-                results["step_results"] = self.execute_parallel_steps(steps, execution_plan)
-            else:
-                # Execute steps sequentially
-                results["step_results"] = self.execute_sequential_steps(steps, execution_plan)
-            
-            results["status"] = "completed"
-            results["completed_at"] = datetime.utcnow().isoformat()
-            
-            logger.info("Plan execution completed", 
-                       execution_id=results["execution_id"],
-                       steps_completed=len(results["step_results"]))
-            
-        except Exception as e:
-            logger.error("Plan execution failed", 
-                        execution_id=results["execution_id"],
-                        error=str(e))
-            results["status"] = "failed"
-            results["error"] = str(e)
-            results["failed_at"] = datetime.utcnow().isoformat()
+        steps = execution_plan.get("steps", [])
+        parallel_execution = execution_plan.get("parallel_execution", False)
+        
+        if parallel_execution and len(steps) > 1:
+            # Execute steps in parallel where possible
+            results["step_results"] = self.execute_parallel_steps(steps, execution_plan)
+        else:
+            # Execute steps sequentially
+            results["step_results"] = self.execute_sequential_steps(steps, execution_plan)
+        
+        results["status"] = "completed"
+        results["completed_at"] = datetime.utcnow().isoformat()
+        
+        logger.info("Plan execution completed", 
+                   execution_id=results["execution_id"],
+                   steps_completed=len(results["step_results"]))
         
         return results
     

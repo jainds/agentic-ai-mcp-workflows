@@ -217,13 +217,13 @@ class SystemHealthMonitor:
                 response = requests.get(endpoint, timeout=3)
                 response_time = time.time() - start_time
         
-        if response.status_code == 200:
+                if response.status_code == 200:
                     results[service_name] = {
                         "status": "healthy",
                         "response_time": round(response_time * 1000, 2),
                         "message": "Service responding"
                     }
-        else:
+                else:
                     results[service_name] = {
                         "status": "unhealthy",
                         "response_time": round(response_time * 1000, 2),

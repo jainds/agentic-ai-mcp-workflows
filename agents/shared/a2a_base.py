@@ -1,7 +1,7 @@
 """
 Base A2A Agent implementation using Official Google A2A Library.
 Provides common functionality for all agents including agent card serving,
-task handling, and authentication using the official python-a2a library.
+task handling, and authentication using the official a2a-sdk library.
 """
 
 import json
@@ -13,12 +13,9 @@ from abc import ABC, abstractmethod
 import logging
 import asyncio
 
-# Official Google A2A Library imports
-from python_a2a import (
-    A2AServer, A2AClient, AgentCard, Message, TextContent, 
-    MessageRole, TaskRequest, TaskResponse, run_server
-)
-from python_a2a.models import TaskStatus, TaskState
+# Official Google A2A Library imports (a2a-sdk)
+from a2a import A2AServer, A2AClient, run_server
+from a2a.models import AgentCard, TaskRequest, TaskResponse
 
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -95,25 +92,16 @@ class A2AAgent(A2AServer):
     def handle_task(self, task: TaskRequest) -> TaskResponse:
         """Handle incoming A2A tasks - to be implemented by subclasses"""
         # Default implementation - subclasses should override
-        task.status = TaskStatus(
-            state=TaskState.COMPLETED,
-            message={
-                "role": "agent",
-                "content": {
-                    "type": "text",
-                    "text": f"Hello from {self.name}! I received your task."
-                }
-            }
+        response = TaskResponse(
+            taskId=task.taskId,
+            status="completed",
+            parts=[{
+                "text": f"Hello from {self.name}! I received your task.",
+                "type": "text"
+            }]
         )
         
-        task.artifacts = [{
-            "parts": [{
-                "type": "text", 
-                "text": f"Task {task.taskId} processed by {self.name}"
-            }]
-        }]
-        
-        return task
+        return response
     
     async def call_agent(self, agent_url: str, task_data: Dict[str, Any]) -> Any:
         """Call another A2A agent using official client"""
@@ -165,15 +153,16 @@ class A2AClientWrapper:
     async def send_message(self, message_text: str) -> str:
         """Send a simple text message to an agent"""
         try:
-            message = Message(
-                content=TextContent(text=message_text),
-                role=MessageRole.USER
+            # Create task request with message
+            task_request = TaskRequest(
+                taskId=str(uuid.uuid4()),
+                user={"message": message_text}
             )
             
-            response = await self.client.send_message(message)
+            response = await self.client.send_task(task_request)
             
-            if response and response.content:
-                return response.content.text
+            if response and response.parts and len(response.parts) > 0:
+                return response.parts[0].get("text", "No response received")
             
             return "No response received"
             
@@ -197,23 +186,6 @@ class A2AClientWrapper:
             await self.client.close()
 
 
-# Legacy compatibility - maintain existing interface
-class TaskRequest(BaseModel):
-    """A2A Task Request format - legacy compatibility"""
-    taskId: str
-    user: Dict[str, Any]
-    context: Optional[Dict[str, Any]] = None
-    metadata: Optional[Dict[str, Any]] = None
-
-
-class TaskResponse(BaseModel):
-    """A2A Task Response format - legacy compatibility"""
-    taskId: str
-    parts: List[Dict[str, Any]]
-    status: str = "completed"
-    metadata: Optional[Dict[str, Any]] = None
-
-
 # Export the main classes for backward compatibility
 __all__ = [
     'A2AAgent', 
@@ -221,8 +193,5 @@ __all__ = [
     'TaskRequest', 
     'TaskResponse',
     'AgentCard',
-    'Message',
-    'TextContent',
-    'MessageRole',
     'run_server'
 ] 

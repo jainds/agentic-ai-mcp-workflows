@@ -10,9 +10,9 @@ from datetime import datetime
 import uuid
 import time
 
-# Official Google A2A Library imports
-from python_a2a import A2AServer, TaskRequest, TaskResponse, Message, TextContent, MessageRole
-from python_a2a.models import TaskStatus, TaskState
+# Official Google A2A Library imports (a2a-sdk)
+from a2a import A2AServer, run_server
+from a2a.models import AgentCard, TaskRequest, TaskResponse
 
 from agents.shared.a2a_base import A2AAgent, A2AClientWrapper
 from agents.shared.auth import service_auth
@@ -119,22 +119,16 @@ class ClaimsAgent(A2AAgent):
             )
             
             # Process through official A2A handle_task method
-            processed_task = self.handle_task(task)
+            response = self.handle_task(task)
             
-            # Extract response from official A2A format
+            # Extract response from official A2A TaskResponse format
             main_response = "I'm here to help with your insurance needs."
             
-            if processed_task.status and processed_task.status.message:
-                status_message = processed_task.status.message
-                if isinstance(status_message, dict):
-                    content = status_message.get("content", {})
-                    if isinstance(content, dict):
-                        main_response = content.get("text", main_response)
-                    else:
-                        main_response = str(content)
+            if response.parts and len(response.parts) > 0:
+                main_response = response.parts[0].get("text", main_response)
             
-            # Extract metadata from processed task
-            metadata = processed_task.metadata or {}
+            # Extract metadata from TaskResponse
+            metadata = response.metadata or {}
             thinking_steps = metadata.get("thinking_steps", [])
             orchestration_events = metadata.get("orchestration_events", [])
             api_calls = metadata.get("api_calls", [])
@@ -199,61 +193,40 @@ class ClaimsAgent(A2AAgent):
             
             self._add_orchestration_event("task_completed", {"response_length": len(response_content)})
             
-            # Set task status using official A2A format
-            task.status = TaskStatus(
-                state=TaskState.COMPLETED,
-                message={
-                    "role": "agent",
-                    "content": {
-                        "type": "text",
-                        "text": response_content
-                    }
+            # Return TaskResponse using official A2A format
+            return TaskResponse(
+                taskId=task.taskId,
+                status="completed",
+                parts=[{
+                    "text": response_content,
+                    "type": "claims_response"
+                }],
+                metadata={
+                    "agent": "ClaimsAgent",
+                    "intent": intent_analysis.get("intent"),
+                    "thinking_steps": self.current_thinking_steps,
+                    "orchestration_events": self.current_orchestration_events,
+                    "api_calls": self.current_api_calls,
+                    "actions_taken": intent_analysis.get("technical_actions", [])
                 }
             )
-            
-            # Set task artifacts using official A2A format
-            task.artifacts = [{
-                "parts": [{
-                    "type": "text", 
-                    "text": response_content
-                }]
-            }]
-            
-            # Add metadata for tracking
-            task.metadata = {
-                "agent": "ClaimsAgent",
-                "intent": intent_analysis.get("intent"),
-                "thinking_steps": self.current_thinking_steps,
-                "orchestration_events": self.current_orchestration_events,
-                "api_calls": self.current_api_calls,
-                "actions_taken": intent_analysis.get("technical_actions", [])
-            }
-            
-            return task
             
         except Exception as e:
             logger.error("Task processing failed", task_id=task.taskId, error=str(e))
             
-            # Set error status using official A2A format
-            task.status = TaskStatus(
-                state=TaskState.FAILED,
-                message={
-                    "role": "agent",
-                    "content": {
-                        "type": "text",
-                        "text": f"I apologize, but I encountered an error processing your request: {str(e)}"
-                    }
+            # Return error TaskResponse using official A2A format
+            return TaskResponse(
+                taskId=task.taskId,
+                status="failed",
+                parts=[{
+                    "text": f"I apologize, but I encountered an error processing your request: {str(e)}",
+                    "type": "error"
+                }],
+                metadata={
+                    "agent": "ClaimsAgent",
+                    "error": str(e)
                 }
             )
-            
-            task.artifacts = [{
-                "parts": [{
-                    "type": "error",
-                    "text": f"Error: {str(e)}"
-                }]
-            }]
-            
-            return task
     
     async def _analyze_user_intent(self, user_message: str, conversation_id: str) -> Dict[str, Any]:
         """Use LLM to analyze user intent and plan actions"""

@@ -11,9 +11,9 @@ from datetime import datetime
 import json
 import structlog
 
-# Official Google A2A Library imports
-from python_a2a import A2AServer, TaskRequest, TaskResponse, AgentCard
-from python_a2a.models import TaskStatus, TaskState
+# Official Google A2A Library imports (a2a-sdk)
+from a2a import A2AServer, run_server
+from a2a.models import AgentCard, TaskRequest, TaskResponse
 
 from agents.shared.a2a_base import A2AAgent
 
@@ -84,57 +84,39 @@ class FastMCPDataAgent(A2AAgent):
             else:
                 result = {"error": f"Unknown action: {action}"}
             
-            # Set successful completion status
-            task.status = TaskStatus(
-                state=TaskState.COMPLETED,
-                message={
-                    "role": "agent",
-                    "content": {
-                        "type": "data_response",
-                        "text": f"Data operation '{action}' completed successfully"
-                    }
+            # Return successful TaskResponse
+            return TaskResponse(
+                taskId=task.taskId,
+                status="completed",
+                parts=[{
+                    "text": f"Data operation '{action}' completed successfully",
+                    "type": "data_response",
+                    "data": result
+                }],
+                metadata={
+                    "agent": "FastMCPDataAgent",
+                    "action": action,
+                    "result_type": type(result).__name__
                 }
             )
-            
-            # Set task artifacts with the result
-            task.artifacts = [{
-                "parts": [{
-                    "type": "data",
-                    "content": result
-                }]
-            }]
-            
-            task.metadata = {
-                "agent": "FastMCPDataAgent",
-                "action": action,
-                "result_type": type(result).__name__
-            }
-            
-            return task
             
         except Exception as e:
             logger.error("Data operation failed", task_id=task.taskId, action=action, error=str(e))
             
-            # Set error status
-            task.status = TaskStatus(
-                state=TaskState.FAILED,
-                message={
-                    "role": "agent",
-                    "content": {
-                        "type": "error",
-                        "text": f"Data operation failed: {str(e)}"
-                    }
+            # Return error TaskResponse
+            return TaskResponse(
+                taskId=task.taskId,
+                status="failed",
+                parts=[{
+                    "text": f"Data operation failed: {str(e)}",
+                    "type": "error"
+                }],
+                metadata={
+                    "agent": "FastMCPDataAgent",
+                    "action": action,
+                    "error": str(e)
                 }
             )
-            
-            task.artifacts = [{
-                "parts": [{
-                    "type": "error",
-                    "content": {"error": str(e), "action": action}
-                }]
-            }]
-            
-            return task
     
     async def initialize(self):
         """Initialize the agent by discovering available tools from services"""

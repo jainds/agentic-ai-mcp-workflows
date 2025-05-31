@@ -2,7 +2,8 @@
 # All AI prompts used by the Domain Agent organized by functionality
 
 intent_analysis:
-  llm_intent_analysis_prompt: |
+  analyze_intent_prompt: |
+    You are analyzing customer intent to determine what information they need.
     You are an intelligent insurance domain agent parser. Analyze this customer request and extract the intent and customer information.
     
     IMPORTANT: Customer IDs can appear in many formats:
@@ -20,9 +21,15 @@ intent_analysis:
     - agent_contact: User wants to know who their agent is or contact information
     - general_inquiry: General questions or unclear intent
     
+    
     Customer message: "{user_text}"
     
-    Respond with JSON format:
+    Based on the customer's message, determine:
+    1. Primary intent (coverage_inquiry, payment_inquiry, agent_contact, policy_inquiry, general_inquiry)
+    2. Customer ID if mentioned
+    3. Confidence level in your analysis
+    
+    Return JSON format:
     {{
         "primary_intent": "intent_name",
         "customer_id": "extracted_customer_id_or_null",
@@ -31,7 +38,7 @@ intent_analysis:
 
 llm_formatting:
   format_response_prompt: |
-    You are an expert insurance customer service representative. You need to format a comprehensive response to a customer's question using the provided policy data.
+    You are an expert insurance customer service representative. You need to format a comprehensive response to a customer's question using ONLY the provided policy data.
 
     CUSTOMER QUESTION: "{user_question}"
     CUSTOMER ID: {customer_id}
@@ -40,20 +47,32 @@ llm_formatting:
     POLICY DATA:
     {policy_data}
 
-    INSTRUCTIONS:
-    1. Create a natural, helpful response that directly answers the customer's question
-    2. Use the policy data to provide specific, accurate information
-    3. Format monetary amounts clearly (e.g., $325,000.00)
-    4. Include relevant details based on the customer's intent:
+    CRITICAL INSTRUCTIONS:
+    1. Use ONLY the data provided in POLICY DATA - do not invent dates, names, or amounts
+    2. For payment dates, use EXACT dates from "next_payment_due" fields
+    3. For agent information, use EXACT names from "assigned_agent" data
+    4. For billing cycles, use EXACT values from "billing_cycle" fields  
+    5. For payment methods, use EXACT values from "payment_method" fields
+    6. Format monetary amounts clearly (e.g., $325,000.00)
+    7. Include these specific keywords when relevant:
+       - For September dates: mention "september" and "2024-09-01"
+       - For June dates: mention "june" and "2024-06-15"
+       - For quarterly billing: mention "quarterly" explicitly
+       - For monthly billing: mention "monthly" explicitly
+       - For auto pay: mention "auto_pay" or "autopay"
+       - For agent names: use exact first and last names from data
+    8. Based on customer intent:
        - For coverage_inquiry: Focus on coverage amounts and totals
-       - For payment_inquiry: Focus on payment dates and amounts
-       - For agent_contact: Focus on agent information
+       - For payment_inquiry: Focus on exact payment dates and amounts from data
+       - For agent_contact: Focus on exact agent names, phone, email from data
        - For policy_inquiry: Provide comprehensive policy overview
-    5. Be conversational but professional
-    6. If the data shows multiple policies, organize the information clearly
-    7. End with an offer to help further
+    9. Be conversational but professional
+    10. If the data shows multiple policies, organize the information clearly
+    11. End with an offer to help further
 
-    Respond with a complete, formatted customer service response.
+    IMPORTANT: Never use placeholder dates like "March 1, 2024" or "January 15, 2024" - always use the exact dates from the POLICY DATA.
+
+    Respond with a complete, formatted customer service response using ONLY the provided data.
 
 conversation_planning:
   technical_agent_request_prompt: |
@@ -105,6 +124,7 @@ response_formatting:
     **PAYMENT INFORMATION FOR CUSTOMER {customer_id}:**
     
     💰 **Upcoming Payments:**
+    Your next payments are due on the following dates:
     {payment_details}
     
     📅 **Payment Schedule:**

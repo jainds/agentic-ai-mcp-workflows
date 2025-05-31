@@ -4,16 +4,23 @@ Enhanced Technical Agent
 A2A-enabled agent with LLM intelligence that integrates with Policy FastMCP server
 """
 
-import asyncio
-import json
-import os
-import re
 import sys
+import os
+import json
+import re
+import logging
+import asyncio
 from typing import Dict, Any, List, Optional
+
+# Add current directory to Python path for imports
+sys.path.insert(0, os.path.dirname(__file__))
 
 import structlog
 from python_a2a import A2AServer, AgentCard, skill, agent, run_server, TaskStatus, TaskState
 from fastmcp import Client
+from openai import OpenAI
+
+from request_parser import RequestParser
 
 # Setup logging
 structlog.configure(
@@ -44,15 +51,21 @@ class TechnicalAgent(A2AServer):
         
         # Initialize OpenAI client if API key is available
         self.openai_client = None
-        if os.getenv("OPENAI_API_KEY"):
-            try:
-                from openai import OpenAI
-                self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-                logger.info("OpenAI client initialized for LLM intelligence")
-            except ImportError:
-                logger.warning("OpenAI library not available - using rule-based parsing")
-        else:
-            logger.warning("No OpenAI API key found - using rule-based parsing")
+        try:
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            if api_key:
+                self.openai_client = OpenAI(
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=api_key
+                )
+                logger.info("OpenAI client initialized for enhanced parsing")
+            else:
+                logger.warning("No OpenAI API key found, using rule-based parsing only")
+        except Exception as e:
+            logger.warning(f"Failed to initialize OpenAI client: {e}")
+        
+        # Initialize request parser with OpenAI client
+        self.request_parser = RequestParser(self.openai_client)
         
         logger.info("Enhanced Technical Agent initialized")
         logger.info(f"Will connect to Policy FastMCP Server at: {self.policy_server_url}")
@@ -105,264 +118,45 @@ class TechnicalAgent(A2AServer):
             return False
     
     async def _call_mcp_tool_with_retry(self, tool_name: str, params: Dict[str, Any], max_retries: int = 3) -> Any:
-        """Enhanced MCP tool calling with proper session management and validation"""
-        
-        # First validate the request to prevent 400 errors
-        if not self._validate_mcp_request(tool_name, params):
-            raise ValueError(f"Invalid MCP request: tool={tool_name}, params={params}")
-        
+        """Call MCP tool with retry logic and better error handling"""
         last_error = None
         
         for attempt in range(max_retries):
-            client = None
             try:
-                logger.info(f"MCP call attempt {attempt + 1}/{max_retries}: {tool_name} with {params}")
+                # Validate request before sending
+                if not self._validate_mcp_request(tool_name, params):
+                    raise ValueError(f"Invalid MCP request: {tool_name} with params {params}")
                 
-                # Create fresh client for each attempt to avoid session issues
+                # Get fresh client connection
                 client = await self._get_policy_client()
+                if not client:
+                    raise ConnectionError("Unable to establish MCP connection")
                 
-                # Use proper session management with context manager
+                # Make the MCP call with proper context manager
+                logger.info(f"Attempt {attempt + 1}: Calling MCP tool {tool_name} with params {params}")
+                
                 async with client:
-                    # Initialize the session properly
-                    logger.info("Initializing MCP session...")
-                    
-                    # List tools to verify connection and session
-                    try:
-                        tools = await client.list_tools()
-                        available_tools = [tool.name for tool in tools]
-                        logger.info(f"Available MCP tools: {available_tools}")
-                        
-                        # Verify the requested tool is available
-                        if tool_name not in available_tools:
-                            raise ValueError(f"Tool '{tool_name}' not available. Available: {available_tools}")
-                        
-                    except Exception as tool_error:
-                        logger.warning(f"Could not list tools in attempt {attempt + 1}: {tool_error}")
-                        # Don't fail immediately, try the tool call anyway
-                    
-                    # Call the actual tool with validated parameters
-                    logger.info(f"Calling MCP tool: {tool_name}")
-                    result = await client.call_tool(tool_name, params)
-                    
-                    logger.info(f"MCP tool call successful on attempt {attempt + 1}")
-                    return result
-                    
+                    if tool_name == "get_customer_policies":
+                        result = await client.call_tool("get_customer_policies", params)
+                    elif tool_name == "health_check":
+                        result = await client.call_tool("health_check", params or {})
+                    else:
+                        raise ValueError(f"Unknown tool: {tool_name}")
+                
+                logger.info(f"MCP call successful on attempt {attempt + 1}")
+                return result
+                
             except Exception as e:
                 last_error = e
+                logger.warning(f"MCP call attempt {attempt + 1} failed: {e}")
                 
-                # Enhanced error handling for specific error types
-                error_msg = str(e).lower()
-                
-                if "400 bad request" in error_msg:
-                    logger.error(f"400 Bad Request in attempt {attempt + 1}: {e}")
-                    logger.error(f"Request details - Tool: {tool_name}, Params: {params}")
-                    
-                    # For 400 errors, try cleaning the parameters
-                    if attempt < max_retries - 1:
-                        logger.info("Attempting to clean parameters for retry...")
-                        # Additional parameter cleaning for next attempt
-                        if "customer_id" in params:
-                            # More aggressive cleaning
-                            original_id = params["customer_id"]
-                            cleaned_id = re.sub(r'[^\w\-]', '', original_id)  # Remove non-alphanumeric except dash
-                            if cleaned_id != original_id:
-                                params["customer_id"] = cleaned_id
-                                logger.info(f"Cleaned customer_id: '{original_id}' -> '{cleaned_id}'")
-                
-                elif "connection" in error_msg or "timeout" in error_msg:
-                    logger.warning(f"Connection issue in attempt {attempt + 1}: {e}")
-                
-                else:
-                    logger.warning(f"MCP call attempt {attempt + 1} failed: {e}")
-                
-                # Cleanup client on failure
-                if client:
-                    try:
-                        await client.close()
-                    except:
-                        pass
-                
-                # Exponential backoff with jitter
                 if attempt < max_retries - 1:
-                    backoff_time = (1.0 * (2 ** attempt)) + (0.1 * attempt)  # 1s, 2.1s, 4.2s
-                    logger.info(f"Waiting {backoff_time:.1f}s before retry...")
-                    await asyncio.sleep(backoff_time)
+                    wait_time = (attempt + 1) * 2
+                    logger.info(f"Retrying in {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
                     
         logger.error(f"All MCP call attempts failed. Last error: {last_error}")
         raise last_error
-    
-    def _parse_request_with_llm(self, text: str) -> Dict[str, Any]:
-        """Use LLM to intelligently parse the request and extract customer IDs"""
-        if not self.openai_client:
-            return self._parse_request_with_rules(text)
-        
-        try:
-            prompt = f"""
-            You are an intelligent insurance technical agent parser. Analyze this request and extract the intent and customer information.
-            
-            IMPORTANT: Customer IDs can appear in many formats:
-            - Standard formats: user_003, CUST-001, customer-123, cust001, USER001
-            - Casual mentions: "customer john", "user named Sarah", "client ID ABC123"
-            - Mixed case: User_003, CUSTOMER_001, Cust-ABC
-            - With prefixes: "for customer user_003", "check user CUST-001"
-            - Natural language: "policies for user 003", "customer with ID 001"
-            
-            Possible intents:
-            - get_customer_policies: User wants to retrieve/view/check policies for a customer
-            - health_check: User wants to check system/service health status
-            - general_inquiry: General questions or unclear intent
-            
-            Request: "{text}"
-            
-            Instructions:
-            1. Extract any customer identifier mentioned in ANY format (be very flexible)
-            2. Normalize customer IDs to a consistent format when possible
-            3. Determine the most likely intent based on context
-            4. Provide high confidence only when very certain
-            
-            Respond ONLY with valid JSON:
-            {{
-                "intent": "get_customer_policies|health_check|general_inquiry",
-                "customer_id": "normalized_customer_id_or_null", 
-                "original_customer_mention": "exact_text_where_customer_was_mentioned_or_null",
-                "confidence": 0.0-1.0,
-                "reasoning": "brief explanation of your analysis"
-            }}
-            """
-            
-            response = self.openai_client.chat.completions.create(
-                model="openai/gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,  # Lower temperature for more consistent parsing
-                max_tokens=300
-            )
-            
-            result_text = response.choices[0].message.content.strip()
-            logger.info(f"LLM parsing response: {result_text}")
-            
-            # Parse JSON response with better error handling
-            try:
-                parsed_result = json.loads(result_text)
-                
-                # Validate required fields
-                if not isinstance(parsed_result, dict):
-                    raise ValueError("Response is not a JSON object")
-                
-                # Ensure required fields exist with defaults
-                result = {
-                    "intent": parsed_result.get("intent", "general_inquiry"),
-                    "customer_id": parsed_result.get("customer_id"),
-                    "original_customer_mention": parsed_result.get("original_customer_mention"),
-                    "confidence": float(parsed_result.get("confidence", 0.5)),
-                    "reasoning": parsed_result.get("reasoning", "LLM analysis"),
-                    "method": "llm"
-                }
-                
-                # Additional validation for customer_id
-                if result["customer_id"] and result["customer_id"].lower() in ["null", "none", ""]:
-                    result["customer_id"] = None
-                
-                logger.info(f"Successfully parsed with LLM: {result}")
-                return result
-                
-            except (json.JSONDecodeError, ValueError) as json_error:
-                # Try to extract JSON from response if wrapped in other text
-                json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-                if json_match:
-                    try:
-                        parsed_result = json.loads(json_match.group(0))
-                        # Apply same validation as above
-                        result = {
-                            "intent": parsed_result.get("intent", "general_inquiry"),
-                            "customer_id": parsed_result.get("customer_id"),
-                            "original_customer_mention": parsed_result.get("original_customer_mention"),
-                            "confidence": float(parsed_result.get("confidence", 0.5)),
-                            "reasoning": parsed_result.get("reasoning", "LLM analysis (extracted)"),
-                            "method": "llm"
-                        }
-                        
-                        if result["customer_id"] and result["customer_id"].lower() in ["null", "none", ""]:
-                            result["customer_id"] = None
-                            
-                        logger.info(f"Extracted JSON from LLM response: {result}")
-                        return result
-                    except json.JSONDecodeError:
-                        pass
-                
-                logger.warning(f"Could not parse LLM JSON response: {json_error}, falling back to rules")
-                return self._parse_request_with_rules(text)
-                    
-        except Exception as e:
-            logger.warning(f"LLM parsing failed: {e}, falling back to rules")
-            return self._parse_request_with_rules(text)
-    
-    def _parse_request_with_rules(self, text: str) -> Dict[str, Any]:
-        """Enhanced rule-based request parsing as fallback"""
-        text_lower = text.lower()
-        
-        # Enhanced customer ID extraction patterns
-        customer_id = None
-        original_mention = None
-        patterns = [
-            # Standard ID formats
-            (r'user_\w+', None),                         # user_003, user_001
-            (r'CUST-\d+', None),                         # CUST-001, CUST-002  
-            (r'cust-\d+', None),                         # cust-001 (lowercase)
-            (r'customer[_\s-]+([A-Za-z0-9_-]+)', 1),    # customer CUST-001, customer_001
-            (r'user[_\s]+([A-Za-z0-9_-]+)', 1),         # user 003, user ABC
-            (r'client[_\s]+([A-Za-z0-9_-]+)', 1),       # client 001, client ABC
-            # More flexible patterns
-            (r'id[_\s]*([A-Za-z0-9_-]+)', 1),           # id 003, id_ABC
-            (r'([A-Z]{3,}-\d+)', None),                  # Any 3+ letter prefix with dash and numbers
-            (r'([A-Za-z]+\d+)', None),                   # Any letters followed by numbers
-        ]
-        
-        for pattern, group_index in patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                if group_index is not None:
-                    customer_id = match.group(group_index)
-                    original_mention = match.group(0)
-                else:
-                    customer_id = match.group(0)
-                    original_mention = match.group(0)
-                break
-        
-        # Determine intent with better keyword matching
-        intent = "general_inquiry"  # default
-        
-        # Policy-related keywords
-        policy_keywords = ["policy", "policies", "coverage", "claim", "claims", "premium", "deductible"]
-        if any(word in text_lower for word in policy_keywords):
-            intent = "get_customer_policies"
-        
-        # Health check keywords
-        health_keywords = ["health", "status", "check", "ping", "alive", "working"]
-        if any(word in text_lower for word in health_keywords):
-            intent = "health_check"
-        
-        # If we found a customer ID, it's likely a policy request
-        if customer_id and intent == "general_inquiry":
-            intent = "get_customer_policies"
-        
-        # Calculate confidence based on pattern strength
-        confidence = 0.6  # base confidence for rule-based
-        if customer_id:
-            confidence += 0.2  # boost if we found a customer ID
-        if intent != "general_inquiry":
-            confidence += 0.1  # boost if we determined specific intent
-        
-        result = {
-            "intent": intent,
-            "customer_id": customer_id,
-            "original_customer_mention": original_mention,
-            "confidence": min(confidence, 0.9),  # cap at 0.9 for rule-based
-            "reasoning": f"Rule-based pattern matching (found: {original_mention})" if original_mention else "Rule-based pattern matching",
-            "method": "rules"
-        }
-        
-        logger.info(f"Rule-based parsing result: {result}")
-        return result
     
     @skill(
         name="Get Customer Policies",
@@ -500,7 +294,7 @@ class TechnicalAgent(A2AServer):
             else:
                 # Fallback to LLM/rule-based parsing if no session data (for backwards compatibility)
                 logger.info("No customer ID in session, falling back to message parsing")
-                parsed_request = self._parse_request_with_llm(text)
+                parsed_request = self.request_parser.parse_request(text)
                 logger.info(f"Fallback parsing result: {parsed_request}")
             
             intent = parsed_request.get("intent", "general_inquiry")

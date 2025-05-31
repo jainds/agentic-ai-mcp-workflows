@@ -58,4 +58,15 @@ class PromptLoader:
     def get_context_message(self, context_type: str) -> str:
         """Get context message template"""
         templates = self.prompts.get("conversation_context", {})
-        return templates.get(context_type, "") 
+        return templates.get(context_type, "")
+    
+    def get_llm_formatting_prompt(self, user_question: str, customer_id: str, intent: str, technical_response: str, response_template: str) -> str:
+        """Get the LLM response formatting prompt"""
+        template = self.prompts.get("llm_formatting", {}).get("format_response_prompt", "")
+        return template.format(
+            user_question=user_question,
+            customer_id=customer_id,
+            intent=intent,
+            technical_response=technical_response,
+            response_template=response_template
+        ) 

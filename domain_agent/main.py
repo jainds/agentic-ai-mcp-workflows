@@ -5,19 +5,26 @@ Conversational insurance agent that helps customers and communicates with Techni
 """
 
 import sys
-import re
-import json
 import os
-from typing import Dict, Any, Optional
+import json
+import re
+import logging
+from typing import Dict, Any, Optional, List
 from datetime import datetime
+
+# Add current directory to Python path for imports
+sys.path.insert(0, os.path.dirname(__file__))
 
 import structlog
 import openai
 import yaml
 from dotenv import load_dotenv
 from python_a2a import A2AServer, skill, agent, run_server, TaskStatus, TaskState, A2AClient
+from openai import OpenAI
 
 from prompt_loader import PromptLoader
+from intent_analyzer import IntentAnalyzer
+from response_formatter import ResponseFormatter
 
 # Load environment variables
 load_dotenv()
@@ -43,33 +50,33 @@ class DomainAgent(A2AServer):
     def __init__(self):
         super().__init__()
         
-        # Load prompts
+        # Initialize prompt loader
         self.prompts = PromptLoader()
+        
+        # Set up OpenAI client for LLM features
+        self.openai_client = None
+        try:
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            if api_key:
+                self.openai_client = OpenAI(
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=api_key
+                )
+                logger.info("🔥 DOMAIN AGENT: OpenAI client initialized")
+            else:
+                logger.warning("🔥 DOMAIN AGENT: No OpenAI API key found - using rule-based analysis only")
+        except Exception as e:
+            logger.warning(f"🔥 DOMAIN AGENT: Failed to initialize OpenAI: {e}")
+        
+        # Initialize modular components
+        self.intent_analyzer = IntentAnalyzer(self.openai_client)
+        self.response_formatter = ResponseFormatter(self.openai_client)
         
         # Technical Agent setup
         self.technical_agent_url = os.getenv("TECHNICAL_AGENT_URL", "http://insurance-ai-poc-technical-agent:8002")
         self.technical_client = None
         
-        # OpenAI setup (configured for OpenRouter)
-        self.openai_client = None
-        api_key = os.getenv("OPENAI_API_KEY")
-        if api_key:
-            try:
-                # Use OpenRouter if the key starts with sk-or-
-                if api_key.startswith("sk-or-"):
-                    self.openai_client = openai.OpenAI(
-                        api_key=api_key,
-                        base_url="https://openrouter.ai/api/v1"
-                    )
-                    logger.info("OpenRouter client initialized")
-                else:
-                    self.openai_client = openai.OpenAI(api_key=api_key)
-                    logger.info("OpenAI client initialized")
-            except Exception as e:
-                logger.warning(f"LLM client initialization failed: {e}")
-        else:
-            logger.warning("No OpenAI API key found - using rule-based responses only")
-        
+        logger.info("🔥 DOMAIN AGENT: Initialized with modular components")
         logger.info("Domain Agent initialized")
         logger.info(f"Will connect to Technical Agent at: {self.technical_agent_url}")
     
@@ -85,110 +92,12 @@ class DomainAgent(A2AServer):
         return self.technical_client
     
     def analyze_customer_intent(self, user_text: str) -> Dict[str, Any]:
-        """Analyze customer intent and extract information"""
-        
-        # Try LLM analysis first if available
-        if self.openai_client:
-            return self._analyze_with_llm(user_text)
-        else:
-            return self._analyze_with_rules(user_text)
+        """Analyze customer intent and extract information using modular analyzer"""
+        return self.intent_analyzer.analyze_customer_intent(user_text)
     
-    def _analyze_with_llm(self, user_text: str) -> Dict[str, Any]:
-        """Use LLM to understand customer intent"""
-        try:
-            prompt = self.prompts.get_intent_analysis_prompt(user_text)
-            
-            response = self.openai_client.chat.completions.create(
-                model="openai/gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=200
-            )
-            
-            result_text = response.choices[0].message.content.strip()
-            logger.info(f"🔥 DOMAIN AGENT: LLM raw response: {result_text}")
-            
-            # Try to parse JSON, handling common formatting issues
-            try:
-                result = json.loads(result_text)
-            except json.JSONDecodeError:
-                # Try to extract JSON from markdown code blocks
-                if result_text.startswith("```json") and result_text.endswith("```"):
-                    json_content = result_text[7:-3].strip()
-                    result = json.loads(json_content)
-                elif result_text.startswith("```") and result_text.endswith("```"):
-                    json_content = result_text[3:-3].strip()
-                    result = json.loads(json_content)
-                else:
-                    # Try to find JSON in the response
-                    import re
-                    json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-                    if json_match:
-                        json_content = json_match.group(0)
-                        result = json.loads(json_content)
-                    else:
-                        raise ValueError(f"No valid JSON found in LLM response: {result_text}")
-            
-            logger.info(f"LLM intent analysis: {result}")
-            return result
-            
-        except Exception as e:
-            logger.warning(f"LLM analysis failed: {e}, falling back to rules")
-            return self._analyze_with_rules(user_text)
-    
-    def _analyze_with_rules(self, user_text: str) -> Dict[str, Any]:
-        """Use simple rules to understand customer intent"""
-        text_lower = user_text.lower()
-        
-        # Extract customer ID
-        customer_id = None
-        patterns = [
-            r'cust-\d+',
-            r'user_\d+', 
-            r'customer\s+([a-zA-Z0-9_-]+)',
-            r'for\s+customer\s+([a-zA-Z0-9_-]+)',
-            r'customer\s+id\s+([a-zA-Z0-9_-]+)'
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, user_text, re.IGNORECASE)
-            if match:
-                if match.groups():
-                    customer_id = match.group(1)
-                else:
-                    customer_id = match.group(0)
-                break
-        
-        # Determine intent based on keywords
-        intent = "general_inquiry"  # default
-        
-        # Coverage/total amount queries
-        if any(word in text_lower for word in ["total coverage", "coverage amount", "total amount", "how much coverage"]):
-            intent = "coverage_inquiry"
-        # Payment queries (including premium and billing)
-        elif any(word in text_lower for word in ["payment", "due", "billing", "pay", "premium", "premiums", "deductible", "deductibles"]):
-            intent = "payment_inquiry"
-        # Agent contact queries
-        elif any(word in text_lower for word in ["agent", "contact", "who is my", "representative"]):
-            intent = "agent_contact"
-        # Policy type queries  
-        elif any(word in text_lower for word in ["types of policies", "what policies", "policy types"]):
-            intent = "policy_inquiry"
-        # General policy queries
-        elif any(word in text_lower for word in ["policy", "policies", "coverage"]):
-            intent = "policy_inquiry"
-        # Claims queries
-        elif any(word in text_lower for word in ["claim", "claims"]):
-            intent = "claim_status"
-        
-        result = {
-            "primary_intent": intent,
-            "customer_id": customer_id,
-            "confidence": 0.7 if customer_id else 0.5
-        }
-        
-        logger.info(f"Rule-based intent analysis: {result}")
-        return result
+    def format_comprehensive_response(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
+        """Format comprehensive response using modular formatter"""
+        return self.response_formatter.format_comprehensive_response(intent, customer_id, technical_response, user_question)
     
     def plan_response(self, user_text: str, intent_analysis: Dict[str, Any], session_data: Dict[str, Any]) -> Dict[str, Any]:
         """Plan what to do based on customer intent"""
@@ -217,82 +126,6 @@ class DomainAgent(A2AServer):
             plan["response_template"] = "claims_not_available"
         
         return plan
-    
-    def format_comprehensive_response(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
-        """Format response using LLM with intent-specific templates - LLM required"""
-        
-        if not technical_response:
-            return "I couldn't retrieve your policy information. Please try again or contact your agent."
-        
-        # Require LLM for formatting - no fallback
-        if not self.openai_client:
-            raise ValueError("OpenAI API key is required for response formatting. Please configure OPENAI_API_KEY environment variable.")
-        
-        return self._format_with_llm(intent, customer_id, technical_response, user_question)
-    
-    def _format_with_llm(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
-        """Use LLM to intelligently extract and format information using intent-specific templates"""
-        try:
-            # Select appropriate template based on intent
-            template_key = self._get_template_key_for_intent(intent)
-            response_template = self.prompts.prompts.get("response_formatting", {}).get(template_key, "")
-            
-            # Enhanced prompt that combines template structure with LLM intelligence
-            enhanced_prompt = f"""You are an expert insurance customer service representative. Format a comprehensive response using the provided template structure and policy data.
-
-CUSTOMER QUESTION: "{user_question}"
-CUSTOMER ID: {customer_id}
-INTENT: {intent}
-
-COMPREHENSIVE POLICY DATA:
-{technical_response}
-
-RESPONSE TEMPLATE STRUCTURE:
-{response_template}
-
-INSTRUCTIONS:
-1. Use the template structure above as your formatting guide
-2. Extract relevant data from the comprehensive policy JSON to populate the template
-3. Calculate totals, dates, and summaries as needed
-4. For payment_inquiry: Focus on payment dates, amounts, billing cycles
-5. For coverage_inquiry: Calculate total coverage amounts across policies
-6. For policy_types: List all policy types and their key details
-7. For agent_contact: Extract agent information from the policy data
-8. Format monetary amounts clearly (e.g., $325,000.00)
-9. Format dates in readable format (e.g., September 1, 2024)
-10. Be conversational, professional, and helpful
-11. If data is missing for template sections, adapt gracefully, but don't make up data
-12. Restrict response to only relevant to actual customer question based on template. End with offer to help further
-
-
-IMPORTANT: Extract and calculate actual values from the JSON data - don't use placeholder or mock or fake values."""
-
-            response = self.openai_client.chat.completions.create(
-                model="openai/gpt-4o-mini",
-                messages=[{"role": "user", "content": enhanced_prompt}],
-                temperature=0.3,
-                max_tokens=1500
-            )
-            
-            formatted_response = response.choices[0].message.content.strip()
-            logger.info(f"🔥 DOMAIN AGENT: LLM formatted response using template: {template_key}")
-            return formatted_response
-            
-        except Exception as e:
-            logger.error(f"🔥 DOMAIN AGENT: LLM formatting failed: {e}")
-            raise ValueError(f"Failed to format response with LLM: {e}")
-
-    def _get_template_key_for_intent(self, intent: str) -> str:
-        """Map intent to appropriate response template key"""
-        template_mapping = {
-            "payment_inquiry": "payment_due_template",
-            "coverage_inquiry": "coverage_total_template", 
-            "agent_contact": "agent_contact_template",
-            "policy_inquiry": "policy_response_template",
-            "policy_types": "policy_types_template"
-        }
-        
-        return template_mapping.get(intent, "policy_response_template")
     
     @skill(
         name="ask",

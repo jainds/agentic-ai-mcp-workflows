@@ -15,13 +15,23 @@ spec:
       component: domain-agent
   template:
     metadata:
+      annotations:
+        deployment-update: {{ .Values.deploymentUpdate.timestamp | quote }}
       labels:
         {{- include "insurance-ai-poc.selectorLabels" . | nindent 8 }}
         component: domain-agent
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "insurance-ai-poc.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: domain-agent
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:

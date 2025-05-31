@@ -3,8 +3,8 @@ replicaCount: 1
 
 image:
   repository: insurance-ai-poc
-  pullPolicy: IfNotPresent
-  tag: "latest"
+  tag: fix-1748660643
+  pullPolicy: Never
 
 imagePullSecrets: []
 nameOverride: ""
@@ -130,4 +130,8 @@ config:
   streamlitUI:
     host: "0.0.0.0"
     port: 8501
-    domainAgentUrl: "http://insurance-ai-poc-domain-agent:8003" 
+    domainAgentUrl: "http://insurance-ai-poc-domain-agent:8003"
+
+# Force deployment update
+deploymentUpdate:
+  timestamp: "2025-05-31-00-26" 

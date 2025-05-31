@@ -1,9 +1,0 @@
-fastapi==0.115.12
-uvicorn==0.34.2
-pydantic==2.11.5
-fastmcp==1.9.1
-structlog==25.3.0
-httpx==0.28.1
-python-jose==3.5.0
-passlib==1.7.4
-bcrypt==4.3.0 

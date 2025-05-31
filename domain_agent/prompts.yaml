@@ -47,41 +47,33 @@ intent_analysis:
 
 llm_formatting:
   format_response_prompt: |
-    You are an expert insurance customer service representative. You need to format a comprehensive response to a customer's question using ONLY the provided policy data.
+    You are an expert insurance customer service representative. Format a comprehensive response using the provided template structure and policy data.
 
     CUSTOMER QUESTION: "{user_question}"
     CUSTOMER ID: {customer_id}
     INTENT: {intent}
 
-    POLICY DATA:
-    {policy_data}
+    COMPREHENSIVE POLICY DATA:
+    {technical_response}
 
-    CRITICAL INSTRUCTIONS:
-    1. Use ONLY the data provided in POLICY DATA - do not invent dates, names, or amounts
-    2. For payment dates, use EXACT dates from "next_payment_due" fields
-    3. For agent information, use EXACT names from "assigned_agent" data
-    4. For billing cycles, use EXACT values from "billing_cycle" fields  
-    5. For payment methods, use EXACT values from "payment_method" fields
-    6. Format monetary amounts clearly (e.g., $325,000.00)
-    7. Include these specific keywords when relevant:
-       - For September dates: mention "september" and "2024-09-01"
-       - For June dates: mention "june" and "2024-06-15"
-       - For quarterly billing: mention "quarterly" explicitly
-       - For monthly billing: mention "monthly" explicitly
-       - For auto pay: mention "auto_pay" or "autopay"
-       - For agent names: use exact first and last names from data
-    8. Based on customer intent:
-       - For coverage_inquiry: Focus on coverage amounts and totals
-       - For payment_inquiry: Focus on exact payment dates and amounts from data
-       - For agent_contact: Focus on exact agent names, phone, email from data
-       - For policy_inquiry: Provide comprehensive policy overview
-    9. Be conversational but professional
-    10. If the data shows multiple policies, organize the information clearly
-    11. End with an offer to help further
+    RESPONSE TEMPLATE STRUCTURE:
+    {response_template}
 
-    IMPORTANT: Never use placeholder dates like "March 1, 2024" or "January 15, 2024" - always use the exact dates from the POLICY DATA.
+    INSTRUCTIONS:
+    1. Use the template structure above as your formatting guide
+    2. Extract relevant data from the comprehensive policy JSON to populate the template
+    3. Calculate totals, dates, and summaries as needed
+    4. For payment_inquiry: Focus on payment dates, amounts, billing cycles
+    5. For coverage_inquiry: Calculate total coverage amounts across policies
+    6. For policy_types: List all policy types and their key details
+    7. For agent_contact: Extract agent information from the policy data
+    8. Format monetary amounts clearly (e.g., $325,000.00)
+    9. Format dates in readable format (e.g., September 1, 2024)
+    10. Be conversational, professional, and helpful
+    11. If data is missing for template sections, adapt gracefully, but don't make up data
+    12. Restrict response to only relevant to actual customer question based on template. End with offer to help further
 
-    Respond with a complete, formatted customer service response using ONLY the provided data.
+    IMPORTANT: Extract and calculate actual values from the JSON data - don't use placeholder or mock or fake values.
 
 conversation_planning:
   technical_agent_request_prompt: |

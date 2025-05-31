@@ -21,6 +21,16 @@ podSecurityContext: {}
 
 securityContext: {}
 
+# Secrets Configuration
+secrets:
+  # Use existing secret for API keys (recommended for production)
+  useExistingSecret: false
+  secretName: "api-keys"
+  # Fallback values for development (not recommended for production)
+  apiKeys:
+    openaiApiKey: ""
+    anthropicApiKey: ""
+
 # Domain Agent Configuration
 domainAgent:
   enabled: true
@@ -106,6 +116,7 @@ affinity: {}
 env:
   ENVIRONMENT: "production"
   LOG_LEVEL: "INFO"
+  # Deprecated: Use secrets.useExistingSecret instead
   OPENAI_API_KEY: ""
   ANTHROPIC_API_KEY: ""
   

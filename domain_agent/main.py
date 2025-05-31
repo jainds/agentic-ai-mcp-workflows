@@ -190,59 +190,79 @@ class DomainAgent(A2AServer):
         return plan
     
     def format_comprehensive_response(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
-        """Format response using LLM to intelligently extract and format from raw technical response"""
+        """Format response using LLM with intent-specific templates - LLM required"""
         
         if not technical_response:
             return "I couldn't retrieve your policy information. Please try again or contact your agent."
         
-        # Use LLM for intelligent formatting - it can handle any response format
-        if self.openai_client:
-            return self._format_with_llm(intent, customer_id, technical_response, user_question)
-        else:
-            # Fallback: extract basic info and format simply
-            return self._format_with_rules_from_raw(intent, customer_id, technical_response)
+        # Require LLM for formatting - no fallback
+        if not self.openai_client:
+            raise ValueError("OpenAI API key is required for response formatting. Please configure OPENAI_API_KEY environment variable.")
+        
+        return self._format_with_llm(intent, customer_id, technical_response, user_question)
     
     def _format_with_llm(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
-        """Use LLM to intelligently extract and format information from raw technical response"""
+        """Use LLM to intelligently extract and format information using intent-specific templates"""
         try:
-            # Load the prompt from YAML file
-            prompt = self.prompts.get_format_response_prompt().format(
-                user_question=user_question,
-                customer_id=customer_id,
-                intent=intent,
-                policy_data=technical_response  # Pass raw technical response as "policy_data"
-            )
+            # Select appropriate template based on intent
+            template_key = self._get_template_key_for_intent(intent)
+            response_template = self.prompts.prompts.get("response_formatting", {}).get(template_key, "")
             
+            # Enhanced prompt that combines template structure with LLM intelligence
+            enhanced_prompt = f"""You are an expert insurance customer service representative. Format a comprehensive response using the provided template structure and policy data.
+
+CUSTOMER QUESTION: "{user_question}"
+CUSTOMER ID: {customer_id}
+INTENT: {intent}
+
+COMPREHENSIVE POLICY DATA:
+{technical_response}
+
+RESPONSE TEMPLATE STRUCTURE:
+{response_template}
+
+INSTRUCTIONS:
+1. Use the template structure above as your formatting guide
+2. Extract relevant data from the comprehensive policy JSON to populate the template
+3. Calculate totals, dates, and summaries as needed
+4. For payment_inquiry: Focus on payment dates, amounts, billing cycles
+5. For coverage_inquiry: Calculate total coverage amounts across policies
+6. For policy_types: List all policy types and their key details
+7. For agent_contact: Extract agent information from the policy data
+8. Format monetary amounts clearly (e.g., $325,000.00)
+9. Format dates in readable format (e.g., September 1, 2024)
+10. Be conversational, professional, and helpful
+11. If data is missing for template sections, adapt gracefully
+12. End with offer to help further
+
+IMPORTANT: Extract and calculate actual values from the JSON data - don't use placeholder values."""
+
             response = self.openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": enhanced_prompt}],
                 temperature=0.3,
                 max_tokens=1500
             )
             
             formatted_response = response.choices[0].message.content.strip()
-            logger.info(f"🔥 DOMAIN AGENT: LLM formatted response successfully")
+            logger.info(f"🔥 DOMAIN AGENT: LLM formatted response using template: {template_key}")
             return formatted_response
             
         except Exception as e:
-            logger.error(f"🔥 DOMAIN AGENT: LLM formatting failed: {e}, falling back to simple format")
-            return self._format_with_rules_from_raw(intent, customer_id, technical_response)
-    
-    def _format_with_rules_from_raw(self, intent: str, customer_id: str, technical_response: str) -> str:
-        """Simple fallback formatting from raw technical response"""
+            logger.error(f"🔥 DOMAIN AGENT: LLM formatting failed: {e}")
+            raise ValueError(f"Failed to format response with LLM: {e}")
+
+    def _get_template_key_for_intent(self, intent: str) -> str:
+        """Map intent to appropriate response template key"""
+        template_mapping = {
+            "payment_inquiry": "payment_due_template",
+            "coverage_inquiry": "coverage_total_template", 
+            "agent_contact": "agent_contact_template",
+            "policy_inquiry": "policy_response_template",
+            "policy_types": "policy_types_template"
+        }
         
-        # Basic response that includes the technical information
-        if intent == "coverage_inquiry":
-            return f"Here's your coverage information for customer {customer_id}:\n\n{technical_response}\n\nIf you need more details, please contact your agent."
-        
-        elif intent == "payment_inquiry":
-            return f"Here are your payment details for customer {customer_id}:\n\n{technical_response}\n\nFor payment assistance, please contact your agent."
-        
-        elif intent == "agent_contact":
-            return f"Here's your agent information for customer {customer_id}:\n\n{technical_response}\n\nYou can contact them for any policy questions."
-        
-        else:
-            return f"Here's your policy information for customer {customer_id}:\n\n{technical_response}\n\nLet me know if you need more specific details."
+        return template_mapping.get(intent, "policy_response_template")
     
     @skill(
         name="ask",
@@ -279,13 +299,21 @@ class DomainAgent(A2AServer):
                         logger.info(f"🔥 DOMAIN AGENT: Technical response received")
                         logger.info(f"🔥 DOMAIN AGENT: Raw technical response: {technical_response}")
                         
-                        # Pass raw response directly to formatter - let LLM handle extraction
-                        final_response = self.format_comprehensive_response(
-                            intent_analysis["primary_intent"],
-                            response_plan["customer_id"], 
-                            technical_response,  # Pass raw response instead of parsed data
-                            user_text
-                        )
+                        # Use LLM to format comprehensive response with templates
+                        try:
+                            final_response = self.format_comprehensive_response(
+                                intent_analysis["primary_intent"],
+                                response_plan["customer_id"], 
+                                technical_response,
+                                user_text
+                            )
+                        except ValueError as e:
+                            # Handle LLM formatting errors gracefully
+                            if "OpenAI API key" in str(e):
+                                final_response = "I need OpenAI configuration to provide formatted responses. Please contact support to enable AI formatting capabilities."
+                            else:
+                                final_response = f"I retrieved your policy information but encountered a formatting issue. Please contact support or try again. Raw data: {technical_response[:200]}..."
+                            logger.error(f"🔥 DOMAIN AGENT: Formatting error: {e}")
                     else:
                         final_response = "I'm having trouble connecting to our policy system. Please try again."
                 except Exception as e:

@@ -519,35 +519,46 @@ class TechnicalAgent(A2AServer):
                 # Call our skill asynchronously
                 result = asyncio.run(self.get_customer_policies_skill(customer_id))
                 
-                # Format response with enhanced context
+                # Send comprehensive JSON data directly to domain agent
                 if result["success"]:
                     customer_name = customer_data.get('name', customer_id) if customer_data else customer_id
-                    response_text = f"Found {result['count']} policies for customer {customer_id}"
                     
                     # Add personalized greeting if we have customer name from session
                     if authenticated and customer_name != customer_id:
-                        response_text = f"Hello {customer_name}! " + response_text
+                        response_prefix = f"Hello {customer_name}! "
+                    else:
+                        response_prefix = ""
                     
                     if original_mention and original_mention != customer_id and not original_mention.startswith("session:"):
-                        response_text += f" (identified from: '{original_mention}')"
+                        response_prefix += f"(identified from: '{original_mention}') "
                     
                     if result["count"] > 0:
-                        response_text += f":\n\n"
-                        for i, policy in enumerate(result["policies"], 1):
-                            response_text += f"{i}. Policy {policy.get('id', 'Unknown')} ({policy.get('type', 'Unknown')} policy)\n"
-                            response_text += f"   Status: {policy.get('status', 'Unknown')}\n"
-                            response_text += f"   Premium: ${policy.get('premium', 'Unknown')}\n\n"
+                        # Send the comprehensive JSON data directly to domain agent
+                        # This preserves all payment info, agent details, vehicle info, coverage limits, etc.
+                        comprehensive_data = {
+                            "customer_id": customer_id,
+                            "total_policies": result["count"],
+                            "policies": result["policies"],
+                            "response_prefix": response_prefix,
+                            "method": method,
+                            "confidence": confidence if method != "session" else 1.0
+                        }
+                        
+                        # Convert to JSON string for domain agent processing
+                        response_text = json.dumps(comprehensive_data, indent=2)
+                    else:
+                        response_text = f"{response_prefix}Found {result['count']} policies for customer {customer_id}"
                     
                     # Add session/parsing info if not from authenticated session
                     if method == "session":
-                        response_text += f"\n(Information retrieved for authenticated customer)"
+                        logger.info("Information retrieved for authenticated customer")
                     elif method == "llm" and confidence < 0.8:
-                        response_text += f"\n(Note: Parsed with {confidence:.1%} confidence using {method} method)"
+                        logger.info(f"Parsed with {confidence:.1%} confidence using {method} method")
                 else:
                     response_text = f"Error retrieving policies for customer {customer_id}: {result['error']}"
                     if original_mention and original_mention != customer_id and not original_mention.startswith("session:"):
                         response_text += f" (identified from: '{original_mention}')"
-                    
+                
                 task.artifacts = [{
                     "parts": [{"type": "text", "text": response_text}]
                 }]

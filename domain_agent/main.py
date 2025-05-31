@@ -189,101 +189,69 @@ class DomainAgent(A2AServer):
         
         return plan
     
-    def format_comprehensive_response(self, intent: str, customer_id: str, policy_data: list, user_question: str) -> str:
-        """Use LLM for intelligent data formatting and munging"""
+    def format_comprehensive_response(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
+        """Format response using LLM to intelligently extract and format from raw technical response"""
         
-        if not policy_data:
-            return self.prompts.get_error_response("customer_not_found").format(customer_id=customer_id)
+        if not technical_response:
+            return "I couldn't retrieve your policy information. Please try again or contact your agent."
         
-        # Use LLM for intelligent formatting if available
+        # Use LLM for intelligent formatting - it can handle any response format
         if self.openai_client:
-            return self._format_with_llm(intent, customer_id, policy_data, user_question)
+            return self._format_with_llm(intent, customer_id, technical_response, user_question)
         else:
-            return self._format_with_rules(intent, customer_id, policy_data)
+            # Fallback: extract basic info and format simply
+            return self._format_with_rules_from_raw(intent, customer_id, technical_response)
     
-    def _format_with_llm(self, intent: str, customer_id: str, policy_data: list, user_question: str) -> str:
-        """Use LLM for intelligent data formatting and munging"""
+    def _format_with_llm(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
+        """Use LLM to intelligently extract and format information from raw technical response"""
         try:
-            # Create a comprehensive prompt for the LLM
             # Load the prompt from YAML file
             prompt = self.prompts.get_format_response_prompt().format(
                 user_question=user_question,
                 customer_id=customer_id,
                 intent=intent,
-                policy_data=json.dumps(policy_data, indent=2)
+                policy_data=technical_response  # Pass raw technical response as "policy_data"
             )
             
             response = self.openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,  # Slightly more creative for natural formatting
-                max_tokens=1500   # Allow longer responses for comprehensive formatting
+                temperature=0.3,
+                max_tokens=1500
             )
             
             formatted_response = response.choices[0].message.content.strip()
-            logger.info(f"LLM formatted response successfully for intent: {intent}")
+            logger.info(f"🔥 DOMAIN AGENT: LLM formatted response successfully")
             return formatted_response
             
         except Exception as e:
-            logger.error(f"LLM formatting failed: {e}, falling back to rule-based formatting")
-            return self._format_with_rules(intent, customer_id, policy_data)
+            logger.error(f"🔥 DOMAIN AGENT: LLM formatting failed: {e}, falling back to simple format")
+            return self._format_with_rules_from_raw(intent, customer_id, technical_response)
     
-    def _format_with_rules(self, intent: str, customer_id: str, policy_data: list) -> str:
-        """Simplified rule-based formatting as fallback"""
+    def _format_with_rules_from_raw(self, intent: str, customer_id: str, technical_response: str) -> str:
+        """Simple fallback formatting from raw technical response"""
         
-        # Extract basic information
-        summary = policy_data[0] if policy_data and policy_data[0].get("summary") else {}
-        policies = policy_data[1:] if policy_data and policy_data[0].get("summary") else policy_data
-        
-        # Basic response based on intent
+        # Basic response that includes the technical information
         if intent == "coverage_inquiry":
-            total_coverage = 0
-            coverage_details = []
-            for policy in policies:
-                coverage = policy.get("coverage_amount", 0)
-                total_coverage += coverage
-                coverage_details.append(f"• {policy.get('type', 'Unknown')} Policy: ${coverage:,.2f}")
-            
-            return f"Hello! Here's your coverage information for customer {customer_id}:\n\n" \
-                   f"Total Coverage: ${total_coverage:,.2f}\n\n" \
-                   f"Coverage Breakdown:\n" + "\n".join(coverage_details)
+            return f"Here's your coverage information for customer {customer_id}:\n\n{technical_response}\n\nIf you need more details, please contact your agent."
         
         elif intent == "payment_inquiry":
-            payment_info = []
-            for policy in policies:
-                if policy.get("next_payment_due"):
-                    payment_info.append(f"• {policy.get('type', 'Unknown')} Policy: ${policy.get('premium', 0):.2f} due {policy.get('next_payment_due')}")
-            
-            return f"Hello! Here's your payment information for customer {customer_id}:\n\n" + \
-                   ("\n".join(payment_info) if payment_info else "No upcoming payments found.")
+            return f"Here are your payment details for customer {customer_id}:\n\n{technical_response}\n\nFor payment assistance, please contact your agent."
         
         elif intent == "agent_contact":
-            for policy in policies:
-                if policy.get("assigned_agent"):
-                    agent = policy["assigned_agent"]
-                    return f"Hello! Your assigned agent for customer {customer_id} is:\n\n" \
-                           f"Name: {agent.get('name', 'Unknown')}\n" \
-                           f"Phone: {agent.get('phone', 'Not available')}\n" \
-                           f"Email: {agent.get('email', 'Not available')}"
-            return f"Agent contact information is not available for customer {customer_id}."
+            return f"Here's your agent information for customer {customer_id}:\n\n{technical_response}\n\nYou can contact them for any policy questions."
         
-        else:  # General policy inquiry
-            policy_list = []
-            for i, policy in enumerate(policies, 1):
-                policy_list.append(f"{i}. {policy.get('type', 'Unknown')} Policy ({policy.get('id', 'Unknown')})")
-                policy_list.append(f"   Status: {policy.get('status', 'Unknown')}")
-                policy_list.append(f"   Premium: ${policy.get('premium', 0):.2f}")
-            
-            return f"Hello! Here are your policies for customer {customer_id}:\n\n" + "\n".join(policy_list)
+        else:
+            return f"Here's your policy information for customer {customer_id}:\n\n{technical_response}\n\nLet me know if you need more specific details."
     
     @skill(
-        name="ask",  # This is the default skill name that A2A clients call
+        name="ask",
         description="Handle customer conversations about insurance policies and claims",
         tags=["conversation", "customer", "insurance"]
     )
     def ask(self, task):
         """Handle customer conversation requests"""
-        logger.info(f"🔥 DOMAIN AGENT: ASK SKILL called with: {task}")
+        logger.info(f"🔥 DOMAIN AGENT: Received task: {task}")
         
         try:
             # Extract customer message
@@ -291,16 +259,16 @@ class DomainAgent(A2AServer):
             content = message_data.get("content", {})
             user_text = content.get("text", "") if isinstance(content, dict) else str(content)
             
-            logger.info(f"🔥 DOMAIN AGENT: Processing customer message: {user_text}")
+            logger.info(f"🔥 DOMAIN AGENT: Processing message: {user_text}")
             
             # Step 1: Analyze customer intent
             intent_analysis = self.analyze_customer_intent(user_text)
-            logger.info(f"🔥 DOMAIN AGENT: Customer intent: {intent_analysis}")
+            logger.info(f"🔥 DOMAIN AGENT: Intent: {intent_analysis}")
             
             # Step 2: Plan response
             session_data = getattr(task, 'session', {}) or {}
             response_plan = self.plan_response(user_text, intent_analysis, session_data)
-            logger.info(f"🔥 DOMAIN AGENT: Response plan: {response_plan}")
+            logger.info(f"🔥 DOMAIN AGENT: Plan: {response_plan}")
             
             # Step 3: Get information from Technical Agent if needed
             if response_plan["action"] == "ask_technical_agent":
@@ -308,48 +276,67 @@ class DomainAgent(A2AServer):
                     client = self.get_technical_client()
                     if client:
                         technical_response = client.ask(response_plan["technical_request"])
-                        logger.info(f"🔥 DOMAIN AGENT: Technical Agent response: {technical_response}")
+                        logger.info(f"🔥 DOMAIN AGENT: Technical response received")
+                        logger.info(f"🔥 DOMAIN AGENT: Raw technical response: {technical_response}")
                         
-                        # Parse the technical response to extract policy data
-                        policy_data = self._parse_technical_response(technical_response)
-                        
-                        # Format comprehensive response
+                        # Pass raw response directly to formatter - let LLM handle extraction
                         final_response = self.format_comprehensive_response(
                             intent_analysis["primary_intent"],
                             response_plan["customer_id"], 
-                            policy_data,
+                            technical_response,  # Pass raw response instead of parsed data
                             user_text
                         )
                     else:
-                        final_response = self.prompts.get_error_response("technical_agent_error")
+                        final_response = "I'm having trouble connecting to our policy system. Please try again."
                 except Exception as e:
                     logger.error(f"🔥 DOMAIN AGENT: Technical Agent error: {e}")
-                    final_response = self.prompts.get_error_response("technical_agent_error")
+                    final_response = "I'm having trouble retrieving your policy information. Please try again."
             
             elif response_plan["action"] == "claims_not_available":
-                final_response = self.prompts.get_response_template("claims_not_available")
+                final_response = "Claims information is currently being updated. Please contact your agent for claim status."
             
             else:
                 # General help response
-                final_response = self.prompts.get_response_template("general_help_template")
+                final_response = "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need."
             
-            logger.info(f"🔥 DOMAIN AGENT: Final response: {final_response[:100]}...")
+            logger.info(f"🔥 DOMAIN AGENT: Sending response: {final_response[:100]}...")
             
-            # Step 4: Return response
+            # Return response
             task.artifacts = [{
                 "parts": [{"type": "text", "text": final_response}]
             }]
             task.status = TaskStatus(state=TaskState.COMPLETED)
             
         except Exception as e:
-            logger.error(f"🔥 DOMAIN AGENT: Error handling conversation: {e}")
-            error_response = f"I apologize, but I encountered an error processing your request: {str(e)}"
+            logger.error(f"🔥 DOMAIN AGENT: Error: {e}")
+            error_response = f"I apologize, but I encountered an error processing your request. Please try again."
             task.artifacts = [{
                 "parts": [{"type": "text", "text": error_response}]
             }]
             task.status = TaskStatus(state=TaskState.FAILED)
         
         return task
+    
+    def handle_task(self, task):
+        """Handle incoming A2A tasks - main entry point"""
+        logger.info(f"🔥🔥🔥 DOMAIN AGENT HANDLE_TASK CALLED: {task}")
+        return self.ask(task)
+    
+    def process_task(self, task):
+        """Alternative task processing method"""
+        logger.info(f"🔥🔥🔥 DOMAIN AGENT PROCESS_TASK CALLED: {task}")
+        return self.ask(task)
+    
+    def handle_message(self, message):
+        """Handle message-based requests"""
+        logger.info(f"🔥🔥🔥 DOMAIN AGENT HANDLE_MESSAGE CALLED: {message}")
+        # Convert message to task format if needed
+        task = type('Task', (), {
+            'message': message,
+            'artifacts': [],
+            'status': None
+        })()
+        return self.ask(task)
     
     def _parse_technical_response(self, response: str) -> list:
         """Parse technical agent response to extract policy data"""
@@ -371,27 +358,6 @@ class DomainAgent(A2AServer):
         except Exception as e:
             logger.error(f"Failed to parse technical response: {e}")
             return []
-
-    def handle_task(self, task):
-        """Handle incoming A2A tasks - main entry point"""
-        logger.info(f"🔥 DOMAIN AGENT: handle_task called with: {task}")
-        return self.ask(task)
-    
-    def process_task(self, task):
-        """Alternative task processing method"""
-        logger.info(f"🔥 DOMAIN AGENT: process_task called with: {task}")
-        return self.ask(task)
-    
-    def handle_message(self, message):
-        """Handle message-based requests"""
-        logger.info(f"🔥 DOMAIN AGENT: handle_message called with: {message}")
-        # Convert message to task format if needed
-        task = type('Task', (), {
-            'message': message,
-            'artifacts': [],
-            'status': None
-        })()
-        return self.ask(task)
 
 
 if __name__ == "__main__":

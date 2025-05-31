@@ -281,9 +281,9 @@ class DomainAgent(A2AServer):
         description="Handle customer conversations about insurance policies and claims",
         tags=["conversation", "customer", "insurance"]
     )
-    def handle_conversation(self, task):
+    def ask(self, task):
         """Handle customer conversation requests"""
-        logger.info(f"🔥 DOMAIN AGENT: Received conversation task: {task}")
+        logger.info(f"🔥 DOMAIN AGENT: ASK SKILL called with: {task}")
         
         try:
             # Extract customer message
@@ -371,6 +371,27 @@ class DomainAgent(A2AServer):
         except Exception as e:
             logger.error(f"Failed to parse technical response: {e}")
             return []
+
+    def handle_task(self, task):
+        """Handle incoming A2A tasks - main entry point"""
+        logger.info(f"🔥 DOMAIN AGENT: handle_task called with: {task}")
+        return self.ask(task)
+    
+    def process_task(self, task):
+        """Alternative task processing method"""
+        logger.info(f"🔥 DOMAIN AGENT: process_task called with: {task}")
+        return self.ask(task)
+    
+    def handle_message(self, message):
+        """Handle message-based requests"""
+        logger.info(f"🔥 DOMAIN AGENT: handle_message called with: {message}")
+        # Convert message to task format if needed
+        task = type('Task', (), {
+            'message': message,
+            'artifacts': [],
+            'status': None
+        })()
+        return self.ask(task)
 
 
 if __name__ == "__main__":

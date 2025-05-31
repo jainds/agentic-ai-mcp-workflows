@@ -32,10 +32,26 @@ spec:
             - configMapRef:
                 name: {{ include "insurance-ai-poc.fullname" . }}-config
           env:
+            {{- if .Values.secrets.useExistingSecret }}
+            # Use existing Kubernetes secret (recommended for production)
             - name: OPENAI_API_KEY
-              value: {{ .Values.env.OPENAI_API_KEY | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: OPENAI_API_KEY
             - name: ANTHROPIC_API_KEY
-              value: {{ .Values.env.ANTHROPIC_API_KEY | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+            {{- else }}
+            # Fallback to values (backward compatibility, not recommended for production)
+            - name: OPENAI_API_KEY
+              value: {{ .Values.env.OPENAI_API_KEY | default .Values.secrets.apiKeys.openaiApiKey | quote }}
+            - name: ANTHROPIC_API_KEY
+              value: {{ .Values.env.ANTHROPIC_API_KEY | default .Values.secrets.apiKeys.anthropicApiKey | quote }}
+            {{- end }}
           workingDir: /app
           command: ["python", "technical_agent/main.py"]
           resources:

@@ -39,7 +39,7 @@ class DomainAgentClient:
         logger.warning("No active domain agent endpoint found")
     
     def send_message(self, message: str, customer_id: str) -> Dict[str, Any]:
-        """Send message to real domain agent using A2A protocol"""
+        """Send message to real domain agent using A2A protocol with session-based customer ID"""
         if not self.base_url:
             return {
                 "response": "❌ Domain agent is not available. Please check system health.",
@@ -53,14 +53,27 @@ class DomainAgentClient:
             # Log the outgoing API call
             call_start = time.time()
             
-            # Use A2A task format
+            # Use enhanced A2A task format with structured customer ID
             payload = {
                 "message": {
                     "content": {
                         "type": "text",
-                        "text": f"{message} for customer {customer_id}" if customer_id else message
+                        "text": message  # Keep original message clean
                     },
                     "role": "user"
+                },
+                # Add customer context as structured data
+                "session": {
+                "customer_id": customer_id,
+                    "session_id": st.session_state.get('session_id', str(uuid.uuid4())),
+                    "authenticated": st.session_state.get('authenticated', False),
+                    "customer_data": st.session_state.get('customer_data', {})
+                },
+                # Add metadata for better tracking
+                "metadata": {
+                    "ui_mode": "advanced" if UIConfig.is_advanced_mode() else "simple",
+                    "timestamp": datetime.now().isoformat(),
+                    "message_id": str(uuid.uuid4())
                 }
             }
             
@@ -103,8 +116,8 @@ class DomainAgentClient:
                 # Format response in expected UI format
                 formatted_result = {
                     "response": agent_response,
-                    "thinking_steps": ["Received user message", "Analyzed intent", "Generated response"],
-                    "orchestration_events": ["A2A task received", "Processing completed", "Response sent"],
+                    "thinking_steps": ["Received user message", "Processed with session customer ID", "Generated response"],
+                    "orchestration_events": ["A2A task received", "Customer ID from session", "Processing completed", "Response sent"],
                     "api_calls": []
                 }
                 
@@ -178,18 +191,32 @@ class DomainAgentClient:
             st.session_state.api_calls = st.session_state.api_calls[-50:]
 
 def send_chat_message_simple(message: str, customer_id: str) -> Dict[str, Any]:
-    """Simple fallback chat function for basic mode"""
+    """Simple fallback chat function for basic mode with session-based customer ID"""
     try:
         # Try domain agent first using A2A protocol
         agent_url = f"{UIConfig.DOMAIN_AGENT_ENDPOINTS[0]}/tasks/send"
         
+        # Use structured payload with session data
         payload = {
             "message": {
                 "content": {
                     "type": "text",
-                    "text": f"{message} for customer {customer_id}" if customer_id else message
+                    "text": message  # Keep original message clean
                 },
                 "role": "user"
+            },
+            # Add customer context as structured data
+            "session": {
+                "customer_id": customer_id,
+                "session_id": st.session_state.get('session_id', str(uuid.uuid4())),
+                "authenticated": st.session_state.get('authenticated', False),
+                "customer_data": st.session_state.get('customer_data', {})
+            },
+            # Simple mode metadata
+            "metadata": {
+                "ui_mode": "simple",
+                "timestamp": datetime.now().isoformat(),
+                "message_id": str(uuid.uuid4())
             }
         }
         

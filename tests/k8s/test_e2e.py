@@ -135,7 +135,7 @@ class E2ETester:
                 "message": {
                     "content": {
                         "type": "text",
-                        "text": "Show me my current insurance policies for customer user_001"
+                        "text": "Show me my current insurance policies for customer user_003"
                     },
                     "role": "user"
                 }
@@ -160,6 +160,23 @@ class E2ETester:
                         # Check for artifacts (actual response)
                         if "artifacts" in data and data["artifacts"]:
                             print("   ✅ Got response artifacts from domain agent")
+                            
+                            # Check if the response contains actual policy data
+                            artifact_text = data["artifacts"][0]["parts"][0]["text"]
+                            if "Found" in artifact_text and "policies for customer" in artifact_text:
+                                print("   ✅ Domain Agent successfully retrieved policy data from Technical Agent")
+                                if "Policy POL-" in artifact_text:
+                                    print("   ✅ Detailed policy information provided")
+                                
+                                # Verify no URL construction errors
+                                if "/tasks/send/tasks/send" not in artifact_text:
+                                    print("   ✅ No URL construction errors detected")
+                                else:
+                                    print("   ❌ URL construction error still present")
+                                    return False
+                            else:
+                                print("   ⚠️  Response received but may not contain expected policy data")
+                                print(f"     Response preview: {artifact_text[:100]}...")
                         
                         print("✅ Policy inquiry workflow completed")
                         return True

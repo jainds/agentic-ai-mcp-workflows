@@ -32,7 +32,7 @@ class PromptLoader:
     
     def get_intent_analysis_prompt(self, user_text: str) -> str:
         """Get the LLM intent analysis prompt"""
-        template = self.prompts.get("intent_analysis", {}).get("llm_intent_analysis_prompt", "")
+        template = self.prompts.get("intent_analysis", {}).get("analyze_intent_prompt", "")
         return template.format(user_text=user_text)
     
     def get_format_response_prompt(self) -> str:

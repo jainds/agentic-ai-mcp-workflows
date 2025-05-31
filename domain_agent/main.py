@@ -106,7 +106,28 @@ class DomainAgent(A2AServer):
             )
             
             result_text = response.choices[0].message.content.strip()
-            result = json.loads(result_text)
+            logger.info(f"🔥 DOMAIN AGENT: LLM raw response: {result_text}")
+            
+            # Try to parse JSON, handling common formatting issues
+            try:
+                result = json.loads(result_text)
+            except json.JSONDecodeError:
+                # Try to extract JSON from markdown code blocks
+                if result_text.startswith("```json") and result_text.endswith("```"):
+                    json_content = result_text[7:-3].strip()
+                    result = json.loads(json_content)
+                elif result_text.startswith("```") and result_text.endswith("```"):
+                    json_content = result_text[3:-3].strip()
+                    result = json.loads(json_content)
+                else:
+                    # Try to find JSON in the response
+                    import re
+                    json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+                    if json_match:
+                        json_content = json_match.group(0)
+                        result = json.loads(json_content)
+                    else:
+                        raise ValueError(f"No valid JSON found in LLM response: {result_text}")
             
             logger.info(f"LLM intent analysis: {result}")
             return result
@@ -144,8 +165,8 @@ class DomainAgent(A2AServer):
         # Coverage/total amount queries
         if any(word in text_lower for word in ["total coverage", "coverage amount", "total amount", "how much coverage"]):
             intent = "coverage_inquiry"
-        # Payment queries
-        elif any(word in text_lower for word in ["payment", "due", "billing", "pay"]):
+        # Payment queries (including premium and billing)
+        elif any(word in text_lower for word in ["payment", "due", "billing", "pay", "premium", "premiums", "deductible", "deductibles"]):
             intent = "payment_inquiry"
         # Agent contact queries
         elif any(word in text_lower for word in ["agent", "contact", "who is my", "representative"]):
@@ -290,12 +311,43 @@ IMPORTANT: Extract and calculate actual values from the JSON data - don't use pl
             
             logger.info(f"🔥 DOMAIN AGENT: Processing message: {user_text}")
             
+            # Extract session data - try multiple approaches
+            session_data = {}
+            
+            # Approach 1: From task.session attribute
+            if hasattr(task, 'session') and task.session:
+                session_data = task.session
+                logger.info(f"🔥 DOMAIN AGENT: Session data from task.session: {session_data}")
+            
+            # Approach 2: From getattr
+            elif getattr(task, 'session', None):
+                session_data = getattr(task, 'session', {})
+                logger.info(f"🔥 DOMAIN AGENT: Session data from getattr: {session_data}")
+            
+            # Approach 3: Check if session data is in metadata
+            elif hasattr(task, 'metadata') and task.metadata and 'session' in task.metadata:
+                session_data = task.metadata.get('session', {})
+                logger.info(f"🔥 DOMAIN AGENT: Session data from metadata: {session_data}")
+            
+            # Approach 4: Check if there's a request context (for direct HTTP calls)
+            else:
+                try:
+                    from flask import request
+                    if request and request.is_json:
+                        request_data = request.get_json()
+                        if request_data and 'session' in request_data:
+                            session_data = request_data['session']
+                            logger.info(f"🔥 DOMAIN AGENT: Session data from Flask request: {session_data}")
+                except:
+                    pass
+            
+            logger.info(f"🔥 DOMAIN AGENT: Final session data: {session_data}")
+            
             # Step 1: Analyze customer intent
             intent_analysis = self.analyze_customer_intent(user_text)
             logger.info(f"🔥 DOMAIN AGENT: Intent: {intent_analysis}")
             
             # Step 2: Plan response
-            session_data = getattr(task, 'session', {}) or {}
             response_plan = self.plan_response(user_text, intent_analysis, session_data)
             logger.info(f"🔥 DOMAIN AGENT: Plan: {response_plan}")
             

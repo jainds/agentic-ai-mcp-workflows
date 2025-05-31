@@ -205,40 +205,13 @@ class DomainAgent(A2AServer):
         """Use LLM for intelligent data formatting and munging"""
         try:
             # Create a comprehensive prompt for the LLM
-            prompt = f"""
-            You are an expert insurance customer service representative. You need to format a comprehensive response to a customer's question using the provided policy data.
-
-            CUSTOMER QUESTION: "{user_question}"
-            CUSTOMER ID: {customer_id}
-            INTENT: {intent}
-            
-            POLICY DATA (JSON):
-            {json.dumps(policy_data, indent=2)}
-            
-            INSTRUCTIONS:
-            1. Extract and present the information most relevant to the customer's specific question
-            2. If the data contains a summary object, use it for totals and overviews
-            3. Format monetary amounts clearly (e.g., $250,000, $95.00)
-            4. Present dates in a readable format
-            5. Include agent contact information when relevant
-            6. For coverage questions, focus on coverage amounts and limits
-            7. For payment questions, focus on due dates, amounts, and billing cycles
-            8. For policy status questions, focus on active/inactive status and policy details
-            9. For agent contact questions, focus on assigned agent information
-            10. Handle missing data gracefully - if specific information isn't available, say so clearly
-            11. Be conversational and helpful, like a real customer service representative
-            12. Include specific policy IDs, numbers, and details when available
-            13. If there are multiple policies, organize the information clearly
-            14. Always acknowledge the customer by their ID at the beginning
-            
-            RESPONSE FORMAT:
-            - Start with a friendly greeting mentioning the customer ID
-            - Directly answer their specific question first
-            - Provide supporting details and context
-            - End with an offer to help with anything else
-            
-            Generate a comprehensive, natural, and helpful response:
-            """
+            # Load the prompt from YAML file
+            prompt = self.prompts.get_format_response_prompt().format(
+                user_question=user_question,
+                customer_id=customer_id,
+                intent=intent,
+                policy_data=json.dumps(policy_data, indent=2)
+            )
             
             response = self.openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -310,7 +283,7 @@ class DomainAgent(A2AServer):
     )
     def handle_conversation(self, task):
         """Handle customer conversation requests"""
-        logger.info(f"Received conversation task: {task}")
+        logger.info(f"🔥 DOMAIN AGENT: Received conversation task: {task}")
         
         try:
             # Extract customer message
@@ -318,7 +291,7 @@ class DomainAgent(A2AServer):
             content = message_data.get("content", {})
             user_text = content.get("text", "") if isinstance(content, dict) else str(content)
             
-            logger.info(f"Processing customer message: {user_text}")
+            logger.info(f"🔥 DOMAIN AGENT: Processing customer message: {user_text}")
             
             # Step 1: Analyze customer intent
             intent_analysis = self.analyze_customer_intent(user_text)
@@ -375,6 +348,13 @@ class DomainAgent(A2AServer):
             task.status = TaskStatus(state=TaskState.FAILED)
         
         return task
+    
+    def handle_task(self, task):
+        """Default task handler - routes all tasks to conversation handling"""
+        logger.info(f"🔥 DOMAIN AGENT: Default task handler received: {task}")
+        logger.info(f"🔥 DOMAIN AGENT: Task type: {type(task)}")
+        logger.info(f"🔥 DOMAIN AGENT: Task attributes: {dir(task)}")
+        return self.handle_conversation(task)
     
     def _parse_technical_response(self, response: str) -> list:
         """Parse technical agent response to extract policy data"""

@@ -40,8 +40,38 @@ class PolicyQueriesE2ETester:
             {
                 "id": "payment_due_date", 
                 "query": "When is my next payment due for customer CUST-001?",
-                "expected_keywords": ["payment", "due", "september", "june"],
+                "expected_keywords": ["payment", "due", "september", "june", "2024-09-01", "2024-06-15"],
                 "description": "Test payment due date information"
+            },
+            {
+                "id": "payment_due_auto",
+                "query": "When is my auto insurance payment due for customer CUST-001?",
+                "expected_keywords": ["payment", "due", "september", "2024-09-01", "auto", "quarterly"],
+                "description": "Test specific auto policy payment due date"
+            },
+            {
+                "id": "payment_due_life",
+                "query": "When is my life insurance payment due for customer CUST-001?",
+                "expected_keywords": ["payment", "due", "june", "2024-06-15", "life", "monthly"],
+                "description": "Test specific life policy payment due date"
+            },
+            {
+                "id": "payment_method_info",
+                "query": "What payment method do I have set up for customer CUST-001?",
+                "expected_keywords": ["payment", "method", "auto_pay", "auto", "autopay"],
+                "description": "Test payment method information retrieval"
+            },
+            {
+                "id": "billing_cycle_info",
+                "query": "What are my billing cycles for customer CUST-001?",
+                "expected_keywords": ["billing", "cycle", "quarterly", "monthly", "payment"],
+                "description": "Test billing cycle information"
+            },
+            {
+                "id": "next_payment_amount",
+                "query": "How much is my next payment for customer CUST-001?",
+                "expected_keywords": ["payment", "amount", "$95", "$45", "premium"],
+                "description": "Test next payment amount information"
             },
             {
                 "id": "contact_person",
@@ -214,7 +244,8 @@ class PolicyQueriesE2ETester:
         
         # Category analysis
         categories = {
-            "Core Requirements": ["total_coverage", "policy_types", "payment_due_date", "contact_person"],
+            "Core Requirements": ["total_coverage", "policy_types", "contact_person"],
+            "Payment Information": ["payment_due_date", "payment_due_auto", "payment_due_life", "payment_method_info", "billing_cycle_info", "next_payment_amount"],
             "Policy Details": ["policy_details", "premium_amounts", "policy_status"],
             "Coverage Information": ["coverage_limits", "deductibles", "policy_dates"]
         }

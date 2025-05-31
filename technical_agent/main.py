@@ -284,7 +284,7 @@ class TechnicalAgent(A2AServer):
             
             # Use the retry mechanism for MCP calls
             result = await self._call_mcp_tool_with_retry("get_customer_policies", {"customer_id": customer_id})
-            
+                
             # Process the result properly
             policies_data = []
             if result:
@@ -310,16 +310,16 @@ class TechnicalAgent(A2AServer):
                         logger.info(f"Unknown content type: {type(content)} - {content}")
             else:
                 logger.warning("No result returned from MCP call")
-            
-            logger.info(f"Successfully retrieved {len(policies_data)} policies for customer {customer_id}")
-            
-            return {
-                "success": True,
-                "customer_id": customer_id,
-                "policies": policies_data,
+                
+                logger.info(f"Successfully retrieved {len(policies_data)} policies for customer {customer_id}")
+                
+                return {
+                    "success": True,
+                    "customer_id": customer_id,
+                    "policies": policies_data,
                 "count": len(policies_data)
-            }
-            
+                }
+                
         except Exception as e:
             logger.error(f"Error fetching policies for customer {customer_id}: {e}")
             return {
@@ -424,13 +424,13 @@ class TechnicalAgent(A2AServer):
             
             # Handle different intents with session context
             if intent == "get_customer_policies" and customer_id:
-                # Call our skill asynchronously
-                result = asyncio.run(self.get_customer_policies_skill(customer_id))
-                
+                    # Call our skill asynchronously
+                    result = asyncio.run(self.get_customer_policies_skill(customer_id))
+                    
                 # Format response with enhanced context
-                if result["success"]:
+                    if result["success"]:
                     customer_name = customer_data.get('name', customer_id) if customer_data else customer_id
-                    response_text = f"Found {result['count']} policies for customer {customer_id}"
+                        response_text = f"Found {result['count']} policies for customer {customer_id}"
                     
                     # Add personalized greeting if we have customer name from session
                     if authenticated and customer_name != customer_id:
@@ -439,12 +439,12 @@ class TechnicalAgent(A2AServer):
                     if original_mention and original_mention != customer_id and not original_mention.startswith("session:"):
                         response_text += f" (identified from: '{original_mention}')"
                     
-                    if result["count"] > 0:
-                        response_text += f":\n\n"
-                        for i, policy in enumerate(result["policies"], 1):
-                            response_text += f"{i}. Policy {policy.get('id', 'Unknown')} ({policy.get('type', 'Unknown')} policy)\n"
-                            response_text += f"   Status: {policy.get('status', 'Unknown')}\n"
-                            response_text += f"   Premium: ${policy.get('premium', 'Unknown')}\n\n"
+                        if result["count"] > 0:
+                            response_text += f":\n\n"
+                            for i, policy in enumerate(result["policies"], 1):
+                                response_text += f"{i}. Policy {policy.get('id', 'Unknown')} ({policy.get('type', 'Unknown')} policy)\n"
+                                response_text += f"   Status: {policy.get('status', 'Unknown')}\n"
+                                response_text += f"   Premium: ${policy.get('premium', 'Unknown')}\n\n"
                     
                     # Add session/parsing info if not from authenticated session
                     if method == "session":
@@ -452,15 +452,15 @@ class TechnicalAgent(A2AServer):
                     elif method == "llm" and confidence < 0.8:
                         response_text += f"\n(Note: Parsed with {confidence:.1%} confidence using {method} method)"
                 else:
-                    response_text = f"Error retrieving policies for customer {customer_id}: {result['error']}"
+                        response_text = f"Error retrieving policies for customer {customer_id}: {result['error']}"
                     if original_mention and original_mention != customer_id and not original_mention.startswith("session:"):
                         response_text += f" (identified from: '{original_mention}')"
-                
-                task.artifacts = [{
-                    "parts": [{"type": "text", "text": response_text}]
-                }]
-                task.status = TaskStatus(state=TaskState.COMPLETED)
-                
+                    
+                    task.artifacts = [{
+                        "parts": [{"type": "text", "text": response_text}]
+                    }]
+                    task.status = TaskStatus(state=TaskState.COMPLETED)
+            
             elif intent == "health_check":
                 # Health check request
                 health_result = asyncio.run(self.health_check())
@@ -479,7 +479,7 @@ class TechnicalAgent(A2AServer):
                     "parts": [{"type": "text", "text": response_text}]
                 }]
                 task.status = TaskStatus(state=TaskState.COMPLETED)
-                
+            
             elif intent == "get_customer_policies" and not customer_id:
                 # Customer policies requested but no ID found
                 response_text = "I understand you want to look up customer policies, but I couldn't identify a specific customer ID.\n\n"

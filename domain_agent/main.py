@@ -240,10 +240,11 @@ INSTRUCTIONS:
 8. Format monetary amounts clearly (e.g., $325,000.00)
 9. Format dates in readable format (e.g., September 1, 2024)
 10. Be conversational, professional, and helpful
-11. If data is missing for template sections, adapt gracefully
-12. End with offer to help further
+11. If data is missing for template sections, adapt gracefully, but don't make up data
+12. Restrict response to only relevant to actual customer question based on template. End with offer to help further
 
-IMPORTANT: Extract and calculate actual values from the JSON data - don't use placeholder values."""
+
+IMPORTANT: Extract and calculate actual values from the JSON data - don't use placeholder or mock or fake values."""
 
             response = self.openai_client.chat.completions.create(
                 model="openai/gpt-4o-mini",

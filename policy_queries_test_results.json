@@ -1,0 +1,297 @@
+{
+  "summary": {
+    "total_tests": 15,
+    "passed": 2,
+    "failed": 13,
+    "success_rate": 0.13333333333333333,
+    "avg_response_time": 2.03,
+    "category_breakdown": {
+      "Core Requirements": {
+        "total": 3,
+        "passed": 1,
+        "success_rate": 0.3333333333333333
+      },
+      "Payment Information": {
+        "total": 6,
+        "passed": 0,
+        "success_rate": 0.0
+      },
+      "Policy Details": {
+        "total": 3,
+        "passed": 1,
+        "success_rate": 0.3333333333333333
+      },
+      "Coverage Information": {
+        "total": 3,
+        "passed": 0,
+        "success_rate": 0.0
+      }
+    }
+  },
+  "test_results": [
+    {
+      "test_id": "total_coverage",
+      "description": "Test total coverage calculation across all policies",
+      "query": "What's the total coverage amount for customer CUST-001?",
+      "success": false,
+      "response": "Here's your coverage information for customer CUST-001:\n\nError retrieving policies for customer CUST-001: \n\nIf you need more details, please contact your agent.",
+      "keywords_found": [
+        "coverage"
+      ],
+      "keywords_missing": [
+        "325,000",
+        "total",
+        "75,000",
+        "250,000"
+      ],
+      "timestamp": "2025-05-31T14:57:06.090192",
+      "response_time": 3.22
+    },
+    {
+      "test_id": "policy_types",
+      "description": "Test policy types identification",
+      "query": "What types of policies do I have for customer CUST-001?",
+      "success": true,
+      "response": "Here's your policy information for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nLet me know if you need more specific details.",
+      "keywords_found": [
+        "auto",
+        "life",
+        "policy"
+      ],
+      "keywords_missing": [
+        "types"
+      ],
+      "timestamp": "2025-05-31T14:57:10.319208",
+      "response_time": 0.06
+    },
+    {
+      "test_id": "payment_due_date",
+      "description": "Test payment due date information",
+      "query": "When is my next payment due for customer CUST-001?",
+      "success": false,
+      "response": "Here are your payment details for customer CUST-001:\n\nError retrieving policies for customer CUST-001: Client error '400 Bad Request' for url 'http://insurance-ai-poc-policy-server:8001/mcp/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400\n\nFor payment assistance, please contact your agent.",
+      "keywords_found": [
+        "payment"
+      ],
+      "keywords_missing": [
+        "due",
+        "september",
+        "june",
+        "2024-09-01",
+        "2024-06-15"
+      ],
+      "timestamp": "2025-05-31T14:57:11.385330",
+      "response_time": 3.21
+    },
+    {
+      "test_id": "payment_due_auto",
+      "description": "Test specific auto policy payment due date",
+      "query": "When is my auto insurance payment due for customer CUST-001?",
+      "success": false,
+      "response": "Here are your payment details for customer CUST-001:\n\nError retrieving policies for customer CUST-001: \n\nFor payment assistance, please contact your agent.",
+      "keywords_found": [
+        "payment"
+      ],
+      "keywords_missing": [
+        "due",
+        "september",
+        "2024-09-01",
+        "auto",
+        "quarterly"
+      ],
+      "timestamp": "2025-05-31T14:57:15.600358",
+      "response_time": 3.21
+    },
+    {
+      "test_id": "payment_due_life",
+      "description": "Test specific life policy payment due date",
+      "query": "When is my life insurance payment due for customer CUST-001?",
+      "success": false,
+      "response": "Here are your payment details for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nFor payment assistance, please contact your agent.",
+      "keywords_found": [
+        "payment",
+        "life"
+      ],
+      "keywords_missing": [
+        "due",
+        "june",
+        "2024-06-15",
+        "monthly"
+      ],
+      "timestamp": "2025-05-31T14:57:19.817467",
+      "response_time": 1.13
+    },
+    {
+      "test_id": "payment_method_info",
+      "description": "Test payment method information retrieval",
+      "query": "What payment method do I have set up for customer CUST-001?",
+      "success": false,
+      "response": "Here are your payment details for customer CUST-001:\n\nError retrieving policies for customer CUST-001: \n\nFor payment assistance, please contact your agent.",
+      "keywords_found": [
+        "payment"
+      ],
+      "keywords_missing": [
+        "method",
+        "auto_pay",
+        "auto",
+        "autopay"
+      ],
+      "timestamp": "2025-05-31T14:57:21.948267",
+      "response_time": 3.25
+    },
+    {
+      "test_id": "billing_cycle_info",
+      "description": "Test billing cycle information",
+      "query": "What are my billing cycles for customer CUST-001?",
+      "success": false,
+      "response": "Here are your payment details for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nFor payment assistance, please contact your agent.",
+      "keywords_found": [
+        "payment"
+      ],
+      "keywords_missing": [
+        "billing",
+        "cycle",
+        "quarterly",
+        "monthly"
+      ],
+      "timestamp": "2025-05-31T14:57:26.208137",
+      "response_time": 3.24
+    },
+    {
+      "test_id": "next_payment_amount",
+      "description": "Test next payment amount information",
+      "query": "How much is my next payment for customer CUST-001?",
+      "success": false,
+      "response": "Here are your payment details for customer CUST-001:\n\nError retrieving policies for customer CUST-001: Client error '400 Bad Request' for url 'http://insurance-ai-poc-policy-server:8001/mcp/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400\n\nFor payment assistance, please contact your agent.",
+      "keywords_found": [
+        "payment"
+      ],
+      "keywords_missing": [
+        "amount",
+        "$95",
+        "$45",
+        "premium"
+      ],
+      "timestamp": "2025-05-31T14:57:30.455757",
+      "response_time": 3.24
+    },
+    {
+      "test_id": "contact_person",
+      "description": "Test assigned agent contact information",
+      "query": "Who is my contact person for policies for customer CUST-001?",
+      "success": false,
+      "response": "Here's your agent information for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nYou can contact them for any policy questions.",
+      "keywords_found": [
+        "agent",
+        "contact"
+      ],
+      "keywords_missing": [
+        "michael",
+        "brown"
+      ],
+      "timestamp": "2025-05-31T14:57:34.702904",
+      "response_time": 0.07
+    },
+    {
+      "test_id": "policy_details",
+      "description": "Test detailed policy information retrieval",
+      "query": "Show me details of my auto policy for customer CUST-001",
+      "success": false,
+      "response": "Here's your policy information for customer CUST-001:\n\nError retrieving policies for customer CUST-001: Client error '400 Bad Request' for url 'http://insurance-ai-poc-policy-server:8001/mcp/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400\n\nLet me know if you need more specific details.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "honda",
+        "civic",
+        "auto",
+        "liability",
+        "collision"
+      ],
+      "timestamp": "2025-05-31T14:57:35.774665",
+      "response_time": 3.25
+    },
+    {
+      "test_id": "premium_amounts",
+      "description": "Test premium amount and billing cycle information",
+      "query": "What are my premium amounts for customer CUST-001?",
+      "success": false,
+      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "premium",
+        "$95",
+        "$45",
+        "monthly",
+        "quarterly"
+      ],
+      "timestamp": "2025-05-31T14:57:40.023481",
+      "response_time": 0.04
+    },
+    {
+      "test_id": "policy_status",
+      "description": "Test policy status reporting",
+      "query": "What's the status of my policies for customer CUST-001?",
+      "success": true,
+      "response": "Here's your policy information for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nLet me know if you need more specific details.",
+      "keywords_found": [
+        "active",
+        "status",
+        "POL-2024"
+      ],
+      "keywords_missing": [],
+      "timestamp": "2025-05-31T14:57:41.061853",
+      "response_time": 0.07
+    },
+    {
+      "test_id": "coverage_limits",
+      "description": "Test detailed coverage limits information",
+      "query": "What are my coverage limits for customer CUST-001?",
+      "success": false,
+      "response": "Here's your policy information for customer CUST-001:\n\nError retrieving policies for customer CUST-001: Client error '400 Bad Request' for url 'http://insurance-ai-poc-policy-server:8001/mcp/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400\n\nLet me know if you need more specific details.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "75,000",
+        "250,000",
+        "bodily",
+        "injury",
+        "benefit"
+      ],
+      "timestamp": "2025-05-31T14:57:42.136639",
+      "response_time": 3.23
+    },
+    {
+      "test_id": "deductibles",
+      "description": "Test deductible information across policies",
+      "query": "What are my deductibles for customer CUST-001?",
+      "success": false,
+      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "deductible",
+        "$750",
+        "$0",
+        "auto",
+        "life"
+      ],
+      "timestamp": "2025-05-31T14:57:46.370695",
+      "response_time": 0.02
+    },
+    {
+      "test_id": "policy_dates",
+      "description": "Test policy expiration date information",
+      "query": "When do my policies expire for customer CUST-001?",
+      "success": false,
+      "response": "Here's your policy information for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nLet me know if you need more specific details.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "expire",
+        "2025",
+        "2034",
+        "end",
+        "date"
+      ],
+      "timestamp": "2025-05-31T14:57:47.399388",
+      "response_time": 3.23
+    }
+  ],
+  "timestamp": "2025-05-31T14:57:51.634999"
+}

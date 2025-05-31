@@ -61,7 +61,7 @@ spec:
               key: openai-api-key
               optional: true
         - name: LLM_MODEL
-          value: "anthropic/claude-3.5-sonnet"
+          value: "openai/gpt-4o-mini"
         - name: PYTHON_A2A_COMPATIBLE
           value: "true"
         - name: PROFESSIONAL_TEMPLATES_ENABLED

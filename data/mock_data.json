@@ -47,6 +47,22 @@
         "email_alerts": true,
         "two_factor_auth": true
       }
+    },
+    {
+      "id": "agent_001",
+      "email": "michael.brown@insurance.com",
+      "first_name": "Michael",
+      "last_name": "Brown",
+      "role": "agent",
+      "status": "active",
+      "phone": "+1-555-0103",
+      "created_at": "2024-01-10T00:00:00Z",
+      "last_login": "2024-05-30T08:00:00Z",
+      "preferences": {
+        "notifications": true,
+        "email_alerts": true,
+        "two_factor_auth": true
+      }
     }
   ],
   "policies": [
@@ -60,6 +76,10 @@
       "deductible": 500.00,
       "start_date": "2024-01-01T00:00:00Z",
       "end_date": "2024-12-31T23:59:59Z",
+      "assigned_agent_id": "user_002",
+      "billing_cycle": "monthly",
+      "next_payment_due": "2024-06-15T00:00:00Z",
+      "payment_method": "auto_pay",
       "details": {
         "vehicle": {
           "make": "Toyota",
@@ -86,6 +106,10 @@
       "deductible": 1000.00,
       "start_date": "2024-01-01T00:00:00Z",
       "end_date": "2024-12-31T23:59:59Z",
+      "assigned_agent_id": "user_002",
+      "billing_cycle": "monthly",
+      "next_payment_due": "2024-06-15T00:00:00Z",
+      "payment_method": "manual_pay",
       "details": {
         "property": {
           "address": "123 Main St, Anytown, ST 12345",
@@ -111,6 +135,10 @@
       "deductible": 750.00,
       "start_date": "2024-03-01T00:00:00Z",
       "end_date": "2025-02-28T23:59:59Z",
+      "assigned_agent_id": "agent_001",
+      "billing_cycle": "quarterly",
+      "next_payment_due": "2024-09-01T00:00:00Z",
+      "payment_method": "auto_pay",
       "details": {
         "vehicle": {
           "make": "Honda",
@@ -137,6 +165,10 @@
       "deductible": 0.00,
       "start_date": "2024-01-15T00:00:00Z",
       "end_date": "2034-01-14T23:59:59Z",
+      "assigned_agent_id": "agent_001",
+      "billing_cycle": "monthly",
+      "next_payment_due": "2024-06-15T00:00:00Z",
+      "payment_method": "auto_pay",
       "details": {
         "policy_type": "term_life",
         "term_years": 10,

@@ -152,7 +152,7 @@ Is there any specific aspect you'd like me to explain in more detail?"""
         # Try OpenRouter first, fall back to OpenAI
         openrouter_key = os.getenv('OPENROUTER_API_KEY')
         openai_key = os.getenv('OPENAI_API_KEY')
-        model_name = os.getenv('LLM_MODEL') or os.getenv('PRIMARY_MODEL_NAME') or os.getenv('SECONDARY_MODEL_NAME') or "anthropic/claude-3.5-sonnet"
+        model_name = os.getenv('LLM_MODEL') or os.getenv('PRIMARY_MODEL_NAME') or os.getenv('SECONDARY_MODEL_NAME') or "openai/gpt-4o-mini"
         
         if openrouter_key:
             self.llm_client = OpenAI(

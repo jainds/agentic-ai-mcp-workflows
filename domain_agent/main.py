@@ -50,15 +50,23 @@ class DomainAgent(A2AServer):
         self.technical_agent_url = os.getenv("TECHNICAL_AGENT_URL", "http://insurance-ai-poc-technical-agent:8002")
         self.technical_client = None
         
-        # OpenAI setup (optional)
+        # OpenAI setup (configured for OpenRouter)
         self.openai_client = None
         api_key = os.getenv("OPENAI_API_KEY")
         if api_key:
             try:
-                self.openai_client = openai.OpenAI(api_key=api_key)
-                logger.info("OpenAI client initialized")
+                # Use OpenRouter if the key starts with sk-or-
+                if api_key.startswith("sk-or-"):
+                    self.openai_client = openai.OpenAI(
+                        api_key=api_key,
+                        base_url="https://openrouter.ai/api/v1"
+                    )
+                    logger.info("OpenRouter client initialized")
+                else:
+                    self.openai_client = openai.OpenAI(api_key=api_key)
+                    logger.info("OpenAI client initialized")
             except Exception as e:
-                logger.warning(f"OpenAI initialization failed: {e}")
+                logger.warning(f"LLM client initialization failed: {e}")
         else:
             logger.warning("No OpenAI API key found - using rule-based responses only")
         
@@ -91,7 +99,7 @@ class DomainAgent(A2AServer):
             prompt = self.prompts.get_intent_analysis_prompt(user_text)
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="openai/gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
                 max_tokens=200
@@ -238,7 +246,7 @@ INSTRUCTIONS:
 IMPORTANT: Extract and calculate actual values from the JSON data - don't use placeholder values."""
 
             response = self.openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="openai/gpt-4o-mini",
                 messages=[{"role": "user", "content": enhanced_prompt}],
                 temperature=0.3,
                 max_tokens=1500

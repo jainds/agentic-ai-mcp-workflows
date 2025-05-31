@@ -32,10 +32,9 @@ structlog.configure(
 
 logger = structlog.get_logger(__name__)
 
-
 @agent(
-    name="Insurance Domain Agent",
-    description="Conversational insurance agent that helps customers with policy inquiries and claims",
+    name="Domain Agent", 
+    description="Conversational insurance agent that helps customers and communicates with Technical Agent",
     version="2.0.0"
 )
 class DomainAgent(A2AServer):
@@ -44,298 +43,370 @@ class DomainAgent(A2AServer):
     def __init__(self):
         super().__init__()
         
-        # Load prompts from YAML
+        # Load prompts
         self.prompts = PromptLoader()
         
         # Technical Agent setup
-        self.technical_agent_url = os.getenv("TECHNICAL_AGENT_URL", "http://localhost:8002")
+        self.technical_agent_url = os.getenv("TECHNICAL_AGENT_URL", "http://insurance-ai-poc-technical-agent:8002")
         self.technical_client = None
         
-        # OpenAI setup
+        # OpenAI setup (optional)
         self.openai_client = None
-        if os.getenv("OPENAI_API_KEY"):
-            self.openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            logger.info("OpenAI client initialized")
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            try:
+                self.openai_client = openai.OpenAI(api_key=api_key)
+                logger.info("OpenAI client initialized")
+            except Exception as e:
+                logger.warning(f"OpenAI initialization failed: {e}")
         else:
-            logger.warning("No OpenAI API key - using rule-based responses only")
+            logger.warning("No OpenAI API key found - using rule-based responses only")
         
         logger.info("Domain Agent initialized")
         logger.info(f"Will connect to Technical Agent at: {self.technical_agent_url}")
     
     def get_technical_client(self):
         """Get Technical Agent client (create if needed)"""
-        if self.technical_client is None:
-            self.technical_client = A2AClient(self.technical_agent_url)
+        if not self.technical_client:
+            try:
+                self.technical_client = A2AClient(self.technical_agent_url)
+                logger.info("Technical Agent client created")
+            except Exception as e:
+                logger.error(f"Failed to create Technical Agent client: {e}")
+                self.technical_client = None
         return self.technical_client
     
-    def analyze_customer_intent(self, customer_message: str) -> Dict[str, Any]:
-        """Figure out what the customer wants"""
+    def analyze_customer_intent(self, user_text: str) -> Dict[str, Any]:
+        """Analyze customer intent and extract information"""
         
-        # Try LLM first if available
+        # Try LLM analysis first if available
         if self.openai_client:
-            try:
-                return self._analyze_with_llm(customer_message)
-            except Exception as e:
-                logger.warning(f"LLM analysis failed: {e}, using rules")
-        
-        # Fallback to rule-based analysis
-        return self._analyze_with_rules(customer_message)
+            return self._analyze_with_llm(user_text)
+        else:
+            return self._analyze_with_rules(user_text)
     
-    def _analyze_with_llm(self, customer_message: str) -> Dict[str, Any]:
+    def _analyze_with_llm(self, user_text: str) -> Dict[str, Any]:
         """Use LLM to understand customer intent"""
-        prompt = self.prompts.get_intent_analysis_prompt(customer_message)
-        
-        response = self.openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=300
-        )
-        
-        result_text = response.choices[0].message.content.strip()
-        logger.info(f"LLM analysis: {result_text}")
-        
         try:
-            # Try to parse JSON response
-            result = json.loads(result_text)
-            result["method"] = "llm"
+            prompt = self.prompts.get_intent_analysis_prompt(user_text)
             
-            # Clean up null values
-            if result.get("customer_id") in ["null", "none", ""]:
-                result["customer_id"] = None
-                
+            response = self.openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=200
+            )
+            
+            result_text = response.choices[0].message.content.strip()
+            result = json.loads(result_text)
+            
+            logger.info(f"LLM intent analysis: {result}")
             return result
             
-        except json.JSONDecodeError:
-            # Try to extract JSON from wrapped response
-            json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-            if json_match:
-                try:
-                    result = json.loads(json_match.group(0))
-                    result["method"] = "llm"
-                    if result.get("customer_id") in ["null", "none", ""]:
-                        result["customer_id"] = None
-                    return result
-                except json.JSONDecodeError:
-                    pass
-            
-            logger.warning("Could not parse LLM response, using rules")
-            return self._analyze_with_rules(customer_message)
+        except Exception as e:
+            logger.warning(f"LLM analysis failed: {e}, falling back to rules")
+            return self._analyze_with_rules(user_text)
     
-    def _analyze_with_rules(self, customer_message: str) -> Dict[str, Any]:
+    def _analyze_with_rules(self, user_text: str) -> Dict[str, Any]:
         """Use simple rules to understand customer intent"""
-        text_lower = customer_message.lower()
+        text_lower = user_text.lower()
         
-        # Look for customer ID patterns
+        # Extract customer ID
         customer_id = None
-        original_mention = None
-        
         patterns = [
-            r'user_\w+',                                    # user_003
-            r'CUST-\d+',                                    # CUST-001
-            r'cust-\d+',                                    # cust-001
-            r'customer[_\s-]+([A-Za-z0-9_-]+)',            # customer CUST-001
-            r'user[_\s]+([A-Za-z0-9_-]+)',                 # user 003
-            r'client[_\s]+([A-Za-z0-9_-]+)',               # client 001
+            r'cust-\d+',
+            r'user_\d+', 
+            r'customer\s+([a-zA-Z0-9_-]+)',
+            r'for\s+customer\s+([a-zA-Z0-9_-]+)',
+            r'customer\s+id\s+([a-zA-Z0-9_-]+)'
         ]
         
         for pattern in patterns:
-            match = re.search(pattern, customer_message, re.IGNORECASE)
+            match = re.search(pattern, user_text, re.IGNORECASE)
             if match:
-                if '(' in pattern:  # pattern with group
+                if match.groups():
                     customer_id = match.group(1)
                 else:
                     customer_id = match.group(0)
-                original_mention = match.group(0)
                 break
         
-        # Determine intent
-        intent = "general_inquiry"
+        # Determine intent based on keywords
+        intent = "general_inquiry"  # default
         
-        if any(word in text_lower for word in ["policy", "policies", "coverage", "premium"]):
+        # Coverage/total amount queries
+        if any(word in text_lower for word in ["total coverage", "coverage amount", "total amount", "how much coverage"]):
+            intent = "coverage_inquiry"
+        # Payment queries
+        elif any(word in text_lower for word in ["payment", "due", "billing", "pay"]):
+            intent = "payment_inquiry"
+        # Agent contact queries
+        elif any(word in text_lower for word in ["agent", "contact", "who is my", "representative"]):
+            intent = "agent_contact"
+        # Policy type queries  
+        elif any(word in text_lower for word in ["types of policies", "what policies", "policy types"]):
             intent = "policy_inquiry"
-        elif any(word in text_lower for word in ["claim", "claims", "status", "file"]):
+        # General policy queries
+        elif any(word in text_lower for word in ["policy", "policies", "coverage"]):
+            intent = "policy_inquiry"
+        # Claims queries
+        elif any(word in text_lower for word in ["claim", "claims"]):
             intent = "claim_status"
-        elif customer_id and any(word in text_lower for word in ["tell", "show", "get", "my"]):
-            intent = "policy_inquiry"
         
-        confidence = 0.7 if customer_id else 0.5
-        
-        return {
+        result = {
             "primary_intent": intent,
             "customer_id": customer_id,
-            "original_customer_mention": original_mention,
-            "confidence": confidence,
-            "reasoning": f"Rule-based analysis found: {original_mention}" if original_mention else "Rule-based analysis",
-            "method": "rules"
+            "confidence": 0.7 if customer_id else 0.5
         }
-    
-    def plan_response(self, customer_message: str, intent_analysis: Dict[str, Any], 
-                     session_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Figure out how to respond to the customer"""
         
-        intent = intent_analysis.get("primary_intent")
+        logger.info(f"Rule-based intent analysis: {result}")
+        return result
+    
+    def plan_response(self, user_text: str, intent_analysis: Dict[str, Any], session_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Plan what to do based on customer intent"""
+        
+        intent = intent_analysis.get("primary_intent", "general_inquiry")
         customer_id = intent_analysis.get("customer_id")
         
-        # Check session for customer info (priority over parsing)
-        session_customer_id = session_data.get("customer_id")
-        if session_customer_id:
-            customer_id = session_customer_id
-            intent_analysis["customer_id"] = session_customer_id
-            intent_analysis["method"] = "session"
-            intent_analysis["confidence"] = 1.0
+        # Use session customer ID if available
+        if not customer_id and session_data.get("customer_id"):
+            customer_id = session_data["customer_id"]
         
         plan = {
-            "action": "ask_technical_agent",
+            "action": "general_help",
             "customer_id": customer_id,
-            "intent": intent,
             "technical_request": None,
-            "response_strategy": intent
+            "response_template": "general_help"
         }
         
         # Plan what to ask Technical Agent
-        if intent == "policy_inquiry" and customer_id:
-            plan["technical_request"] = f"Get policies for customer {customer_id}"
-        elif intent == "claim_status" and customer_id:
-            plan["technical_request"] = f"Get claim status for customer {customer_id}"
-        elif intent == "policy_inquiry" and not customer_id:
-            plan["action"] = "request_customer_id"
-        elif intent == "claim_status" and not customer_id:
-            plan["action"] = "request_customer_id"
-        else:
-            plan["action"] = "general_help"
-            plan["technical_request"] = "General insurance help"
+        if intent in ["policy_inquiry", "coverage_inquiry", "payment_inquiry", "agent_contact"] and customer_id:
+            plan["action"] = "ask_technical_agent"
+            plan["technical_request"] = f"Get comprehensive policies for customer {customer_id}"
+            plan["response_template"] = intent
+        elif intent == "claim_status":
+            plan["action"] = "claims_not_available"
+            plan["response_template"] = "claims_not_available"
         
         return plan
     
-    def format_customer_response(self, intent: str, technical_response: str, 
-                               customer_id: Optional[str] = None, **context) -> str:
-        """Format a nice response for the customer"""
+    def format_comprehensive_response(self, intent: str, customer_id: str, policy_data: list, user_question: str) -> str:
+        """Use LLM for intelligent data formatting and munging"""
         
-        # Get base template from YAML
-        template = self.prompts.get_response_template(intent)
+        if not policy_data:
+            return self.prompts.get_error_response("customer_not_found").format(customer_id=customer_id)
         
-        if template:
-            # Use template from YAML
-            response = template.format(technical_response=technical_response)
+        # Use LLM for intelligent formatting if available
+        if self.openai_client:
+            return self._format_with_llm(intent, customer_id, policy_data, user_question)
         else:
-            # Fallback response
-            response = f"Thank you for your inquiry.\n\n{technical_response}\n\nHow else can I help you?"
-        
-        # Add context notes if needed
-        if context.get("method") == "session" and context.get("customer_name"):
-            session_note = self.prompts.get_context_message("session_context_note")
-            if session_note:
-                response += "\n\n" + session_note.format(customer_name=context["customer_name"])
-        
-        return response
+            return self._format_with_rules(intent, customer_id, policy_data)
     
-    def handle_customer_conversation(self, customer_message: str, session_data: Dict[str, Any] = None) -> str:
-        """Main conversation handler - simple and clear"""
-        
-        if session_data is None:
-            session_data = {}
-        
+    def _format_with_llm(self, intent: str, customer_id: str, policy_data: list, user_question: str) -> str:
+        """Use LLM for intelligent data formatting and munging"""
         try:
-            # Step 1: Understand what customer wants
-            intent_analysis = self.analyze_customer_intent(customer_message)
-            logger.info(f"Customer intent: {intent_analysis}")
+            # Create a comprehensive prompt for the LLM
+            prompt = f"""
+            You are an expert insurance customer service representative. You need to format a comprehensive response to a customer's question using the provided policy data.
+
+            CUSTOMER QUESTION: "{user_question}"
+            CUSTOMER ID: {customer_id}
+            INTENT: {intent}
             
-            # Step 2: Plan response strategy
-            response_plan = self.plan_response(customer_message, intent_analysis, session_data)
-            logger.info(f"Response plan: {response_plan}")
+            POLICY DATA (JSON):
+            {json.dumps(policy_data, indent=2)}
             
-            # Step 3: Get information from Technical Agent if needed
-            technical_response = ""
-            if response_plan["action"] == "ask_technical_agent" and response_plan["technical_request"]:
-                try:
-                    technical_client = self.get_technical_client()
-                    technical_response = technical_client.ask(response_plan["technical_request"])
-                    logger.info(f"Technical Agent response: {technical_response}")
-                except Exception as e:
-                    logger.error(f"Technical Agent error: {e}")
-                    technical_response = "I'm having trouble accessing your account information right now."
+            INSTRUCTIONS:
+            1. Extract and present the information most relevant to the customer's specific question
+            2. If the data contains a summary object, use it for totals and overviews
+            3. Format monetary amounts clearly (e.g., $250,000, $95.00)
+            4. Present dates in a readable format
+            5. Include agent contact information when relevant
+            6. For coverage questions, focus on coverage amounts and limits
+            7. For payment questions, focus on due dates, amounts, and billing cycles
+            8. For policy status questions, focus on active/inactive status and policy details
+            9. For agent contact questions, focus on assigned agent information
+            10. Handle missing data gracefully - if specific information isn't available, say so clearly
+            11. Be conversational and helpful, like a real customer service representative
+            12. Include specific policy IDs, numbers, and details when available
+            13. If there are multiple policies, organize the information clearly
+            14. Always acknowledge the customer by their ID at the beginning
             
-            elif response_plan["action"] == "request_customer_id":
-                technical_response = self.prompts.get_error_response("missing_customer_id").format(
-                    additional_context="To provide specific information, I need your customer ID."
-                )
+            RESPONSE FORMAT:
+            - Start with a friendly greeting mentioning the customer ID
+            - Directly answer their specific question first
+            - Provide supporting details and context
+            - End with an offer to help with anything else
             
-            elif response_plan["action"] == "general_help":
-                technical_response = "I'm here to help with your insurance questions."
+            Generate a comprehensive, natural, and helpful response:
+            """
             
-            # Step 4: Format nice response for customer
-            customer_context = {
-                "method": intent_analysis.get("method"),
-                "customer_name": session_data.get("customer_data", {}).get("name")
-            }
-            
-            final_response = self.format_customer_response(
-                response_plan["response_strategy"],
-                technical_response,
-                response_plan["customer_id"],
-                **customer_context
+            response = self.openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,  # Slightly more creative for natural formatting
+                max_tokens=1500   # Allow longer responses for comprehensive formatting
             )
             
-            return final_response
+            formatted_response = response.choices[0].message.content.strip()
+            logger.info(f"LLM formatted response successfully for intent: {intent}")
+            return formatted_response
             
         except Exception as e:
-            logger.error(f"Error in conversation: {e}")
-            error_response = self.prompts.get_error_response("parsing_error")
-            return error_response.format(error_message=str(e))
+            logger.error(f"LLM formatting failed: {e}, falling back to rule-based formatting")
+            return self._format_with_rules(intent, customer_id, policy_data)
+    
+    def _format_with_rules(self, intent: str, customer_id: str, policy_data: list) -> str:
+        """Simplified rule-based formatting as fallback"""
+        
+        # Extract basic information
+        summary = policy_data[0] if policy_data and policy_data[0].get("summary") else {}
+        policies = policy_data[1:] if policy_data and policy_data[0].get("summary") else policy_data
+        
+        # Basic response based on intent
+        if intent == "coverage_inquiry":
+            total_coverage = 0
+            coverage_details = []
+            for policy in policies:
+                coverage = policy.get("coverage_amount", 0)
+                total_coverage += coverage
+                coverage_details.append(f"• {policy.get('type', 'Unknown')} Policy: ${coverage:,.2f}")
+            
+            return f"Hello! Here's your coverage information for customer {customer_id}:\n\n" \
+                   f"Total Coverage: ${total_coverage:,.2f}\n\n" \
+                   f"Coverage Breakdown:\n" + "\n".join(coverage_details)
+        
+        elif intent == "payment_inquiry":
+            payment_info = []
+            for policy in policies:
+                if policy.get("next_payment_due"):
+                    payment_info.append(f"• {policy.get('type', 'Unknown')} Policy: ${policy.get('premium', 0):.2f} due {policy.get('next_payment_due')}")
+            
+            return f"Hello! Here's your payment information for customer {customer_id}:\n\n" + \
+                   ("\n".join(payment_info) if payment_info else "No upcoming payments found.")
+        
+        elif intent == "agent_contact":
+            for policy in policies:
+                if policy.get("assigned_agent"):
+                    agent = policy["assigned_agent"]
+                    return f"Hello! Your assigned agent for customer {customer_id} is:\n\n" \
+                           f"Name: {agent.get('name', 'Unknown')}\n" \
+                           f"Phone: {agent.get('phone', 'Not available')}\n" \
+                           f"Email: {agent.get('email', 'Not available')}"
+            return f"Agent contact information is not available for customer {customer_id}."
+        
+        else:  # General policy inquiry
+            policy_list = []
+            for i, policy in enumerate(policies, 1):
+                policy_list.append(f"{i}. {policy.get('type', 'Unknown')} Policy ({policy.get('id', 'Unknown')})")
+                policy_list.append(f"   Status: {policy.get('status', 'Unknown')}")
+                policy_list.append(f"   Premium: ${policy.get('premium', 0):.2f}")
+            
+            return f"Hello! Here are your policies for customer {customer_id}:\n\n" + "\n".join(policy_list)
     
     @skill(
         name="Customer Conversation",
-        description="Handle customer conversations about insurance",
+        description="Handle customer conversations about insurance policies and claims",
         tags=["conversation", "customer", "insurance"]
     )
-    def customer_conversation_skill(self, customer_message: str) -> str:
-        """A2A skill for customer conversations"""
-        return self.handle_customer_conversation(customer_message)
-    
-    def handle_task(self, task):
-        """Handle A2A tasks from UI"""
-        logger.info(f"Received task: {task}")
+    def handle_conversation(self, task):
+        """Handle customer conversation requests"""
+        logger.info(f"Received conversation task: {task}")
         
         try:
-            # Extract message
+            # Extract customer message
             message_data = task.message or {}
             content = message_data.get("content", {})
+            user_text = content.get("text", "") if isinstance(content, dict) else str(content)
             
-            if isinstance(content, dict):
-                text = content.get("text", "")
-            else:
-                text = str(content)
+            logger.info(f"Processing customer message: {user_text}")
             
-            # Extract session data
+            # Step 1: Analyze customer intent
+            intent_analysis = self.analyze_customer_intent(user_text)
+            logger.info(f"Customer intent: {intent_analysis}")
+            
+            # Step 2: Plan response
             session_data = getattr(task, 'session', {}) or {}
+            response_plan = self.plan_response(user_text, intent_analysis, session_data)
+            logger.info(f"Response plan: {response_plan}")
             
-            # Handle conversation
-            response = self.handle_customer_conversation(text, session_data)
+            # Step 3: Get information from Technical Agent if needed
+            if response_plan["action"] == "ask_technical_agent":
+                try:
+                    client = self.get_technical_client()
+                    if client:
+                        technical_response = client.ask(response_plan["technical_request"])
+                        logger.info(f"Technical Agent response: {technical_response}")
+                        
+                        # Parse the technical response to extract policy data
+                        policy_data = self._parse_technical_response(technical_response)
+                        
+                        # Format comprehensive response
+                        final_response = self.format_comprehensive_response(
+                            intent_analysis["primary_intent"],
+                            response_plan["customer_id"], 
+                            policy_data,
+                            user_text
+                        )
+                    else:
+                        final_response = self.prompts.get_error_response("technical_agent_error")
+                except Exception as e:
+                    logger.error(f"Technical Agent error: {e}")
+                    final_response = self.prompts.get_error_response("technical_agent_error")
             
-            # Set response
+            elif response_plan["action"] == "claims_not_available":
+                final_response = self.prompts.get_response_template("claims_not_available")
+            
+            else:
+                # General help response
+                final_response = self.prompts.get_response_template("general_help_template")
+            
+            # Step 4: Return response
             task.artifacts = [{
-                "parts": [{"type": "text", "text": response}]
+                "parts": [{"type": "text", "text": final_response}]
             }]
             task.status = TaskStatus(state=TaskState.COMPLETED)
             
         except Exception as e:
-            logger.error(f"Task error: {e}")
-            error_response = self.prompts.get_error_response("parsing_error")
+            logger.error(f"Error handling conversation: {e}")
+            error_response = f"I apologize, but I encountered an error processing your request: {str(e)}"
             task.artifacts = [{
-                "parts": [{"type": "text", "text": error_response.format(error_message=str(e))}]
+                "parts": [{"type": "text", "text": error_response}]
             }]
             task.status = TaskStatus(state=TaskState.FAILED)
         
         return task
+    
+    def _parse_technical_response(self, response: str) -> list:
+        """Parse technical agent response to extract policy data"""
+        try:
+            # Try to find JSON data in the response
+            lines = response.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith('[') or line.startswith('{'):
+                    try:
+                        return json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+            
+            # If no JSON found, return empty list
+            logger.warning("No JSON policy data found in technical response")
+            return []
+            
+        except Exception as e:
+            logger.error(f"Failed to parse technical response: {e}")
+            return []
 
 
 if __name__ == "__main__":
+    # Check command line arguments for port
     port = 8003
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
     
-    logger.info(f"Starting Simple Domain Agent on port {port}")
+    logger.info(f"Starting Domain Agent on port {port}")
+    logger.info("Domain Agent provides conversational interface for insurance customers")
     
+    # Create and run the agent
     agent = DomainAgent()
     run_server(agent, port=port) 

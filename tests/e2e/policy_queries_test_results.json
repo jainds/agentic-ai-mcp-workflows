@@ -1,0 +1,298 @@
+{
+  "summary": {
+    "total_tests": 15,
+    "passed": 3,
+    "failed": 12,
+    "success_rate": 0.2,
+    "avg_response_time": 7.36,
+    "category_breakdown": {
+      "Core Requirements": {
+        "total": 3,
+        "passed": 1,
+        "success_rate": 0.3333333333333333
+      },
+      "Payment Information": {
+        "total": 6,
+        "passed": 2,
+        "success_rate": 0.3333333333333333
+      },
+      "Policy Details": {
+        "total": 3,
+        "passed": 0,
+        "success_rate": 0.0
+      },
+      "Coverage Information": {
+        "total": 3,
+        "passed": 0,
+        "success_rate": 0.0
+      }
+    }
+  },
+  "test_results": [
+    {
+      "test_id": "total_coverage",
+      "description": "Test total coverage calculation across all policies",
+      "query": "What's the total coverage amount for customer CUST-001?",
+      "success": true,
+      "response": "**TOTAL COVERAGE SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83c\udfaf **Total Coverage Amount: $325,000.00**\n\n\ud83d\udccb **Coverage Breakdown:**\n- **Auto Insurance (Policy ID: POL-2024-AUTO-002)**\n  - Coverage Amount: $75,000.00\n  - Premium: $95.00\n  - Deductible: $750.00\n  - Coverage Types: Liability, Collision, Comprehensive\n  - Policy Limits: \n    - Bodily Injury: $75,000.00\n    - Property Damage: $40,000.00\n    - Collision: $20,000.00\n    - Comprehensive: $20,000.00\n  - Vehicle: 2019 Honda Civic (VIN: 2HGFC2F59KH123456)\n  - Policy Duration: March 1, 2024 - February 28, 2025\n\n- **Life Insurance (Policy ID: POL-2024-LIFE-001)**\n  - Coverage Amount: $250,000.00\n  - Premium: $45.00\n  - Deductible: $0.00\n  - Policy Type: Term Life (10 years)\n  - Beneficiaries: Jane Doe, John Doe Jr.\n  - Coverage Types: Death Benefit, Accidental Death\n  - Policy Duration: January 15, 2024 - January 14, 2034\n\nThis represents the combined coverage across all your active policies.\n\nIf you have any further questions or need assistance with anything else, feel free to ask!",
+      "keywords_found": [
+        "coverage",
+        "325,000",
+        "total",
+        "75,000",
+        "250,000"
+      ],
+      "keywords_missing": [],
+      "timestamp": "2025-05-31T15:24:02.094270",
+      "response_time": 11.09
+    },
+    {
+      "test_id": "policy_types",
+      "description": "Test policy types identification",
+      "query": "What types of policies do I have for customer CUST-001?",
+      "success": false,
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 0\n\u2022 Policy Types: None\n\u2022 Total Coverage: $0.00\n\n\ud83d\udcca **Your Policies:**\nUnfortunately, we encountered an error retrieving policies for customer CUST-001. As a result, we do not have specific policy details available at this time.\n\n\ud83d\udcb0 **Payment Information:**\nSince there are no policies associated with your account, there are no payment details to provide.\n\n\ud83d\udc64 **Your Contact Agent:**\nWe currently do not have an assigned contact agent for your account due to the absence of policies.\n\nIs there anything specific about your policies you'd like me to explain further? If you have any other questions or need assistance with something else, please let me know!",
+      "keywords_found": [
+        "policy",
+        "types"
+      ],
+      "keywords_missing": [
+        "auto",
+        "life"
+      ],
+      "timestamp": "2025-05-31T15:24:14.186947",
+      "response_time": 7.62
+    },
+    {
+      "test_id": "payment_due_date",
+      "description": "Test payment due date information",
+      "query": "When is my next payment due for customer CUST-001?",
+      "success": false,
+      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nUnfortunately, I am unable to retrieve the specific payment details for your account at this moment due to a technical issue. Please check back later or contact customer support for immediate assistance.\n\n\ud83d\udcc5 **Payment Schedule:**\nCurrently, I cannot provide the exact payment schedule for your account. I recommend reaching out to our customer service team directly for the most accurate information regarding your payment due dates.\n\nWould you like help setting up automatic payments or updating your payment method? I'm here to assist you further!",
+      "keywords_found": [
+        "payment",
+        "due"
+      ],
+      "keywords_missing": [
+        "september",
+        "june",
+        "2024-09-01",
+        "2024-06-15"
+      ],
+      "timestamp": "2025-05-31T15:24:22.816652",
+      "response_time": 6.84
+    },
+    {
+      "test_id": "payment_due_auto",
+      "description": "Test specific auto policy payment due date",
+      "query": "When is my auto insurance payment due for customer CUST-001?",
+      "success": false,
+      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next auto insurance payment of **$95.00** is due on **March 1, 2024**.\n\n\ud83d\udcc5 **Payment Schedule:**\nYour auto insurance policy operates on an annual billing cycle, with payments due on the first day of March each year. The current policy period runs from **March 1, 2024** to **February 28, 2025**.\n\nWould you like help setting up automatic payments or updating your payment method?",
+      "keywords_found": [
+        "payment",
+        "due",
+        "auto"
+      ],
+      "keywords_missing": [
+        "september",
+        "2024-09-01",
+        "quarterly"
+      ],
+      "timestamp": "2025-05-31T15:24:30.664925",
+      "response_time": 7.99
+    },
+    {
+      "test_id": "payment_due_life",
+      "description": "Test specific life policy payment due date",
+      "query": "When is my life insurance payment due for customer CUST-001?",
+      "success": true,
+      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nUnfortunately, I am unable to retrieve your specific policy details at this moment due to a technical issue. This may be related to a client error on our server. I recommend checking back later or contacting our support team directly for assistance.\n\n\ud83d\udcc5 **Payment Schedule:**\nAs I currently do not have access to your payment schedule, I suggest reviewing your last statement or your online account for the most accurate information on your payment due dates. Typically, life insurance payments are made monthly, quarterly, or annually, depending on your selected billing cycle.\n\nWould you like help setting up automatic payments or updating your payment method? Please let me know how I can assist you further!",
+      "keywords_found": [
+        "payment",
+        "due",
+        "life",
+        "monthly"
+      ],
+      "keywords_missing": [
+        "june",
+        "2024-06-15"
+      ],
+      "timestamp": "2025-05-31T15:24:39.658993",
+      "response_time": 7.27
+    },
+    {
+      "test_id": "payment_method_info",
+      "description": "Test payment method information retrieval",
+      "query": "What payment method do I have set up for customer CUST-001?",
+      "success": true,
+      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nUnfortunately, I was unable to retrieve the payment details for your account due to a client error. This may be due to a temporary issue with our system. Please try again later or contact our support team for immediate assistance.\n\n\ud83d\udcc5 **Payment Schedule:**\nI also couldn't access your payment schedule at this time. If you have any specific dates or amounts in mind, feel free to share, and I can help you with that information.\n\nWould you like help setting up automatic payments or updating your payment method? I'm here to assist you with any further questions or concerns you may have!",
+      "keywords_found": [
+        "payment",
+        "method",
+        "auto"
+      ],
+      "keywords_missing": [
+        "auto_pay",
+        "autopay"
+      ],
+      "timestamp": "2025-05-31T15:24:47.933484",
+      "response_time": 6.82
+    },
+    {
+      "test_id": "billing_cycle_info",
+      "description": "Test billing cycle information",
+      "query": "What are my billing cycles for customer CUST-001?",
+      "success": false,
+      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\n- **Auto Insurance Premium:** $95.00 due on March 1, 2024\n- **Life Insurance Premium:** $45.00 due on January 15, 2024\n\n\ud83d\udcc5 **Payment Schedule:**\n- **Life Insurance:** \n  - Payment Amount: $45.00\n  - Due Date: January 15, 2024\n  - Next Payment: January 15, 2025 (Annual)\n  \n- **Auto Insurance:** \n  - Payment Amount: $95.00\n  - Due Date: March 1, 2024\n  - Next Payment: March 1, 2025 (Annual)\n\nWould you like help setting up automatic payments or updating your payment method?",
+      "keywords_found": [
+        "payment"
+      ],
+      "keywords_missing": [
+        "billing",
+        "cycle",
+        "quarterly",
+        "monthly"
+      ],
+      "timestamp": "2025-05-31T15:24:55.762828",
+      "response_time": 9.86
+    },
+    {
+      "test_id": "next_payment_amount",
+      "description": "Test next payment amount information",
+      "query": "How much is my next payment for customer CUST-001?",
+      "success": false,
+      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nUnfortunately, I was unable to retrieve the payment details for your account at this time. Please check your account through our online portal or contact customer support for the most accurate information regarding your next payment.\n\n\ud83d\udcc5 **Payment Schedule:**\nAs I currently do not have access to your payment schedule, I recommend logging into your account or reaching out to our customer service team for assistance with your payment dates and amounts.\n\nWould you like help setting up automatic payments or updating your payment method? I'm here to assist you with any further questions you may have!",
+      "keywords_found": [
+        "payment",
+        "amount"
+      ],
+      "keywords_missing": [
+        "$95",
+        "$45",
+        "premium"
+      ],
+      "timestamp": "2025-05-31T15:25:06.627669",
+      "response_time": 7.0
+    },
+    {
+      "test_id": "contact_person",
+      "description": "Test assigned agent contact information",
+      "query": "Who is my contact person for policies for customer CUST-001?",
+      "success": false,
+      "response": "**YOUR INSURANCE AGENT FOR CUSTOMER CUST-001:**\n\n\ud83d\udc64 **Primary Contact:**\nYour primary contact for all your insurance needs is your dedicated agent. Unfortunately, specific agent details such as name and contact information are not provided in the current policy data. Please reach out to our customer service for assistance in obtaining your agent's information.\n\n\ud83d\udcde **How to Reach Your Agent:**\n\u2022 Phone: Not available\n\u2022 Email: Not available\n\nYour agent is available to help with policy questions, claims, and account changes.\n\n### Summary of Your Policies:\nYou currently have two active policies:\n\n1. **Auto Insurance Policy (POL-2024-AUTO-002)**\n   - **Type:** Auto\n   - **Premium:** $95.00/month\n   - **Coverage Amount:** $75,000.00\n   - **Deductible:** $750.00\n   - **Coverage Types:** Liability, Collision, Comprehensive\n   - **Vehicle Details:** \n     - Make: Honda\n     - Model: Civic\n     - Year: 2019\n     - VIN: 2HGFC2F59KH123456\n   - **Policy Duration:** March 1, 2024 - February 28, 2025\n\n2. **Life Insurance Policy (POL-2024-LIFE-001)**\n   - **Type:** Life\n   - **Premium:** $45.00/month\n   - **Coverage Amount:** $250,000.00\n   - **Deductible:** $0.00\n   - **Coverage Types:** Death Benefit, Accidental Death\n   - **Beneficiaries:** Jane Doe, John Doe Jr.\n   - **Policy Duration:** January 15, 2024 - January 14, 2034\n\n### Total Coverage Amount:\n- **Total Coverage Across Policies:** $75,000.00 (Auto) + $250,000.00 (Life) = **$325,000.00**\n\nIf you have any further questions or need assistance with your policies, please feel free to ask!",
+      "keywords_found": [
+        "agent",
+        "contact"
+      ],
+      "keywords_missing": [
+        "michael",
+        "brown"
+      ],
+      "timestamp": "2025-05-31T15:25:14.631959",
+      "response_time": 10.67
+    },
+    {
+      "test_id": "policy_details",
+      "description": "Test detailed policy information retrieval",
+      "query": "Show me details of my auto policy for customer CUST-001",
+      "success": false,
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 0  \n\u2022 Policy Types: None  \n\u2022 Total Coverage: $0.00  \n\n\ud83d\udcca **Your Policies:**\nUnfortunately, we were unable to retrieve your policy details at this time. It seems there was an error processing your request. \n\n\ud83d\udcb0 **Payment Information:**\nAs there are currently no policies associated with your account, there is no payment information available.\n\n\ud83d\udc64 **Your Contact Agent:**\nWe currently do not have an assigned contact agent for your account due to the absence of policies.\n\nIs there anything specific about your policies you'd like me to explain further? If you have any other questions or need assistance, please let me know!",
+      "keywords_found": [],
+      "keywords_missing": [
+        "honda",
+        "civic",
+        "auto",
+        "liability",
+        "collision"
+      ],
+      "timestamp": "2025-05-31T15:25:26.305288",
+      "response_time": 7.17
+    },
+    {
+      "test_id": "premium_amounts",
+      "description": "Test premium amount and billing cycle information",
+      "query": "What are my premium amounts for customer CUST-001?",
+      "success": false,
+      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "premium",
+        "$95",
+        "$45",
+        "monthly",
+        "quarterly"
+      ],
+      "timestamp": "2025-05-31T15:25:34.476596",
+      "response_time": 1.05
+    },
+    {
+      "test_id": "policy_status",
+      "description": "Test policy status reporting",
+      "query": "What's the status of my policies for customer CUST-001?",
+      "success": false,
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: N/A (Unable to retrieve policy data)\n\u2022 Policy Types: N/A (Unable to retrieve policy data)\n\u2022 Total Coverage: N/A (Unable to retrieve policy data)\n\n\ud83d\udcca **Your Policies:**\nUnfortunately, we encountered an error while attempting to retrieve your policy information. The error message indicates a '400 Bad Request', which means there may be an issue with the request sent to our server. For more information, you can refer to this [link](https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400).\n\n\ud83d\udcb0 **Payment Information:**\nN/A (Unable to retrieve payment information)\n\n\ud83d\udc64 **Your Contact Agent:**\nN/A (Unable to retrieve agent information)\n\nIs there anything specific about your policies you'd like me to explain further? If you have any other questions or need assistance, please let me know!",
+      "keywords_found": [
+        "status"
+      ],
+      "keywords_missing": [
+        "active",
+        "POL-2024"
+      ],
+      "timestamp": "2025-05-31T15:25:36.531236",
+      "response_time": 8.2
+    },
+    {
+      "test_id": "coverage_limits",
+      "description": "Test detailed coverage limits information",
+      "query": "What are my coverage limits for customer CUST-001?",
+      "success": false,
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: N/A (Unable to retrieve policy data)\n\u2022 Policy Types: N/A (Unable to retrieve policy data)\n\u2022 Total Coverage: N/A (Unable to retrieve policy data)\n\n\ud83d\udcca **Your Policies:**\nUnfortunately, I was unable to retrieve the details of your policies due to a client error. This may be due to a temporary issue with our system. \n\n\ud83d\udcb0 **Payment Information:**\nPayment information is also unavailable at this time due to the same error.\n\n\ud83d\udc64 **Your Contact Agent:**\nI apologize, but I cannot provide your contact agent's information without access to your policy data.\n\nIs there anything specific about your policies you'd like me to explain further? If you have any other questions or if there's another way I can assist you, please let me know!",
+      "keywords_found": [],
+      "keywords_missing": [
+        "75,000",
+        "250,000",
+        "bodily",
+        "injury",
+        "benefit"
+      ],
+      "timestamp": "2025-05-31T15:25:45.737846",
+      "response_time": 8.45
+    },
+    {
+      "test_id": "deductibles",
+      "description": "Test deductible information across policies",
+      "query": "What are my deductibles for customer CUST-001?",
+      "success": false,
+      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "deductible",
+        "$750",
+        "$0",
+        "auto",
+        "life"
+      ],
+      "timestamp": "2025-05-31T15:25:55.193232",
+      "response_time": 1.25
+    },
+    {
+      "test_id": "policy_dates",
+      "description": "Test policy expiration date information",
+      "query": "When do my policies expire for customer CUST-001?",
+      "success": false,
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 0  \n\u2022 Policy Types: N/A  \n\u2022 Total Coverage: N/A  \n\n\ud83d\udcca **Your Policies:**\nUnfortunately, we encountered an error retrieving policies for customer CUST-001. As a result, I am unable to provide specific details regarding your policies or their expiration dates at this time.\n\n\ud83d\udcb0 **Payment Information:**\nSince we could not retrieve your policy details, I am also unable to provide payment information.\n\n\ud83d\udc64 **Your Contact Agent:**\nI recommend reaching out to our customer service team directly for assistance with your account. They can provide you with the most accurate and up-to-date information regarding your policies and any other inquiries you may have.\n\nIs there anything specific about your policies you'd like me to explain further? Please let me know how I can assist you!",
+      "keywords_found": [
+        "end",
+        "date"
+      ],
+      "keywords_missing": [
+        "expire",
+        "2025",
+        "2034"
+      ],
+      "timestamp": "2025-05-31T15:25:57.444015",
+      "response_time": 9.11
+    }
+  ],
+  "timestamp": "2025-05-31T15:26:07.554954"
+}

@@ -24,98 +24,325 @@ class PolicyQueriesE2ETester:
         
         # Test queries covering all requested scenarios
         self.test_queries = [
-            # Core requested queries
+            # === CORE EXISTING TESTS ===
             {
                 "id": "total_coverage",
                 "query": "What's the total coverage amount for customer CUST-001?",
                 "expected_keywords": ["coverage", "325,000", "total", "75,000", "250,000"],
-                "description": "Test total coverage calculation across all policies"
+                "description": "Test total coverage calculation across all policies",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "policy_types",
                 "query": "What types of policies do I have for customer CUST-001?",
                 "expected_keywords": ["auto", "life", "policy", "types"],
-                "description": "Test policy types identification"
+                "description": "Test policy types identification",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "payment_due_date", 
                 "query": "When is my next payment due for customer CUST-001?",
                 "expected_keywords": ["payment", "due", "september", "june", "2024-09-01", "2024-06-15"],
-                "description": "Test payment due date information"
+                "description": "Test payment due date information",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "payment_due_auto",
                 "query": "When is my auto insurance payment due for customer CUST-001?",
                 "expected_keywords": ["payment", "due", "september", "2024-09-01", "auto", "quarterly"],
-                "description": "Test specific auto policy payment due date"
+                "description": "Test specific auto policy payment due date",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "payment_due_life",
                 "query": "When is my life insurance payment due for customer CUST-001?",
                 "expected_keywords": ["payment", "due", "june", "2024-06-15", "life", "monthly"],
-                "description": "Test specific life policy payment due date"
+                "description": "Test specific life policy payment due date",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "payment_method_info",
                 "query": "What payment method do I have set up for customer CUST-001?",
                 "expected_keywords": ["payment", "method", "auto_pay", "auto", "autopay"],
-                "description": "Test payment method information retrieval"
+                "description": "Test payment method information retrieval",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "billing_cycle_info",
                 "query": "What are my billing cycles for customer CUST-001?",
                 "expected_keywords": ["billing", "cycle", "quarterly", "monthly", "payment"],
-                "description": "Test billing cycle information"
+                "description": "Test billing cycle information",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "next_payment_amount",
                 "query": "How much is my next payment for customer CUST-001?",
                 "expected_keywords": ["payment", "amount", "$95", "$45", "premium"],
-                "description": "Test next payment amount information"
+                "description": "Test next payment amount information",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "contact_person",
                 "query": "Who is my contact person for policies for customer CUST-001?",
                 "expected_keywords": ["michael", "brown", "agent", "contact"],
-                "description": "Test assigned agent contact information"
+                "description": "Test assigned agent contact information",
+                "customer_id": "CUST-001"
             },
-            
-            # Additional relevant policy queries
             {
                 "id": "policy_details",
                 "query": "Show me details of my auto policy for customer CUST-001",
                 "expected_keywords": ["honda", "civic", "auto", "liability", "collision"],
-                "description": "Test detailed policy information retrieval"
+                "description": "Test detailed policy information retrieval",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "premium_amounts",
                 "query": "What are my premium amounts for customer CUST-001?",
                 "expected_keywords": ["premium", "$95", "$45", "monthly", "quarterly"],
-                "description": "Test premium amount and billing cycle information"
+                "description": "Test premium amount and billing cycle information",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "policy_status",
                 "query": "What's the status of my policies for customer CUST-001?",
                 "expected_keywords": ["active", "status", "POL-2024"],
-                "description": "Test policy status reporting"
+                "description": "Test policy status reporting",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "coverage_limits",
                 "query": "What are my coverage limits for customer CUST-001?",
                 "expected_keywords": ["75,000", "250,000", "bodily", "injury", "benefit"],
-                "description": "Test detailed coverage limits information"
+                "description": "Test detailed coverage limits information",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "deductibles",
                 "query": "What are my deductibles for customer CUST-001?",
                 "expected_keywords": ["deductible", "$750", "$0", "auto", "life"],
-                "description": "Test deductible information across policies"
+                "description": "Test deductible information across policies",
+                "customer_id": "CUST-001"
             },
             {
                 "id": "policy_dates",
                 "query": "When do my policies expire for customer CUST-001?",
                 "expected_keywords": ["expire", "2025", "2034", "end", "date"],
-                "description": "Test policy expiration date information"
+                "description": "Test policy expiration date information",
+                "customer_id": "CUST-001"
+            },
+
+            # === NEW COMPREHENSIVE TEST CASES ===
+            
+            # User's specific examples
+            {
+                "id": "general_policies_overview",
+                "query": "Tell me about my policies",
+                "expected_keywords": ["policy", "auto", "life", "coverage", "active"],
+                "description": "Test general policy overview without explicit customer ID",
+                "customer_id": None  # No explicit customer ID in query
+            },
+            {
+                "id": "policy_expiring_next",
+                "query": "Which policy is expiring next for customer CUST-001?",
+                "expected_keywords": ["expire", "expiring", "2025", "auto", "next"],
+                "description": "Test identifying next expiring policy",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "detailed_policy_info",
+                "query": "What are my policy details for customer CUST-001?",
+                "expected_keywords": ["policy", "details", "auto", "life", "POL-2024", "honda"],
+                "description": "Test comprehensive policy details",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "auto_vehicle_details",
+                "query": "For my auto policy, can you give me vehicle details for customer CUST-001?",
+                "expected_keywords": ["auto", "vehicle", "honda", "civic", "2023", "year"],
+                "description": "Test specific vehicle details from auto policy",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "all_policy_limits",
+                "query": "Explain all my policy limits for customer CUST-001",
+                "expected_keywords": ["limits", "coverage", "75,000", "250,000", "bodily", "benefit"],
+                "description": "Test comprehensive policy limits explanation",
+                "customer_id": "CUST-001"
+            },
+
+            # Tests with different customer ID formats
+            {
+                "id": "user_003_format",
+                "query": "What policies does user_003 have?",
+                "expected_keywords": ["policy", "auto", "life", "user_003"],
+                "description": "Test customer ID in user_### format",
+                "customer_id": "user_003"
+            },
+            {
+                "id": "customer_123_format",
+                "query": "Show me coverage for customer-123",
+                "expected_keywords": ["coverage", "customer-123"],
+                "description": "Test customer ID in customer-### format",
+                "customer_id": "customer-123"
+            },
+            {
+                "id": "mixed_case_customer",
+                "query": "What are the payment details for Customer_001?",
+                "expected_keywords": ["payment", "Customer_001"],
+                "description": "Test mixed case customer ID",
+                "customer_id": "Customer_001"
+            },
+            {
+                "id": "casual_customer_mention",
+                "query": "Tell me about policies for customer john",
+                "expected_keywords": ["policy", "john"],
+                "description": "Test casual customer name mention",
+                "customer_id": "john"
+            },
+
+            # Negative test cases
+            {
+                "id": "nonexistent_customer",
+                "query": "What policies does CUST-999 have?",
+                "expected_keywords": ["no policies", "not found", "customer not found", "no records"],
+                "description": "Test non-existent customer ID handling",
+                "customer_id": "CUST-999"
+            },
+            {
+                "id": "invalid_customer_format",
+                "query": "Show me policies for customer @#$%",
+                "expected_keywords": ["invalid", "error", "not found", "invalid customer"],
+                "description": "Test invalid customer ID format",
+                "customer_id": "@#$%"
+            },
+            {
+                "id": "empty_customer",
+                "query": "What are my policies for customer ''?",
+                "expected_keywords": ["invalid", "error", "customer id required"],
+                "description": "Test empty customer ID",
+                "customer_id": ""
+            },
+            {
+                "id": "no_customer_specified",
+                "query": "What are my policies?",
+                "expected_keywords": ["customer", "identify", "specify", "id required"],
+                "description": "Test query without customer identification",
+                "customer_id": None
+            },
+
+            # Edge cases and advanced scenarios
+            {
+                "id": "policy_comparison",
+                "query": "Compare my auto and life policies for CUST-001",
+                "expected_keywords": ["auto", "life", "compare", "coverage", "premium"],
+                "description": "Test policy comparison functionality",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "premium_calculation",
+                "query": "Calculate my total annual premium for customer CUST-001",
+                "expected_keywords": ["premium", "annual", "total", "calculate", "$95", "$45"],
+                "description": "Test premium calculation across policies",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "policy_renewal_info",
+                "query": "When do I need to renew my policies for CUST-001?",
+                "expected_keywords": ["renew", "renewal", "expire", "2025", "2034"],
+                "description": "Test policy renewal information",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "claim_eligibility",
+                "query": "What claims can I make on my policies for CUST-001?",
+                "expected_keywords": ["claim", "coverage", "eligible", "bodily", "injury"],
+                "description": "Test claim eligibility information",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "emergency_contact",
+                "query": "Who should I contact in an emergency for customer CUST-001?",
+                "expected_keywords": ["emergency", "contact", "agent", "michael", "brown"],
+                "description": "Test emergency contact information",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "policy_modifications",
+                "query": "Can I modify my coverage for customer CUST-001?",
+                "expected_keywords": ["modify", "coverage", "change", "update"],
+                "description": "Test policy modification information",
+                "customer_id": "CUST-001"
+            },
+
+            # Performance and stress test cases
+            {
+                "id": "complex_multi_query",
+                "query": "For customer CUST-001, tell me about all policies, payment dates, coverage limits, agent contact, and vehicle details",
+                "expected_keywords": ["policy", "payment", "coverage", "agent", "vehicle", "honda", "michael"],
+                "description": "Test complex multi-part query handling",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "specific_policy_id",
+                "query": "Give me details for policy POL-2024-AUTO-002 for customer CUST-001",
+                "expected_keywords": ["POL-2024-AUTO-002", "auto", "honda", "civic", "details"],
+                "description": "Test specific policy ID lookup",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "date_range_query",
+                "query": "What payments are due between now and December 2024 for CUST-001?",
+                "expected_keywords": ["payment", "due", "september", "june", "2024"],
+                "description": "Test date range payment queries",
+                "customer_id": "CUST-001"
+            },
+
+            # Different query styles
+            {
+                "id": "formal_business_style",
+                "query": "I would like to request a comprehensive review of all insurance policies and associated coverage details for customer identifier CUST-001",
+                "expected_keywords": ["policy", "coverage", "auto", "life", "review"],
+                "description": "Test formal business language style",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "casual_conversational",
+                "query": "Hey, can you just quickly tell me what kind of insurance I have? I'm customer CUST-001",
+                "expected_keywords": ["insurance", "auto", "life", "policy"],
+                "description": "Test casual conversational style",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "technical_jargon",
+                "query": "Provide actuarial data and risk assessment parameters for policyholder CUST-001",
+                "expected_keywords": ["policy", "coverage", "assessment", "risk"],
+                "description": "Test technical insurance jargon handling",
+                "customer_id": "CUST-001"
+            },
+
+            # Multi-language and special characters
+            {
+                "id": "special_characters_query",
+                "query": "What's my coverage amount ($) & payment due dates (?) for customer CUST-001???",
+                "expected_keywords": ["coverage", "payment", "due", "$95", "$45"],
+                "description": "Test special characters in queries",
+                "customer_id": "CUST-001"
+            },
+
+            # Boundary value testing
+            {
+                "id": "very_long_query",
+                "query": "I am writing a very long query to test the system's ability to handle extensive customer requests with lots of details and information and I want to know about my policies and coverage and payments and everything else related to my insurance for customer CUST-001 and I hope this works correctly",
+                "expected_keywords": ["policy", "coverage", "payment", "insurance"],
+                "description": "Test very long query handling",
+                "customer_id": "CUST-001"
+            },
+            {
+                "id": "minimal_query",
+                "query": "CUST-001 policy?",
+                "expected_keywords": ["policy", "auto", "life"],
+                "description": "Test minimal query format",
+                "customer_id": "CUST-001"
             }
         ]
     

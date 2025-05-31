@@ -277,7 +277,7 @@ class DomainAgent(A2AServer):
             return f"Hello! Here are your policies for customer {customer_id}:\n\n" + "\n".join(policy_list)
     
     @skill(
-        name="Customer Conversation",
+        name="ask",  # This is the default skill name that A2A clients call
         description="Handle customer conversations about insurance policies and claims",
         tags=["conversation", "customer", "insurance"]
     )
@@ -295,12 +295,12 @@ class DomainAgent(A2AServer):
             
             # Step 1: Analyze customer intent
             intent_analysis = self.analyze_customer_intent(user_text)
-            logger.info(f"Customer intent: {intent_analysis}")
+            logger.info(f"🔥 DOMAIN AGENT: Customer intent: {intent_analysis}")
             
             # Step 2: Plan response
             session_data = getattr(task, 'session', {}) or {}
             response_plan = self.plan_response(user_text, intent_analysis, session_data)
-            logger.info(f"Response plan: {response_plan}")
+            logger.info(f"🔥 DOMAIN AGENT: Response plan: {response_plan}")
             
             # Step 3: Get information from Technical Agent if needed
             if response_plan["action"] == "ask_technical_agent":
@@ -308,7 +308,7 @@ class DomainAgent(A2AServer):
                     client = self.get_technical_client()
                     if client:
                         technical_response = client.ask(response_plan["technical_request"])
-                        logger.info(f"Technical Agent response: {technical_response}")
+                        logger.info(f"🔥 DOMAIN AGENT: Technical Agent response: {technical_response}")
                         
                         # Parse the technical response to extract policy data
                         policy_data = self._parse_technical_response(technical_response)
@@ -323,7 +323,7 @@ class DomainAgent(A2AServer):
                     else:
                         final_response = self.prompts.get_error_response("technical_agent_error")
                 except Exception as e:
-                    logger.error(f"Technical Agent error: {e}")
+                    logger.error(f"🔥 DOMAIN AGENT: Technical Agent error: {e}")
                     final_response = self.prompts.get_error_response("technical_agent_error")
             
             elif response_plan["action"] == "claims_not_available":
@@ -333,6 +333,8 @@ class DomainAgent(A2AServer):
                 # General help response
                 final_response = self.prompts.get_response_template("general_help_template")
             
+            logger.info(f"🔥 DOMAIN AGENT: Final response: {final_response[:100]}...")
+            
             # Step 4: Return response
             task.artifacts = [{
                 "parts": [{"type": "text", "text": final_response}]
@@ -340,7 +342,7 @@ class DomainAgent(A2AServer):
             task.status = TaskStatus(state=TaskState.COMPLETED)
             
         except Exception as e:
-            logger.error(f"Error handling conversation: {e}")
+            logger.error(f"🔥 DOMAIN AGENT: Error handling conversation: {e}")
             error_response = f"I apologize, but I encountered an error processing your request: {str(e)}"
             task.artifacts = [{
                 "parts": [{"type": "text", "text": error_response}]
@@ -348,13 +350,6 @@ class DomainAgent(A2AServer):
             task.status = TaskStatus(state=TaskState.FAILED)
         
         return task
-    
-    def handle_task(self, task):
-        """Default task handler - routes all tasks to conversation handling"""
-        logger.info(f"🔥 DOMAIN AGENT: Default task handler received: {task}")
-        logger.info(f"🔥 DOMAIN AGENT: Task type: {type(task)}")
-        logger.info(f"🔥 DOMAIN AGENT: Task attributes: {dir(task)}")
-        return self.handle_conversation(task)
     
     def _parse_technical_response(self, response: str) -> list:
         """Parse technical agent response to extract policy data"""

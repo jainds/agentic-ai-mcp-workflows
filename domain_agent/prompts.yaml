@@ -14,24 +14,19 @@ intent_analysis:
     
     Possible intents:
     - policy_inquiry: User wants to retrieve/view/check policies 
-    - claim_status: User wants to check claim status or file claims
+    - claim_status: User wants to check claim status
+    - payment_inquiry: User wants to check payment due dates or amounts
+    - coverage_inquiry: User wants to know about coverage amounts, limits, or totals
+    - agent_contact: User wants to know who their agent is or contact information
     - general_inquiry: General questions or unclear intent
     
-    Request: "{user_text}"
+    Customer message: "{user_text}"
     
-    Instructions:
-    1. Extract any customer identifier mentioned in ANY format (be very flexible)
-    2. Normalize customer IDs to a consistent format when possible
-    3. Determine the most likely intent based on context
-    4. Provide high confidence only when very certain
-    
-    Respond ONLY with valid JSON:
+    Respond with JSON format:
     {{
-        "primary_intent": "policy_inquiry|claim_status|general_inquiry",
-        "customer_id": "normalized_customer_id_or_null", 
-        "original_customer_mention": "exact_text_where_customer_was_mentioned_or_null",
-        "confidence": 0.0-1.0,
-        "reasoning": "brief explanation of your analysis"
+        "primary_intent": "intent_name",
+        "customer_id": "extracted_customer_id_or_null",
+        "confidence": 0.0-1.0
     }}
 
 conversation_planning:
@@ -49,81 +44,147 @@ conversation_planning:
     Request format should be concise and actionable.
 
 response_formatting:
-  policy_inquiry_response: |
-    Thank you for your inquiry about your insurance policies.
-
-    {technical_response}
-
-    **Account Summary:**
-    I've successfully retrieved your current policy information from our system. All policies shown above are currently active and in good standing.
-
-    **Need Additional Help?**
-    If you have questions about any specific policy details, coverage amounts, or would like to make changes to your policies, I'm here to help!
-
-    Is there anything specific about your policies you'd like me to explain in more detail?
-
-  policy_inquiry_response_fallback: |
+  policy_response_template: |
     Thank you for your policy inquiry.
 
-    {technical_response}
+    **POLICY SUMMARY FOR CUSTOMER {customer_id}:**
+    
+    📋 **Overview:**
+    • Total Policies: {total_policies}
+    • Policy Types: {policy_types}
+    • Total Coverage: {total_coverage}
+    
+    📊 **Your Policies:**
+    {policy_details}
+    
+    💰 **Payment Information:**
+    {payment_info}
+    
+    👤 **Your Contact Agent:**
+    {agent_info}
+    
+    Is there anything specific about your policies you'd like me to explain further?
 
-    If you have your customer ID or policy number available, I can provide more detailed information about your specific coverage and benefits.
+  coverage_total_template: |
+    **TOTAL COVERAGE SUMMARY FOR CUSTOMER {customer_id}:**
+    
+    🎯 **Total Coverage Amount: {total_coverage}**
+    
+    📋 **Coverage Breakdown:**
+    {coverage_breakdown}
+    
+    This represents the combined coverage across all your active policies.
 
-    How else can I assist you with your insurance needs today?
+  payment_due_template: |
+    **PAYMENT INFORMATION FOR CUSTOMER {customer_id}:**
+    
+    💰 **Upcoming Payments:**
+    {payment_details}
+    
+    📅 **Payment Schedule:**
+    {payment_schedule}
+    
+    Would you like help setting up automatic payments or updating your payment method?
 
-  claim_status_response: |
-    Thank you for checking on your claim status.
+  agent_contact_template: |
+    **YOUR INSURANCE AGENT FOR CUSTOMER {customer_id}:**
+    
+    👤 **Primary Contact:**
+    {agent_details}
+    
+    📞 **How to Reach Your Agent:**
+    • Phone: {agent_phone}
+    • Email: {agent_email}
+    
+    Your agent is available to help with policy questions, claims, and account changes.
 
-    {technical_response}
+  policy_types_template: |
+    **YOUR POLICY TYPES FOR CUSTOMER {customer_id}:**
+    
+    📋 **Active Policies:**
+    {policy_types_list}
+    
+    🛡️ **Coverage Summary:**
+    {coverage_summary}
+    
+    Each policy type provides different protections tailored to your needs.
 
-    **What This Means:**
-    I'm currently working on gathering your claim information. Our claims processing system is reviewing your case to provide you with the most up-to-date status.
+  policy_details_template: |
+    **DETAILED POLICY INFORMATION FOR CUSTOMER {customer_id}:**
+    
+    {detailed_policy_info}
+    
+    💡 **Key Benefits:**
+    {key_benefits}
+    
+    Would you like more details about any specific policy or coverage type?
 
-    **Next Steps:**
-    Once I have your complete claim details, I'll provide you with:
-    - Current claim status and processing stage
-    - Expected timeline for resolution
-    - Any required documentation or next steps
-
-    Is there anything specific about your claim you'd like me to help clarify?
-
-  general_inquiry_response: |
+  general_help_template: |
     Thank you for contacting our insurance support team.
-
-    {technical_response}
 
     **How I Can Help:**
     I'm here to assist you with:
     - Policy information and coverage details
-    - Claim status updates and filing assistance
-    - Billing and payment questions
-    - General insurance guidance
-
-    Please let me know what specific information you're looking for, and I'll be happy to help!
+    - Payment schedules and due dates
+    - Agent contact information
+    - Coverage amounts and limits
+    - Policy types and benefits
+    
+    Please provide your customer ID, and let me know what specific information you need.
 
 error_handling:
-  parsing_error_response: |
-    I apologize, but I encountered an issue while processing your request.
+  technical_agent_error: |
+    I apologize, but I'm experiencing difficulty retrieving your policy information at the moment.
+    
+    **What you can do:**
+    - Please verify your customer ID is correct
+    - Try again in a few moments
+    - Contact your agent directly if urgent
+    
+    **Alternative Help:**
+    I can still assist with general insurance questions or help you find your agent's contact information.
 
-    **Error Details:** {error_message}
+  customer_not_found: |
+    I couldn't find any policies for the customer ID you provided.
+    
+    **Please check:**
+    - Is your customer ID spelled correctly?
+    - Are you using the right format? (e.g., CUST-001, user_003)
+    
+    **Need help?** 
+    Contact our customer service team at 1-800-INSURANCE for assistance with your account.
 
-    **What You Can Do:**
-    - Please try rephrasing your question
-    - Make sure to include your customer ID if asking about specific policies or claims
-    - Contact our support team directly if the issue persists
+  no_customer_id: |
+    To help you with your policy information, I need your customer ID.
+    
+    **Customer ID formats:**
+    - CUST-001, user_003, customer-123
+    - Check your policy documents or insurance cards
+    
+    **Example:** "Show me my policies for customer CUST-001"
 
-    I'm here to help once we resolve this technical issue. Thank you for your patience!
+claims_responses:
+  claims_not_available: |
+    Thank you for checking on your claim status.
 
-  missing_customer_id_response: |
-    I understand you want to look up your policies, but I couldn't identify a specific customer ID in your request.
-
-    Please specify your customer ID in one of these formats:
-    - user_003
-    - CUST-001
-    - customer ABC123
-    - client 001
-
-    {additional_context}
+    **Current Status:**
+    Our claims processing system is currently being updated to provide you with the most comprehensive service.
+    
+    **What This Means:**
+    I'm currently working on gathering your claim information. Our claims processing system is reviewing your case to provide you with the most up-to-date status.
+    
+    **Next Steps:**
+    For immediate claim assistance, please contact:
+    - Your assigned agent directly
+    - Our claims department at 1-800-CLAIMS
+    - Submit claim updates through your online portal
+    
+    **Once available, I'll provide you with:**
+    - Current claim status and processing stage
+    - Expected timeline for resolution
+    - Any required documentation or next steps
+    
+    Is there anything specific about your claim you'd like me to help clarify?
 
 conversation_context:
   authenticated_greeting: |

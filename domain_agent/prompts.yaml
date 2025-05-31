@@ -13,28 +13,37 @@ intent_analysis:
     - With prefixes: "for customer user_003", "check user CUST-001"
     - Natural language: "policies for user 003", "customer with ID 001"
     
-    Possible intents:
-    - policy_inquiry: User wants to retrieve/view/check policies 
-    - claim_status: User wants to check claim status
-    - payment_inquiry: User wants to check payment due dates or amounts
-    - coverage_inquiry: User wants to know about coverage amounts, limits, or totals
-    - agent_contact: User wants to know who their agent is or contact information
+    Intent Classification Rules:
+    - payment_inquiry: User asks about payments, premiums, billing, due dates, amounts, deductibles
+    - coverage_inquiry: User asks about coverage amounts, limits, totals, how much coverage
+    - policy_inquiry: User asks about policies, policy details, policy types, what policies they have
+    - agent_contact: User asks about their agent, contact information, who to call
+    - claim_status: User asks about claims or claim status
     - general_inquiry: General questions or unclear intent
-    
     
     Customer message: "{user_text}"
     
-    Based on the customer's message, determine:
-    1. Primary intent (coverage_inquiry, payment_inquiry, agent_contact, policy_inquiry, general_inquiry)
-    2. Customer ID if mentioned
-    3. Confidence level in your analysis
+    CRITICAL JSON FORMAT REQUIREMENTS:
+    1. You MUST respond with ONLY valid JSON - no markdown, no explanations, no extra text
+    2. Use exactly these field names: "primary_intent", "customer_id", "confidence"
+    3. primary_intent must be one of: payment_inquiry, coverage_inquiry, policy_inquiry, agent_contact, claim_status, general_inquiry
+    4. customer_id must be the extracted ID string or null (not "null" in quotes)
+    5. confidence must be a number between 0.0 and 1.0
+    6. Do not include any other fields or comments
     
-    Return JSON format:
+    Required JSON Structure:
     {{
-        "primary_intent": "intent_name",
-        "customer_id": "extracted_customer_id_or_null",
-        "confidence": 0.0-1.0
+        "primary_intent": "payment_inquiry",
+        "customer_id": "CUST-001", 
+        "confidence": 0.9
     }}
+    
+    Examples:
+    - "What are my premium amounts for customer CUST-001?" → {{"primary_intent": "payment_inquiry", "customer_id": "CUST-001", "confidence": 0.9}}
+    - "Tell me about my policies" → {{"primary_intent": "policy_inquiry", "customer_id": null, "confidence": 0.8}}
+    - "Who is my agent for user_003?" → {{"primary_intent": "agent_contact", "customer_id": "user_003", "confidence": 0.9}}
+    
+    RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT:
 
 llm_formatting:
   format_response_prompt: |

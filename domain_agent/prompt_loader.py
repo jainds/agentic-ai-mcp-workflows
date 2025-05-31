@@ -35,6 +35,10 @@ class PromptLoader:
         template = self.prompts.get("intent_analysis", {}).get("llm_intent_analysis_prompt", "")
         return template.format(user_text=user_text)
     
+    def get_format_response_prompt(self) -> str:
+        """Get the LLM response formatting prompt template"""
+        return self.prompts.get("llm_formatting", {}).get("format_response_prompt", "")
+    
     def get_response_template(self, intent: str) -> str:
         """Get response template for specific intent"""
         templates = self.prompts.get("response_formatting", {})

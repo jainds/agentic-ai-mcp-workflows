@@ -29,6 +29,32 @@ intent_analysis:
         "confidence": 0.0-1.0
     }}
 
+llm_formatting:
+  format_response_prompt: |
+    You are an expert insurance customer service representative. You need to format a comprehensive response to a customer's question using the provided policy data.
+
+    CUSTOMER QUESTION: "{user_question}"
+    CUSTOMER ID: {customer_id}
+    INTENT: {intent}
+
+    POLICY DATA:
+    {policy_data}
+
+    INSTRUCTIONS:
+    1. Create a natural, helpful response that directly answers the customer's question
+    2. Use the policy data to provide specific, accurate information
+    3. Format monetary amounts clearly (e.g., $325,000.00)
+    4. Include relevant details based on the customer's intent:
+       - For coverage_inquiry: Focus on coverage amounts and totals
+       - For payment_inquiry: Focus on payment dates and amounts
+       - For agent_contact: Focus on agent information
+       - For policy_inquiry: Provide comprehensive policy overview
+    5. Be conversational but professional
+    6. If the data shows multiple policies, organize the information clearly
+    7. End with an offer to help further
+
+    Respond with a complete, formatted customer service response.
+
 conversation_planning:
   technical_agent_request_prompt: |
     You are helping formulate a request to the Technical Agent based on customer intent and available information.

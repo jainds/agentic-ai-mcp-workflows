@@ -42,8 +42,8 @@ class DomainAgent(A2AServer):
     def __init__(self):
         super().__init__()
         
-        # Technical Agent configuration
-        self.technical_agent_url = "http://localhost:8002"
+        # Technical Agent configuration - use environment variable or fallback to localhost
+        self.technical_agent_url = os.getenv("TECHNICAL_AGENT_URL", "http://localhost:8002")
         self.technical_client = None
         
         # Initialize OpenAI client if API key is available
@@ -126,20 +126,29 @@ class DomainAgent(A2AServer):
         # Extract customer ID - preserve original format
         customer_id = None
         
-        # Look for user_XXX pattern first (most common)
-        user_match = re.search(r'user_\w+', user_text, re.IGNORECASE)
-        if user_match:
-            customer_id = user_match.group(0)
-        else:
-            # Look for other customer patterns
-            customer_match = re.search(r'customer[_\s]+(user_\w+|\w+)', user_text, re.IGNORECASE)
-            if customer_match:
-                # Get the actual ID part, not the "customer" prefix
-                full_match = customer_match.group(1)
-                if full_match.startswith('user_'):
-                    customer_id = full_match
+        # Look for various customer ID patterns
+        patterns = [
+            r'user_\w+',           # user_003, user_001
+            r'CUST-\d+',           # CUST-001, CUST-002  
+            r'cust-\d+',           # cust-001 (lowercase)
+            r'customer\s*[-_]?\s*(\w+[-]\w+|\w+)',  # customer CUST-001, customer_001
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, user_text, re.IGNORECASE)
+            if match:
+                if pattern.startswith(r'customer'):
+                    # Extract the ID part after "customer"
+                    customer_id = match.group(1)
                 else:
-                    customer_id = f"user_{full_match}"
+                    customer_id = match.group(0)
+                break
+        
+        # If no direct pattern match, look for "for customer X" pattern
+        if not customer_id:
+            customer_match = re.search(r'(?:for|customer)\s+([A-Za-z0-9_-]+)', user_text, re.IGNORECASE)
+            if customer_match:
+                customer_id = customer_match.group(1)
         
         # Determine intent
         if any(word in text_lower for word in ["policy", "policies", "coverage"]):

@@ -100,6 +100,50 @@
           "liability": 100000
         }
       }
+    },
+    {
+      "id": "POL-2024-AUTO-002",
+      "customer_id": "CUST-001",
+      "type": "auto",
+      "status": "active",
+      "premium": 95.00,
+      "coverage_amount": 75000.00,
+      "deductible": 750.00,
+      "start_date": "2024-03-01T00:00:00Z",
+      "end_date": "2025-02-28T23:59:59Z",
+      "details": {
+        "vehicle": {
+          "make": "Honda",
+          "model": "Civic",
+          "year": 2019,
+          "vin": "2HGFC2F59KH123456"
+        },
+        "coverage_types": ["liability", "collision", "comprehensive"],
+        "policy_limits": {
+          "bodily_injury": 75000,
+          "property_damage": 40000,
+          "collision": 20000,
+          "comprehensive": 20000
+        }
+      }
+    },
+    {
+      "id": "POL-2024-LIFE-001",
+      "customer_id": "CUST-001",
+      "type": "life",
+      "status": "active",
+      "premium": 45.00,
+      "coverage_amount": 250000.00,
+      "deductible": 0.00,
+      "start_date": "2024-01-15T00:00:00Z",
+      "end_date": "2034-01-14T23:59:59Z",
+      "details": {
+        "policy_type": "term_life",
+        "term_years": 10,
+        "beneficiaries": ["Jane Doe", "John Doe Jr."],
+        "medical_exam_required": false,
+        "coverage_types": ["death_benefit", "accidental_death"]
+      }
     }
   ],
   "claims": [

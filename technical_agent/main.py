@@ -38,8 +38,8 @@ class TechnicalAgent(A2AServer):
         # Initialize with agent card
         super().__init__()
         
-        # Policy FastMCP Server configuration
-        self.policy_server_url = "http://insurance-ai-poc-policy-server:8001/mcp"
+        # Policy FastMCP Server configuration - Use trailing slash to avoid 307 redirects
+        self.policy_server_url = "http://insurance-ai-poc-policy-server:8001/mcp/"
         self.policy_client = None
         
         # Initialize OpenAI client if API key is available
@@ -58,9 +58,9 @@ class TechnicalAgent(A2AServer):
         logger.info(f"Will connect to Policy FastMCP Server at: {self.policy_server_url}")
     
     async def _get_policy_client(self):
-        """Get or create FastMCP client connection with proper configuration"""
+        """Get or create FastMCP client connection with enhanced session management"""
         try:
-            # Always create a fresh client to avoid session issues
+            # Create client with explicit configuration
             client = Client(self.policy_server_url)
             logger.info("FastMCP client created successfully")
             return client
@@ -68,33 +68,125 @@ class TechnicalAgent(A2AServer):
             logger.error(f"Failed to create FastMCP client: {e}")
             raise
     
+    def _validate_mcp_request(self, tool_name: str, params: Dict[str, Any]) -> bool:
+        """Validate MCP request parameters to prevent 400 Bad Request errors"""
+        try:
+            # Validate tool name
+            if not tool_name or not isinstance(tool_name, str):
+                logger.error(f"Invalid tool name: {tool_name}")
+                return False
+            
+            # Validate parameters
+            if not isinstance(params, dict):
+                logger.error(f"Invalid parameters type: {type(params)}")
+                return False
+            
+            # Specific validation for get_customer_policies
+            if tool_name == "get_customer_policies":
+                customer_id = params.get("customer_id")
+                if not customer_id or not isinstance(customer_id, str) or len(customer_id.strip()) == 0:
+                    logger.error(f"Invalid customer_id: {customer_id}")
+                    return False
+                
+                # Clean and validate customer ID format
+                clean_customer_id = customer_id.strip()
+                if len(clean_customer_id) < 2:
+                    logger.error(f"Customer ID too short: {clean_customer_id}")
+                    return False
+                
+                # Update params with cleaned customer ID
+                params["customer_id"] = clean_customer_id
+            
+            logger.info(f"MCP request validation passed for {tool_name} with {params}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"MCP request validation failed: {e}")
+            return False
+    
     async def _call_mcp_tool_with_retry(self, tool_name: str, params: Dict[str, Any], max_retries: int = 3) -> Any:
-        """Call MCP tool with retry logic and better error handling"""
+        """Enhanced MCP tool calling with proper session management and validation"""
+        
+        # First validate the request to prevent 400 errors
+        if not self._validate_mcp_request(tool_name, params):
+            raise ValueError(f"Invalid MCP request: tool={tool_name}, params={params}")
+        
         last_error = None
         
         for attempt in range(max_retries):
+            client = None
             try:
                 logger.info(f"MCP call attempt {attempt + 1}/{max_retries}: {tool_name} with {params}")
                 
+                # Create fresh client for each attempt to avoid session issues
                 client = await self._get_policy_client()
+                
+                # Use proper session management with context manager
                 async with client:
-                    # Try to list tools first to verify connection
+                    # Initialize the session properly
+                    logger.info("Initializing MCP session...")
+                    
+                    # List tools to verify connection and session
                     try:
                         tools = await client.list_tools()
-                        logger.info(f"Available MCP tools: {[tool.name for tool in tools]}")
-                    except Exception as e:
-                        logger.warning(f"Could not list tools: {e}")
+                        available_tools = [tool.name for tool in tools]
+                        logger.info(f"Available MCP tools: {available_tools}")
+                        
+                        # Verify the requested tool is available
+                        if tool_name not in available_tools:
+                            raise ValueError(f"Tool '{tool_name}' not available. Available: {available_tools}")
+                        
+                    except Exception as tool_error:
+                        logger.warning(f"Could not list tools in attempt {attempt + 1}: {tool_error}")
+                        # Don't fail immediately, try the tool call anyway
                     
-                    # Call the actual tool
+                    # Call the actual tool with validated parameters
+                    logger.info(f"Calling MCP tool: {tool_name}")
                     result = await client.call_tool(tool_name, params)
+                    
                     logger.info(f"MCP tool call successful on attempt {attempt + 1}")
                     return result
                     
             except Exception as e:
                 last_error = e
-                logger.warning(f"MCP call attempt {attempt + 1} failed: {e}")
+                
+                # Enhanced error handling for specific error types
+                error_msg = str(e).lower()
+                
+                if "400 bad request" in error_msg:
+                    logger.error(f"400 Bad Request in attempt {attempt + 1}: {e}")
+                    logger.error(f"Request details - Tool: {tool_name}, Params: {params}")
+                    
+                    # For 400 errors, try cleaning the parameters
+                    if attempt < max_retries - 1:
+                        logger.info("Attempting to clean parameters for retry...")
+                        # Additional parameter cleaning for next attempt
+                        if "customer_id" in params:
+                            # More aggressive cleaning
+                            original_id = params["customer_id"]
+                            cleaned_id = re.sub(r'[^\w\-]', '', original_id)  # Remove non-alphanumeric except dash
+                            if cleaned_id != original_id:
+                                params["customer_id"] = cleaned_id
+                                logger.info(f"Cleaned customer_id: '{original_id}' -> '{cleaned_id}'")
+                
+                elif "connection" in error_msg or "timeout" in error_msg:
+                    logger.warning(f"Connection issue in attempt {attempt + 1}: {e}")
+                
+                else:
+                    logger.warning(f"MCP call attempt {attempt + 1} failed: {e}")
+                
+                # Cleanup client on failure
+                if client:
+                    try:
+                        await client.close()
+                    except:
+                        pass
+                
+                # Exponential backoff with jitter
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(1.0 * (attempt + 1))  # Exponential backoff
+                    backoff_time = (1.0 * (2 ** attempt)) + (0.1 * attempt)  # 1s, 2.1s, 4.2s
+                    logger.info(f"Waiting {backoff_time:.1f}s before retry...")
+                    await asyncio.sleep(backoff_time)
                     
         logger.error(f"All MCP call attempts failed. Last error: {last_error}")
         raise last_error
@@ -282,7 +374,7 @@ class TechnicalAgent(A2AServer):
         try:
             logger.info(f"Fetching policies for customer: {customer_id}")
             
-            # Use the retry mechanism for MCP calls
+            # Use the enhanced retry mechanism for MCP calls
             result = await self._call_mcp_tool_with_retry("get_customer_policies", {"customer_id": customer_id})
                 
             # Process the result properly
@@ -311,14 +403,14 @@ class TechnicalAgent(A2AServer):
             else:
                 logger.warning("No result returned from MCP call")
                 
-                logger.info(f"Successfully retrieved {len(policies_data)} policies for customer {customer_id}")
-                
-                return {
-                    "success": True,
-                    "customer_id": customer_id,
-                    "policies": policies_data,
+            logger.info(f"Successfully retrieved {len(policies_data)} policies for customer {customer_id}")
+            
+            return {
+                "success": True,
+                "customer_id": customer_id,
+                "policies": policies_data,
                 "count": len(policies_data)
-                }
+            }
                 
         except Exception as e:
             logger.error(f"Error fetching policies for customer {customer_id}: {e}")
@@ -424,13 +516,13 @@ class TechnicalAgent(A2AServer):
             
             # Handle different intents with session context
             if intent == "get_customer_policies" and customer_id:
-                    # Call our skill asynchronously
-                    result = asyncio.run(self.get_customer_policies_skill(customer_id))
-                    
+                # Call our skill asynchronously
+                result = asyncio.run(self.get_customer_policies_skill(customer_id))
+                
                 # Format response with enhanced context
-                    if result["success"]:
+                if result["success"]:
                     customer_name = customer_data.get('name', customer_id) if customer_data else customer_id
-                        response_text = f"Found {result['count']} policies for customer {customer_id}"
+                    response_text = f"Found {result['count']} policies for customer {customer_id}"
                     
                     # Add personalized greeting if we have customer name from session
                     if authenticated and customer_name != customer_id:
@@ -439,12 +531,12 @@ class TechnicalAgent(A2AServer):
                     if original_mention and original_mention != customer_id and not original_mention.startswith("session:"):
                         response_text += f" (identified from: '{original_mention}')"
                     
-                        if result["count"] > 0:
-                            response_text += f":\n\n"
-                            for i, policy in enumerate(result["policies"], 1):
-                                response_text += f"{i}. Policy {policy.get('id', 'Unknown')} ({policy.get('type', 'Unknown')} policy)\n"
-                                response_text += f"   Status: {policy.get('status', 'Unknown')}\n"
-                                response_text += f"   Premium: ${policy.get('premium', 'Unknown')}\n\n"
+                    if result["count"] > 0:
+                        response_text += f":\n\n"
+                        for i, policy in enumerate(result["policies"], 1):
+                            response_text += f"{i}. Policy {policy.get('id', 'Unknown')} ({policy.get('type', 'Unknown')} policy)\n"
+                            response_text += f"   Status: {policy.get('status', 'Unknown')}\n"
+                            response_text += f"   Premium: ${policy.get('premium', 'Unknown')}\n\n"
                     
                     # Add session/parsing info if not from authenticated session
                     if method == "session":
@@ -452,14 +544,14 @@ class TechnicalAgent(A2AServer):
                     elif method == "llm" and confidence < 0.8:
                         response_text += f"\n(Note: Parsed with {confidence:.1%} confidence using {method} method)"
                 else:
-                        response_text = f"Error retrieving policies for customer {customer_id}: {result['error']}"
+                    response_text = f"Error retrieving policies for customer {customer_id}: {result['error']}"
                     if original_mention and original_mention != customer_id and not original_mention.startswith("session:"):
                         response_text += f" (identified from: '{original_mention}')"
                     
-                    task.artifacts = [{
-                        "parts": [{"type": "text", "text": response_text}]
-                    }]
-                    task.status = TaskStatus(state=TaskState.COMPLETED)
+                task.artifacts = [{
+                    "parts": [{"type": "text", "text": response_text}]
+                }]
+                task.status = TaskStatus(state=TaskState.COMPLETED)
             
             elif intent == "health_check":
                 # Health check request

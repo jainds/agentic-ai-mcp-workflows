@@ -47,9 +47,8 @@ class IntentAnalyzer:
                 logger.warning(f"🔥 DOMAIN AGENT: LLM analysis failed: {e}, falling back to rules")
         
         # Fallback to rule-based analysis
-        rule_result = self._analyze_with_rules(user_text)
-        logger.info(f"🔥 DOMAIN AGENT: Rule-based intent analysis result: {rule_result}")
-        return rule_result
+        else:
+            return None
     
     def _analyze_with_llm(self, user_text: str) -> Dict[str, Any]:
         """Use LLM to understand customer intent"""
@@ -126,56 +125,3 @@ class IntentAnalyzer:
             
             logger.error(f"🔥 DOMAIN AGENT: LLM analysis failed: {e}")
             raise ValueError(f"LLM analysis failed: {e}")
-    
-    def _analyze_with_rules(self, user_text: str) -> Dict[str, Any]:
-        """Fallback rule-based intent analysis"""
-        text_lower = user_text.lower()
-        
-        # Extract customer ID using patterns
-        customer_id = None
-        patterns = [
-            r'(?:customer|user|client|id)[:\s]+([A-Za-z0-9_-]+)',
-            r'([A-Z]{3,}-\d+)',  # CUST-001, USER-123
-            r'(user_\w+)',       # user_003
-            r'(\w+\d+)',         # cust001, user123
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, user_text, re.IGNORECASE)
-            if match:
-                customer_id = match.group(1) if '(' in pattern else match.group(0)
-                break
-        
-        # Determine intent based on keywords
-        intent = "general_inquiry"  # default
-        
-        # Coverage/total amount queries
-        if any(word in text_lower for word in ["total coverage", "coverage amount", "total amount", "how much coverage"]):
-            intent = "coverage_inquiry"
-        # Payment queries (including premium and billing)
-        elif any(word in text_lower for word in ["payment", "due", "billing", "pay", "premium", "premiums", "deductible", "deductibles"]):
-            intent = "payment_inquiry"
-        # Agent contact queries
-        elif any(word in text_lower for word in ["agent", "contact", "who is my", "representative"]):
-            intent = "agent_contact"
-        # Policy type queries  
-        elif any(word in text_lower for word in ["policy", "policies", "types", "what do i have", "what policies"]):
-            intent = "policy_inquiry"
-        # Claims queries
-        elif any(word in text_lower for word in ["claim", "claims", "claim status"]):
-            intent = "claim_status"
-        
-        # Calculate confidence
-        confidence = 0.7  # Base confidence for rule-based
-        if customer_id:
-            confidence += 0.2  # Higher confidence if customer ID found
-        if intent != "general_inquiry":
-            confidence += 0.1  # Higher confidence if specific intent detected
-        
-        return {
-            "primary_intent": intent,
-            "customer_id": customer_id,
-            "confidence": min(confidence, 0.9),  # Cap at 0.9 for rule-based
-            "method": "rules",
-            "text_analyzed": user_text
-        } 

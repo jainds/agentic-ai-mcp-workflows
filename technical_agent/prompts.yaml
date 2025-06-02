@@ -3,29 +3,100 @@
 
 request_parsing:
   llm_parsing_prompt: |
-    You are an intelligent insurance technical agent parser. Analyze this request and extract the intent and customer information.
+    You are an intelligent insurance technical agent parser. Analyze this request and extract the intent.
+    
+    IMPORTANT: Customer identification is handled through session authentication. Focus only on determining what the user wants to do.
     
     Possible intents:
-    - get_customer_policies: User wants to retrieve/view/check policies for a customer
+    - get_customer_policies: User wants to retrieve/view/check policies 
     - health_check: User wants to check system/service health status
     - general_inquiry: General questions or unclear intent
     
     Request: "{text}"
     
     Instructions:
-  
     1. Determine the most likely intent based on context
     2. Provide high confidence only when very certain
-    3. Only respond with data that is directly relevant to the request. 
+    3. Focus on the action/intent, not customer identification
     
     Respond ONLY with valid JSON:
     {{
         "intent": "get_customer_policies|health_check|general_inquiry",
-        "customer_id": "normalized_customer_id_or_null", 
-        "original_customer_mention": "exact_text_where_customer_was_mentioned_or_null",
         "confidence": 0.0-1.0,
         "reasoning": "brief explanation of your analysis"
     }}
+
+intelligent_api_selection:
+  tool_selection_prompt: |
+    You are an insurance API assistant. Analyze this request and determine:
+    1. Which API tool to call
+    2. What parameters to extract
+    3. Provide reasoning for your choice
+
+    Request: "{request}"
+    Available customer_id from session: {customer_id}
+    Additional context: {context}
+
+    Available tools:
+    {tools_description}
+
+    Respond with JSON in this exact format:
+    {{
+        "tool_name": "exact_tool_name_from_list_above",
+        "parameters": {{"param_name": "param_value"}},
+        "result_key": "appropriate_key_for_response_data",
+        "reasoning": "why you chose this tool and these parameters",
+        "confidence": 0.95
+    }}
+
+    Rules:
+    - Only use tool names from the list above
+    - customer_id is provided from authenticated session context
+    - policy_id is required for get_policy_details (extract from request)
+    - If you can't extract required parameters, set tool_name to null
+    - Be specific about which information the user is asking for
+
+  multi_tool_planning_prompt: |
+    You are an intelligent insurance API planner. Analyze this complex request and create a comprehensive plan with multiple tool calls to gather all required information.
+
+    Request: "{request}"
+    Available customer_id from session: {customer_id}
+    Additional context: {context}
+
+    Available tools:
+    {tools_description}
+
+    For complex questions that require multiple pieces of information, create a plan with multiple tool calls.
+
+    Examples of complex requests:
+    - "Give me a complete overview" → needs policies, agent, payments, recommendations
+    - "What's the financial status of my insurance?" → needs policies, payments, deductibles
+    - "Help me understand my coverage and costs" → needs coverage_information, payment_information, deductibles
+
+    Respond with JSON in this exact format:
+    {{
+        "plan_type": "single_tool|multi_tool",
+        "reasoning": "why this approach was chosen",
+        "tool_calls": [
+            {{
+                "tool_name": "exact_tool_name_from_list_above",
+                "parameters": {{"param_name": "param_value"}},
+                "result_key": "appropriate_key_for_response_data",
+                "purpose": "what this tool call will provide"
+            }}
+        ],
+        "execution_order": "sequential|parallel",
+        "confidence": 0.95
+    }}
+
+    Rules:
+    - For simple, focused questions use "single_tool" with one tool call
+    - For comprehensive questions use "multi_tool" with multiple tool calls
+    - Use "parallel" execution when tools are independent
+    - Use "sequential" execution when one tool depends on another's result
+    - Only use tool names from the list above
+    - customer_id is provided from session context
+    - Ensure all required parameters are provided
 
 error_responses:
   mcp_connection_error: |

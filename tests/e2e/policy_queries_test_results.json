@@ -1,30 +1,30 @@
 {
   "summary": {
     "total_tests": 43,
-    "passed": 30,
-    "failed": 13,
-    "success_rate": 0.6976744186046512,
-    "avg_response_time": 7.13,
+    "passed": 7,
+    "failed": 36,
+    "success_rate": 0.16279069767441862,
+    "avg_response_time": 1.77,
     "category_breakdown": {
       "Core Requirements": {
         "total": 3,
-        "passed": 3,
-        "success_rate": 1.0
+        "passed": 0,
+        "success_rate": 0.0
       },
       "Payment Information": {
         "total": 6,
-        "passed": 6,
-        "success_rate": 1.0
+        "passed": 0,
+        "success_rate": 0.0
       },
       "Policy Details": {
         "total": 3,
-        "passed": 3,
-        "success_rate": 1.0
+        "passed": 0,
+        "success_rate": 0.0
       },
       "Coverage Information": {
         "total": 3,
-        "passed": 2,
-        "success_rate": 0.6666666666666666
+        "passed": 0,
+        "success_rate": 0.0
       }
     }
   },
@@ -32,347 +32,338 @@
     {
       "test_id": "total_coverage",
       "description": "Test total coverage calculation across all policies",
-      "query": "What's the total coverage amount for customer CUST-001?",
-      "success": true,
-      "response": "**TOTAL COVERAGE SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83c\udfaf **Total Coverage Amount: $325,000.00**\n\n\ud83d\udccb **Coverage Breakdown:**\n- **Auto Policy (POL-2024-AUTO-002)**\n  - Coverage Amount: $75,000.00\n  - Policy Types: Liability, Collision, Comprehensive\n  - Assigned Agent: Michael Brown\n  - Next Payment Due: September 1, 2024\n\n- **Life Policy (POL-2024-LIFE-001)**\n  - Coverage Amount: $250,000.00\n  - Policy Type: Term Life\n  - Assigned Agent: Michael Brown\n  - Next Payment Due: June 15, 2024\n\nThis represents the combined coverage across all your active policies.\n\nIf you have any more questions or need further assistance, feel free to ask!",
-      "keywords_found": [
+      "query": "What's the total coverage amount?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "coverage",
         "325,000",
         "total",
         "75,000",
         "250,000"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:46:00.997024",
-      "response_time": 6.53
+      "timestamp": "2025-06-02T22:35:15.663008",
+      "response_time": 0.07
     },
     {
       "test_id": "policy_types",
       "description": "Test policy types identification",
-      "query": "What types of policies do I have for customer CUST-001?",
-      "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Insurance**  \n   - **Policy ID:** POL-2024-AUTO-002  \n   - **Status:** Active  \n   - **Premium:** $95.00  \n   - **Coverage Amount:** $75,000.00  \n   - **Deductible:** $750.00  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n   - **Next Payment Due:** September 1, 2024  \n   - **Vehicle:** 2019 Honda Civic (VIN: 2HGFC2F59KH123456)  \n\n2. **Life Insurance**  \n   - **Policy ID:** POL-2024-LIFE-001  \n   - **Status:** Active  \n   - **Premium:** $45.00  \n   - **Coverage Amount:** $250,000.00  \n   - **Deductible:** $0.00  \n   - **Policy Type:** Term Life (10 years)  \n   - **Next Payment Due:** June 15, 2024  \n   - **Beneficiaries:** Jane Doe, John Doe Jr.  \n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Insurance Payment:** $95.00 due on September 1, 2024 (Billing Cycle: Quarterly)  \n- **Life Insurance Payment:** $45.00 due on June 15, 2024 (Billing Cycle: Monthly)  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
+      "query": "What types of policies do I have?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
       "keywords_found": [
+        "policy"
+      ],
+      "keywords_missing": [
         "auto",
         "life",
-        "policy",
         "types"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:46:08.532476",
-      "response_time": 7.58
+      "timestamp": "2025-06-02T22:35:16.732799",
+      "response_time": 0.04
     },
     {
       "test_id": "payment_due_date",
       "description": "Test payment due date information",
-      "query": "When is my next payment due for customer CUST-001?",
-      "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payments are due on the following dates:\n- **Life Insurance Policy:** June 15, 2024 - Amount: $45.00\n- **Auto Insurance Policy:** September 1, 2024 - Amount: $95.00\n\n\ud83d\udcc5 **Payment Schedule:**\n- The life insurance policy has a monthly billing cycle.\n- The auto insurance policy has a quarterly billing cycle.\n\nWould you like help setting up automatic payments or updating your payment method?",
-      "keywords_found": [
+      "query": "When is my next payment due?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "payment",
         "due",
         "september",
-        "june"
-      ],
-      "keywords_missing": [
+        "june",
         "2024-09-01",
         "2024-06-15"
       ],
-      "timestamp": "2025-05-31T19:46:17.113128",
-      "response_time": 4.54
+      "timestamp": "2025-06-02T22:35:17.774444",
+      "response_time": 0.04
     },
     {
       "test_id": "payment_due_auto",
       "description": "Test specific auto policy payment due date",
-      "query": "When is my auto insurance payment due for customer CUST-001?",
-      "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next auto insurance payment is due on **September 1, 2024**. The premium amount for this payment is **$95.00**.\n\n\ud83d\udcc5 **Payment Schedule:**\n- **Auto Insurance Payment:** September 1, 2024 (Quarterly billing cycle)\n- **Life Insurance Payment:** June 15, 2024 (Monthly billing cycle)\n\nWould you like help setting up automatic payments or updating your payment method?",
-      "keywords_found": [
+      "query": "When is my auto insurance payment due?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "payment",
         "due",
         "september",
+        "2024-09-01",
         "auto",
         "quarterly"
       ],
-      "keywords_missing": [
-        "2024-09-01"
-      ],
-      "timestamp": "2025-05-31T19:46:22.655955",
-      "response_time": 6.16
+      "timestamp": "2025-06-02T22:35:18.814961",
+      "response_time": 0.04
     },
     {
       "test_id": "payment_due_life",
       "description": "Test specific life policy payment due date",
-      "query": "When is my life insurance payment due for customer CUST-001?",
-      "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payment for your life insurance policy is due on **June 15, 2024**. The premium amount for this payment is **$45.00**.\n\n\ud83d\udcc5 **Payment Schedule:**\n- Life Insurance: \n  - Next Payment Due: June 15, 2024\n  - Billing Cycle: Monthly\n\nWould you like help setting up automatic payments or updating your payment method?",
-      "keywords_found": [
+      "query": "When is my life insurance payment due?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "payment",
         "due",
         "june",
+        "2024-06-15",
         "life",
         "monthly"
       ],
-      "keywords_missing": [
-        "2024-06-15"
-      ],
-      "timestamp": "2025-05-31T19:46:29.824911",
-      "response_time": 3.81
+      "timestamp": "2025-06-02T22:35:19.853748",
+      "response_time": 0.04
     },
     {
       "test_id": "payment_method_info",
       "description": "Test payment method information retrieval",
-      "query": "What payment method do I have set up for customer CUST-001?",
-      "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payments are due on the following dates:\n- **Life Insurance:** $45.00 due on June 15, 2024\n- **Auto Insurance:** $95.00 due on September 1, 2024\n\n\ud83d\udcc5 **Payment Schedule:**\n- The life insurance policy is billed monthly, with payments of $45.00.\n- The auto insurance policy is billed quarterly, with payments of $95.00.\n\nBoth of your policies are set up for automatic payments.\n\nWould you like help setting up automatic payments or updating your payment method?",
-      "keywords_found": [
+      "query": "What payment method do I have set up?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "payment",
         "method",
-        "auto"
-      ],
-      "keywords_missing": [
         "auto_pay",
+        "auto",
         "autopay"
       ],
-      "timestamp": "2025-05-31T19:46:34.640257",
-      "response_time": 3.78
+      "timestamp": "2025-06-02T22:35:20.900101",
+      "response_time": 0.04
     },
     {
       "test_id": "billing_cycle_info",
       "description": "Test billing cycle information",
-      "query": "What are my billing cycles for customer CUST-001?",
-      "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payments are due on the following dates:\n- **Life Insurance Policy:** $45.00 due on **June 15, 2024**\n- **Auto Insurance Policy:** $95.00 due on **September 1, 2024**\n\n\ud83d\udcc5 **Payment Schedule:**\n- Your life insurance policy has a **monthly** billing cycle.\n- Your auto insurance policy has a **quarterly** billing cycle.\n\nWould you like help setting up automatic payments or updating your payment method?",
-      "keywords_found": [
+      "query": "What are my billing cycles?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "billing",
         "cycle",
         "quarterly",
         "monthly",
         "payment"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:46:39.425692",
-      "response_time": 4.44
+      "timestamp": "2025-06-02T22:35:21.939019",
+      "response_time": 0.04
     },
     {
       "test_id": "next_payment_amount",
       "description": "Test next payment amount information",
-      "query": "How much is my next payment for customer CUST-001?",
-      "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payments are due on the following dates:\n- **Life Insurance:** $45.00 due on **June 15, 2024**\n- **Auto Insurance:** $95.00 due on **September 1, 2024**\n\n\ud83d\udcc5 **Payment Schedule:**\n- The life insurance policy is billed monthly, with the next payment of $45.00 due on June 15, 2024.\n- The auto insurance policy is billed quarterly, with the next payment of $95.00 due on September 1, 2024.\n\nWould you like help setting up automatic payments or updating your payment method?",
-      "keywords_found": [
-        "payment",
-        "$95",
-        "$45"
-      ],
+      "query": "How much is my next payment?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "payment",
         "amount",
+        "$95",
+        "$45",
         "premium"
       ],
-      "timestamp": "2025-05-31T19:46:44.869507",
-      "response_time": 7.68
+      "timestamp": "2025-06-02T22:35:22.979348",
+      "response_time": 0.04
     },
     {
       "test_id": "contact_person",
       "description": "Test assigned agent contact information",
-      "query": "Who is my contact person for policies for customer CUST-001?",
-      "success": true,
-      "response": "**YOUR INSURANCE AGENT FOR CUSTOMER CUST-001:**\n\n\ud83d\udc64 **Primary Contact:**\nMichael Brown\n\n\ud83d\udcde **How to Reach Your Agent:**\n\u2022 Phone: +1-555-0103  \n\u2022 Email: michael.brown@insurance.com  \n\nYour agent is available to help with policy questions, claims, and account changes. If you have any further questions or need assistance, feel free to reach out!",
-      "keywords_found": [
+      "query": "Who is my contact person for policies?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "michael",
         "brown",
         "agent",
         "contact"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:46:53.550445",
-      "response_time": 4.23
+      "timestamp": "2025-06-02T22:35:24.019513",
+      "response_time": 0.03
     },
     {
       "test_id": "policy_details",
       "description": "Test detailed policy information retrieval",
-      "query": "Show me details of my auto policy for customer CUST-001",
-      "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Policy**  \n   - **Policy ID:** POL-2024-AUTO-002  \n   - **Status:** Active  \n   - **Premium:** $95.00  \n   - **Coverage Amount:** $75,000.00  \n   - **Deductible:** $750.00  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n   - **Bodily Injury Limit:** $75,000  \n   - **Property Damage Limit:** $40,000  \n   - **Collision Limit:** $20,000  \n   - **Comprehensive Limit:** $20,000  \n   - **Start Date:** March 1, 2024  \n   - **End Date:** February 28, 2025  \n   - **Next Payment Due:** September 1, 2024  \n   - **Billing Cycle:** Quarterly  \n\n2. **Life Policy**  \n   - **Policy ID:** POL-2024-LIFE-001  \n   - **Status:** Active  \n   - **Premium:** $45.00  \n   - **Coverage Amount:** $250,000.00  \n   - **Deductible:** $0.00  \n   - **Policy Type:** Term Life (10 years)  \n   - **Beneficiaries:** Jane Doe, John Doe Jr.  \n   - **Start Date:** January 15, 2024  \n   - **End Date:** January 14, 2034  \n   - **Next Payment Due:** June 15, 2024  \n   - **Billing Cycle:** Monthly  \n\n\ud83d\udcb0 **Payment Information:**\n- **Next Payment Due for Auto Policy:** September 1, 2024  \n- **Next Payment Due for Life Policy:** June 15, 2024  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
-      "keywords_found": [
+      "query": "Show me details of my auto policy.",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "honda",
+        "civic",
         "auto",
         "liability",
         "collision"
       ],
-      "keywords_missing": [
-        "honda",
-        "civic"
-      ],
-      "timestamp": "2025-05-31T19:46:58.778048",
-      "response_time": 7.65
+      "timestamp": "2025-06-02T22:35:25.056423",
+      "response_time": 0.04
     },
     {
       "test_id": "premium_amounts",
       "description": "Test premium amount and billing cycle information",
-      "query": "What are my premium amounts for customer CUST-001?",
-      "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payments are due on the following dates:\n- **Life Insurance Premium:** $45.00 due on June 15, 2024\n- **Auto Insurance Premium:** $95.00 due on September 1, 2024\n\n\ud83d\udcc5 **Payment Schedule:**\n- **Life Insurance:** Monthly billing cycle\n- **Auto Insurance:** Quarterly billing cycle\n\nWould you like help setting up automatic payments or updating your payment method?",
-      "keywords_found": [
+      "query": "What are my premium amounts?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "premium",
         "$95",
         "$45",
         "monthly",
         "quarterly"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:47:07.432855",
-      "response_time": 7.55
+      "timestamp": "2025-06-02T22:35:26.099873",
+      "response_time": 0.03
     },
     {
       "test_id": "policy_status",
       "description": "Test policy status reporting",
-      "query": "What's the status of my policies for customer CUST-001?",
-      "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Insurance (POL-2024-AUTO-002)**  \n   - Status: Active  \n   - Premium: $95.00  \n   - Coverage Amount: $75,000.00  \n   - Deductible: $750.00  \n   - Start Date: March 1, 2024  \n   - End Date: February 28, 2025  \n   - Next Payment Due: September 1, 2024  \n   - Coverage Types: Liability, Collision, Comprehensive  \n   - Policy Limits:  \n     - Bodily Injury: $75,000  \n     - Property Damage: $40,000  \n     - Collision: $20,000  \n     - Comprehensive: $20,000  \n\n2. **Life Insurance (POL-2024-LIFE-001)**  \n   - Status: Active  \n   - Premium: $45.00  \n   - Coverage Amount: $250,000.00  \n   - Deductible: $0.00  \n   - Start Date: January 15, 2024  \n   - End Date: January 14, 2034  \n   - Next Payment Due: June 15, 2024  \n   - Coverage Types: Death Benefit, Accidental Death  \n   - Term: 10 Years  \n   - Beneficiaries: Jane Doe, John Doe Jr.  \n\n\ud83d\udcb0 **Payment Information:**\n- Next Payment Due for Auto Insurance: September 1, 2024  \n- Next Payment Due for Life Insurance: June 15, 2024  \n\n\ud83d\udc64 **Your Contact Agent:**\n- Name: Michael Brown  \n- Email: michael.brown@insurance.com  \n- Phone: +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
-      "keywords_found": [
+      "query": "What's the status of my policies?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "active",
         "status",
         "POL-2024"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:47:15.989050",
-      "response_time": 13.11
+      "timestamp": "2025-06-02T22:35:27.134249",
+      "response_time": 0.03
     },
     {
       "test_id": "coverage_limits",
       "description": "Test detailed coverage limits information",
-      "query": "What are my coverage limits for customer CUST-001?",
-      "success": true,
-      "response": "**TOTAL COVERAGE SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83c\udfaf **Total Coverage Amount: $325,000.00**\n\n\ud83d\udccb **Coverage Breakdown:**\n- **Auto Insurance:**\n  - **Coverage Amount:** $75,000.00\n  - **Bodily Injury Limit:** $75,000.00\n  - **Property Damage Limit:** $40,000.00\n  - **Collision Coverage Limit:** $20,000.00\n  - **Comprehensive Coverage Limit:** $20,000.00\n\n- **Life Insurance:**\n  - **Coverage Amount:** $250,000.00\n  - **Policy Type:** Term Life (10 years)\n  - **Beneficiaries:** Jane Doe, John Doe Jr.\n\nThis represents the combined coverage across all your active policies.\n\nIf you have any further questions or need assistance with anything else, feel free to ask!",
-      "keywords_found": [
+      "query": "What are my coverage limits?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "75,000",
         "250,000",
         "bodily",
-        "injury"
-      ],
-      "keywords_missing": [
+        "injury",
         "benefit"
       ],
-      "timestamp": "2025-05-31T19:47:30.104445",
-      "response_time": 12.15
+      "timestamp": "2025-06-02T22:35:28.168046",
+      "response_time": 0.03
     },
     {
       "test_id": "deductibles",
       "description": "Test deductible information across policies",
-      "query": "What are my deductibles for customer CUST-001?",
+      "query": "What are my deductibles?",
       "success": false,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payments are due on the following dates:\n- **Auto Policy:** $95.00 due on September 1, 2024\n- **Life Policy:** $45.00 due on June 15, 2024\n\n\ud83d\udcc5 **Payment Schedule:**\n- **Auto Policy:** Quarterly billing cycle, with the next payment due on September 1, 2024.\n- **Life Policy:** Monthly billing cycle, with the next payment due on June 15, 2024.\n\nWould you like help setting up automatic payments or updating your payment method?",
-      "keywords_found": [
-        "auto",
-        "life"
-      ],
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
       "keywords_missing": [
         "deductible",
         "$750",
-        "$0"
+        "$0",
+        "auto",
+        "life"
       ],
-      "timestamp": "2025-05-31T19:47:43.254381",
-      "response_time": 4.93
+      "timestamp": "2025-06-02T22:35:29.206295",
+      "response_time": 0.03
     },
     {
       "test_id": "policy_dates",
       "description": "Test policy expiration date information",
-      "query": "When do my policies expire for customer CUST-001?",
-      "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Policy (POL-2024-AUTO-002)**  \n   - Status: Active  \n   - Coverage Amount: $75,000.00  \n   - Start Date: March 1, 2024  \n   - End Date: February 28, 2025  \n   - Next Payment Due: September 1, 2024  \n\n2. **Life Policy (POL-2024-LIFE-001)**  \n   - Status: Active  \n   - Coverage Amount: $250,000.00  \n   - Start Date: January 15, 2024  \n   - End Date: January 14, 2034  \n   - Next Payment Due: June 15, 2024  \n\n\ud83d\udcb0 **Payment Information:**\n- Auto Policy Premium: $95.00 (Quarterly)  \n- Life Policy Premium: $45.00 (Monthly)  \n\n\ud83d\udc64 **Your Contact Agent:**\n- Name: Michael Brown  \n- Email: michael.brown@insurance.com  \n- Phone: +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
-      "keywords_found": [
+      "query": "When do my policies expire?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "expire",
         "2025",
         "2034",
         "end",
         "date"
       ],
-      "keywords_missing": [
-        "expire"
-      ],
-      "timestamp": "2025-05-31T19:47:49.184312",
-      "response_time": 6.84
+      "timestamp": "2025-06-02T22:35:30.245157",
+      "response_time": 0.04
     },
     {
       "test_id": "general_policies_overview",
       "description": "Test general policy overview without explicit customer ID",
-      "query": "Tell me about my policies",
+      "query": "Tell me about my policies.",
       "success": false,
-      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
       "keywords_found": [
-        "policy",
-        "coverage"
+        "policy"
       ],
       "keywords_missing": [
         "auto",
         "life",
+        "coverage",
         "active"
       ],
-      "timestamp": "2025-05-31T19:47:56.961993",
-      "response_time": 0.97
+      "timestamp": "2025-06-02T22:35:31.285139",
+      "response_time": 0.04
     },
     {
       "test_id": "policy_expiring_next",
       "description": "Test identifying next expiring policy",
-      "query": "Which policy is expiring next for customer CUST-001?",
+      "query": "Which policy is expiring next?",
       "success": false,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Policy (POL-2024-AUTO-002)**  \n   - Status: Active  \n   - Coverage Amount: $75,000.00  \n   - Next Payment Due: September 1, 2024  \n   - Premium: $95.00  \n   - Deductible: $750.00  \n   - Coverage Types: Liability, Collision, Comprehensive  \n   - Vehicle: 2019 Honda Civic (VIN: 2HGFC2F59KH123456)  \n\n2. **Life Policy (POL-2024-LIFE-001)**  \n   - Status: Active  \n   - Coverage Amount: $250,000.00  \n   - Next Payment Due: June 15, 2024  \n   - Premium: $45.00  \n   - Deductible: $0.00  \n   - Policy Type: Term Life (10 years)  \n   - Beneficiaries: Jane Doe, John Doe Jr.  \n\n\ud83d\udcb0 **Payment Information:**\n- Next Payment for Life Policy: June 15, 2024  \n- Next Payment for Auto Policy: September 1, 2024  \n\n\ud83d\udc64 **Your Contact Agent:**\n- Name: Michael Brown  \n- Email: michael.brown@insurance.com  \n- Phone: +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
-      "keywords_found": [
-        "auto",
-        "next"
-      ],
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
       "keywords_missing": [
         "expire",
         "expiring",
-        "2025"
+        "2025",
+        "auto",
+        "next"
       ],
-      "timestamp": "2025-05-31T19:47:58.938590",
-      "response_time": 6.41
+      "timestamp": "2025-06-02T22:35:32.331991",
+      "response_time": 0.03
     },
     {
       "test_id": "detailed_policy_info",
       "description": "Test comprehensive policy details",
-      "query": "What are my policy details for customer CUST-001?",
-      "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Insurance**\n   - **Policy ID:** POL-2024-AUTO-002\n   - **Status:** Active\n   - **Premium:** $95.00\n   - **Coverage Amount:** $75,000.00\n   - **Deductible:** $750.00\n   - **Coverage Types:** Liability, Collision, Comprehensive\n   - **Policy Limits:**\n     - Bodily Injury: $75,000.00\n     - Property Damage: $40,000.00\n     - Collision: $20,000.00\n     - Comprehensive: $20,000.00\n   - **Start Date:** March 1, 2024\n   - **End Date:** February 28, 2025\n   - **Next Payment Due:** September 1, 2024\n\n2. **Life Insurance**\n   - **Policy ID:** POL-2024-LIFE-001\n   - **Status:** Active\n   - **Premium:** $45.00\n   - **Coverage Amount:** $250,000.00\n   - **Deductible:** $0.00\n   - **Policy Type:** Term Life (10 years)\n   - **Beneficiaries:** Jane Doe, John Doe Jr.\n   - **Coverage Types:** Death Benefit, Accidental Death\n   - **Start Date:** January 15, 2024\n   - **End Date:** January 14, 2034\n   - **Next Payment Due:** June 15, 2024\n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Insurance Payment Method:** Auto Pay\n- **Next Payment Due for Auto Insurance:** September 1, 2024\n- **Life Insurance Payment Method:** Auto Pay\n- **Next Payment Due for Life Insurance:** June 15, 2024\n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
+      "query": "What are my policy details?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
       "keywords_found": [
-        "policy",
-        "auto",
-        "life",
-        "POL-2024"
+        "policy"
       ],
       "keywords_missing": [
         "details",
+        "auto",
+        "life",
+        "POL-2024",
         "honda"
       ],
-      "timestamp": "2025-05-31T19:48:06.345793",
-      "response_time": 8.4
+      "timestamp": "2025-06-02T22:35:33.370996",
+      "response_time": 0.03
     },
     {
       "test_id": "auto_vehicle_details",
       "description": "Test specific vehicle details from auto policy",
-      "query": "For my auto policy, can you give me vehicle details for customer CUST-001?",
-      "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Policy**  \n   - **Policy ID:** POL-2024-AUTO-002  \n   - **Status:** Active  \n   - **Premium:** $95.00  \n   - **Coverage Amount:** $75,000.00  \n   - **Deductible:** $750.00  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n   - **Policy Limits:**  \n     - Bodily Injury: $75,000  \n     - Property Damage: $40,000  \n     - Collision: $20,000  \n     - Comprehensive: $20,000  \n   - **Vehicle Details:**  \n     - Make: Honda  \n     - Model: Civic  \n     - Year: 2019  \n     - VIN: 2HGFC2F59KH123456  \n   - **Policy Duration:** March 1, 2024 - February 28, 2025  \n\n2. **Life Policy**  \n   - **Policy ID:** POL-2024-LIFE-001  \n   - **Status:** Active  \n   - **Premium:** $45.00  \n   - **Coverage Amount:** $250,000.00  \n   - **Deductible:** $0.00  \n   - **Policy Type:** Term Life (10 years)  \n   - **Beneficiaries:** Jane Doe, John Doe Jr.  \n   - **Coverage Types:** Death Benefit, Accidental Death  \n   - **Policy Duration:** January 15, 2024 - January 14, 2034  \n\n\ud83d\udcb0 **Payment Information:**\n- **Next Payment Due for Auto Policy:** September 1, 2024  \n- **Next Payment Due for Life Policy:** June 15, 2024  \n- **Billing Cycle for Auto Policy:** Quarterly  \n- **Billing Cycle for Life Policy:** Monthly  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
-      "keywords_found": [
+      "query": "For my auto policy, can you give me vehicle details?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "auto",
         "vehicle",
         "honda",
         "civic",
+        "2023",
         "year"
       ],
-      "keywords_missing": [
-        "2023"
-      ],
-      "timestamp": "2025-05-31T19:48:15.751314",
-      "response_time": 9.13
+      "timestamp": "2025-06-02T22:35:34.406332",
+      "response_time": 0.03
     },
     {
       "test_id": "all_policy_limits",
       "description": "Test comprehensive policy limits explanation",
-      "query": "Explain all my policy limits for customer CUST-001",
-      "success": true,
-      "response": "**TOTAL COVERAGE SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83c\udfaf **Total Coverage Amount: $325,000.00**\n\n\ud83d\udccb **Coverage Breakdown:**\n- **Auto Insurance:**\n  - **Coverage Amount:** $75,000.00\n  - **Policy Limits:**\n    - Bodily Injury: $75,000.00\n    - Property Damage: $40,000.00\n    - Collision: $20,000.00\n    - Comprehensive: $20,000.00\n\n- **Life Insurance:**\n  - **Coverage Amount:** $250,000.00\n  - **Policy Type:** Term Life (10 years)\n  - **Coverage Types:** Death Benefit, Accidental Death\n\nThis represents the combined coverage across all your active policies.\n\nIf you have any further questions or need assistance, feel free to ask!",
-      "keywords_found": [
+      "query": "Explain all my policy limits.",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "limits",
         "coverage",
         "75,000",
@@ -380,93 +371,91 @@
         "bodily",
         "benefit"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:48:25.882525",
-      "response_time": 6.26
+      "timestamp": "2025-06-02T22:35:35.443717",
+      "response_time": 0.03
     },
     {
       "test_id": "user_003_format",
       "description": "Test customer ID in user_### format",
-      "query": "What policies does user_003 have?",
-      "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER user_003:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Home  \n\u2022 Total Coverage: $400,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Insurance**  \n   - **Policy ID:** POL-2024-AUTO-001  \n   - **Status:** Active  \n   - **Premium:** $120.00/month  \n   - **Coverage Amount:** $100,000.00  \n   - **Deductible:** $500.00  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n   - **Next Payment Due:** June 15, 2024  \n   - **Vehicle:** 2020 Toyota Camry (VIN: 1HGBH41JXMN109186)  \n\n2. **Home Insurance**  \n   - **Policy ID:** POL-2024-HOME-001  \n   - **Status:** Active  \n   - **Premium:** $85.00/month  \n   - **Coverage Amount:** $300,000.00  \n   - **Deductible:** $1,000.00  \n   - **Coverage Types:** Dwelling, Personal Property, Liability  \n   - **Next Payment Due:** June 15, 2024  \n   - **Property Address:** 123 Main St, Anytown, ST 12345  \n\n\ud83d\udcb0 **Payment Information:**\n- Both policies have a next payment due date of **June 15, 2024**.  \n- Auto Insurance: $120.00/month (Auto Pay)  \n- Home Insurance: $85.00/month (Manual Pay)  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Jane Smith  \n- **Email:** agent@insurance.com  \n- **Phone:** +1-555-0101  \n\nIs there anything specific about your policies you'd like me to explain further?",
+      "query": "What policies do I have?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
       "keywords_found": [
-        "policy",
-        "auto",
-        "user_003"
+        "policy"
       ],
       "keywords_missing": [
-        "life"
+        "auto",
+        "life",
+        "user_003"
       ],
-      "timestamp": "2025-05-31T19:48:33.144856",
-      "response_time": 8.39
+      "timestamp": "2025-06-02T22:35:36.480580",
+      "response_time": 0.04
     },
     {
       "test_id": "customer_123_format",
       "description": "Test customer ID in customer-### format",
-      "query": "Show me coverage for customer-123",
-      "success": true,
-      "response": "**TOTAL COVERAGE SUMMARY FOR CUSTOMER customer-123:**\n\n\ud83c\udfaf **Total Coverage Amount: $0.00**\n\n\ud83d\udccb **Coverage Breakdown:**\nUnfortunately, we were unable to find any active policies associated with customer-123. This means there are currently no coverage details available.\n\nThis represents the combined coverage across all your active policies.\n\nIf you have any further questions or need assistance with anything else, please feel free to ask!",
-      "keywords_found": [
+      "query": "Show me coverage for my policies",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "coverage",
         "customer-123"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:48:42.534573",
-      "response_time": 4.11
+      "timestamp": "2025-06-02T22:35:37.523526",
+      "response_time": 0.03
     },
     {
       "test_id": "mixed_case_customer",
       "description": "Test mixed case customer ID",
-      "query": "What are the payment details for Customer_001?",
-      "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER Customer_001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nUnfortunately, we currently have no payment details available for Customer_001, as there are no policies associated with this account.\n\n\ud83d\udcc5 **Payment Schedule:**\nSince there are no policies found, there is no payment schedule to provide at this time.\n\nWould you like help setting up a new policy or have any other questions? I'm here to assist you!",
-      "keywords_found": [
+      "query": "What are the payment details for my policies?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "payment",
         "Customer_001"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:48:47.653329",
-      "response_time": 3.24
+      "timestamp": "2025-06-02T22:35:38.557433",
+      "response_time": 0.03
     },
     {
       "test_id": "casual_customer_mention",
       "description": "Test casual customer name mention",
-      "query": "Tell me about policies for customer john",
+      "query": "Tell me about my policies.",
       "success": false,
-      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
       "keywords_found": [
         "policy"
       ],
       "keywords_missing": [
         "john"
       ],
-      "timestamp": "2025-05-31T19:48:51.896000",
-      "response_time": 1.01
+      "timestamp": "2025-06-02T22:35:39.593939",
+      "response_time": 0.03
     },
     {
       "test_id": "nonexistent_customer",
       "description": "Test non-existent customer ID handling",
-      "query": "What policies does CUST-999 have?",
+      "query": "What policies do I have?",
       "success": false,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-999:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 0\n\u2022 Policy Types: None\n\u2022 Total Coverage: $0.00\n\n\ud83d\udcca **Your Policies:**\nUnfortunately, there are no policies found for customer CUST-999.\n\n\ud83d\udcb0 **Payment Information:**\nThere is no payment information available as there are no policies associated with your account.\n\n\ud83d\udc64 **Your Contact Agent:**\nThere is no assigned agent information available at this time.\n\nIs there anything specific about your policies you'd like me to explain further?",
-      "keywords_found": [
-        "no policies"
-      ],
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "no policies",
         "not found",
         "customer not found",
         "no records"
       ],
-      "timestamp": "2025-05-31T19:48:53.909098",
-      "response_time": 4.84
+      "timestamp": "2025-06-02T22:35:40.627525",
+      "response_time": 0.03
     },
     {
       "test_id": "invalid_customer_format",
       "description": "Test invalid customer ID format",
-      "query": "Show me policies for customer @#$%",
+      "query": "Show me policies for my account",
       "success": false,
-      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
       "keywords_found": [],
       "keywords_missing": [
         "invalid",
@@ -474,66 +463,65 @@
         "not found",
         "invalid customer"
       ],
-      "timestamp": "2025-05-31T19:48:59.757587",
-      "response_time": 1.01
+      "timestamp": "2025-06-02T22:35:41.655271",
+      "response_time": 0.03
     },
     {
       "test_id": "empty_customer",
       "description": "Test empty customer ID",
-      "query": "What are my policies for customer ''?",
+      "query": "What are my policies?",
       "success": false,
-      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
       "keywords_found": [],
       "keywords_missing": [
         "invalid",
         "error",
         "customer id required"
       ],
-      "timestamp": "2025-05-31T19:49:01.768906",
-      "response_time": 1.2
+      "timestamp": "2025-06-02T22:35:42.689114",
+      "response_time": 0.03
     },
     {
       "test_id": "no_customer_specified",
       "description": "Test query without customer identification",
       "query": "What are my policies?",
       "success": false,
-      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
-      "keywords_found": [
-        "customer"
-      ],
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "customer",
         "identify",
         "specify",
         "id required"
       ],
-      "timestamp": "2025-05-31T19:49:03.978449",
-      "response_time": 1.17
+      "timestamp": "2025-06-02T22:35:43.725999",
+      "response_time": 0.04
     },
     {
       "test_id": "policy_comparison",
       "description": "Test policy comparison functionality",
-      "query": "Compare my auto and life policies for CUST-001",
-      "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 2  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n\n1. **Auto Policy**  \n   - **Policy ID:** POL-2024-AUTO-002  \n   - **Status:** Active  \n   - **Premium:** $95.00 (Quarterly)  \n   - **Coverage Amount:** $75,000.00  \n   - **Deductible:** $750.00  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n   - **Policy Limits:**  \n     - Bodily Injury: $75,000  \n     - Property Damage: $40,000  \n     - Collision: $20,000  \n     - Comprehensive: $20,000  \n   - **Next Payment Due:** September 1, 2024  \n   - **Vehicle:** 2019 Honda Civic (VIN: 2HGFC2F59KH123456)  \n\n2. **Life Policy**  \n   - **Policy ID:** POL-2024-LIFE-001  \n   - **Status:** Active  \n   - **Premium:** $45.00 (Monthly)  \n   - **Coverage Amount:** $250,000.00  \n   - **Deductible:** $0.00  \n   - **Policy Type:** Term Life (10 years)  \n   - **Beneficiaries:** Jane Doe, John Doe Jr.  \n   - **Next Payment Due:** June 15, 2024  \n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Policy Next Payment:** $95.00 due on September 1, 2024  \n- **Life Policy Next Payment:** $45.00 due on June 15, 2024  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
-      "keywords_found": [
+      "query": "Compare my auto and life policies",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "auto",
         "life",
+        "compare",
         "coverage",
         "premium"
       ],
-      "keywords_missing": [
-        "compare"
-      ],
-      "timestamp": "2025-05-31T19:49:06.154592",
-      "response_time": 10.91
+      "timestamp": "2025-06-02T22:35:44.764578",
+      "response_time": 0.03
     },
     {
       "test_id": "premium_calculation",
       "description": "Test premium calculation across policies",
-      "query": "Calculate my total annual premium for customer CUST-001",
-      "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payments are due on the following dates:\n- **Auto Insurance:** $95.00 due on **September 1, 2024**\n- **Life Insurance:** $45.00 due on **June 15, 2024**\n\n\ud83d\udcc5 **Payment Schedule:**\n- The auto insurance premium of $95.00 is billed quarterly, with the next payment due on September 1, 2024.\n- The life insurance premium of $45.00 is billed monthly, with the next payment due on June 15, 2024.\n\nYour total annual premium is calculated as follows:\n- Auto Insurance: $95.00 x 4 = $380.00\n- Life Insurance: $45.00 x 12 = $540.00\n- **Total Annual Premium: $380.00 + $540.00 = $920.00**\n\nWould you like help setting up automatic payments or updating your payment method?",
-      "keywords_found": [
+      "query": "Calculate my total annual premium",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "premium",
         "annual",
         "total",
@@ -541,87 +529,82 @@
         "$95",
         "$45"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:49:18.069485",
-      "response_time": 6.28
+      "timestamp": "2025-06-02T22:35:45.797994",
+      "response_time": 0.03
     },
     {
       "test_id": "policy_renewal_info",
       "description": "Test policy renewal information",
-      "query": "When do I need to renew my policies for CUST-001?",
+      "query": "When do I need to renew my policies?",
       "success": false,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Insurance**  \n   - **Policy ID:** POL-2024-AUTO-002  \n   - **Status:** Active  \n   - **Premium:** $95.00  \n   - **Coverage Amount:** $75,000.00  \n   - **Deductible:** $750.00  \n   - **Start Date:** March 1, 2024  \n   - **End Date:** February 28, 2025  \n   - **Next Payment Due:** September 1, 2024  \n   - **Billing Cycle:** Quarterly  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n\n2. **Life Insurance**  \n   - **Policy ID:** POL-2024-LIFE-001  \n   - **Status:** Active  \n   - **Premium:** $45.00  \n   - **Coverage Amount:** $250,000.00  \n   - **Deductible:** $0.00  \n   - **Start Date:** January 15, 2024  \n   - **End Date:** January 14, 2034  \n   - **Next Payment Due:** June 15, 2024  \n   - **Billing Cycle:** Monthly  \n   - **Coverage Types:** Death Benefit, Accidental Death  \n\n\ud83d\udcb0 **Payment Information:**\n- **Next Payment Due for Auto Insurance:** September 1, 2024  \n- **Next Payment Due for Life Insurance:** June 15, 2024  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Agent Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
-      "keywords_found": [
-        "2025",
-        "2034"
-      ],
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
       "keywords_missing": [
         "renew",
         "renewal",
-        "expire"
+        "expire",
+        "2025",
+        "2034"
       ],
-      "timestamp": "2025-05-31T19:49:25.351121",
-      "response_time": 9.33
+      "timestamp": "2025-06-02T22:35:46.834523",
+      "response_time": 0.03
     },
     {
       "test_id": "claim_eligibility",
       "description": "Test claim eligibility information",
-      "query": "What claims can I make on my policies for CUST-001?",
+      "query": "What claims can I make on my policies?",
       "success": false,
-      "response": "Claims information is currently being updated. Please contact your agent for claim status.",
-      "keywords_found": [
-        "claim"
-      ],
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "claim",
         "coverage",
         "eligible",
         "bodily",
         "injury"
       ],
-      "timestamp": "2025-05-31T19:49:35.687134",
-      "response_time": 1.02
+      "timestamp": "2025-06-02T22:35:47.871116",
+      "response_time": 0.03
     },
     {
       "test_id": "emergency_contact",
       "description": "Test emergency contact information",
-      "query": "Who should I contact in an emergency for customer CUST-001?",
-      "success": true,
-      "response": "**YOUR INSURANCE AGENT FOR CUSTOMER CUST-001:**\n\n\ud83d\udc64 **Primary Contact:**\nMichael Brown\n\n\ud83d\udcde **How to Reach Your Agent:**\n\u2022 Phone: +1-555-0103  \n\u2022 Email: michael.brown@insurance.com\n\nYour agent is available to help with policy questions, claims, and account changes.\n\nIf you have any further questions or need assistance, feel free to ask!",
-      "keywords_found": [
+      "query": "Who should I contact in an emergency?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "emergency",
         "contact",
         "agent",
         "michael",
         "brown"
       ],
-      "keywords_missing": [
-        "emergency"
-      ],
-      "timestamp": "2025-05-31T19:49:37.712191",
-      "response_time": 4.1
+      "timestamp": "2025-06-02T22:35:48.905928",
+      "response_time": 0.03
     },
     {
       "test_id": "policy_modifications",
       "description": "Test policy modification information",
-      "query": "Can I modify my coverage for customer CUST-001?",
+      "query": "Can I modify my coverage?",
       "success": false,
-      "response": "**TOTAL COVERAGE SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83c\udfaf **Total Coverage Amount: $325,000.00**\n\n\ud83d\udccb **Coverage Breakdown:**\n- **Auto Policy (POL-2024-AUTO-002)**: \n  - Coverage Amount: $75,000.00\n  - Coverage Types: Liability, Collision, Comprehensive\n  - Vehicle: 2019 Honda Civic (VIN: 2HGFC2F59KH123456)\n  \n- **Life Policy (POL-2024-LIFE-001)**: \n  - Coverage Amount: $250,000.00\n  - Policy Type: Term Life (10 years)\n  - Beneficiaries: Jane Doe, John Doe Jr.\n\nThis represents the combined coverage across all your active policies.\n\nIf you would like to modify your coverage or have any further questions, feel free to ask!",
-      "keywords_found": [
-        "modify",
-        "coverage"
-      ],
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "modify",
+        "coverage",
         "change",
         "update"
       ],
-      "timestamp": "2025-05-31T19:49:42.812930",
-      "response_time": 29.37
+      "timestamp": "2025-06-02T22:35:49.940959",
+      "response_time": 0.03
     },
     {
       "test_id": "complex_multi_query",
       "description": "Test complex multi-part query handling",
       "query": "For customer CUST-001, tell me about all policies, payment dates, coverage limits, agent contact, and vehicle details",
       "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Insurance**  \n   - **Policy ID:** POL-2024-AUTO-002  \n   - **Status:** Active  \n   - **Premium:** $95.00  \n   - **Coverage Amount:** $75,000.00  \n   - **Deductible:** $750.00  \n   - **Start Date:** March 1, 2024  \n   - **End Date:** February 28, 2025  \n   - **Next Payment Due:** September 1, 2024  \n   - **Billing Cycle:** Quarterly  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n   - **Policy Limits:**  \n     - Bodily Injury: $75,000  \n     - Property Damage: $40,000  \n     - Collision: $20,000  \n     - Comprehensive: $20,000  \n   - **Vehicle Details:**  \n     - Make: Honda  \n     - Model: Civic  \n     - Year: 2019  \n     - VIN: 2HGFC2F59KH123456  \n\n2. **Life Insurance**  \n   - **Policy ID:** POL-2024-LIFE-001  \n   - **Status:** Active  \n   - **Premium:** $45.00  \n   - **Coverage Amount:** $250,000.00  \n   - **Deductible:** $0.00  \n   - **Start Date:** January 15, 2024  \n   - **End Date:** January 14, 2034  \n   - **Next Payment Due:** June 15, 2024  \n   - **Billing Cycle:** Monthly  \n   - **Coverage Types:** Death Benefit, Accidental Death  \n   - **Beneficiaries:** Jane Doe, John Doe Jr.  \n   - **Medical Exam Required:** No  \n\n\ud83d\udcb0 **Payment Information:**\n- **Next Payment Dates:**  \n  - Auto Insurance: September 1, 2024  \n  - Life Insurance: June 15, 2024  \n- **Payment Methods:**  \n  - Both policies are set to Auto Pay  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 2  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n\n1. **Auto Policy**\n   - **Policy ID:** POL-2024-AUTO-002\n   - **Status:** Active\n   - **Premium:** $95.00\n   - **Coverage Amount:** $75,000.00\n   - **Deductible:** $750.00\n   - **Start Date:** March 1, 2024\n   - **End Date:** February 28, 2025\n   - **Billing Cycle:** Quarterly\n   - **Next Payment Due:** September 1, 2024\n   - **Payment Method:** Auto Pay\n   - **Vehicle Details:**\n     - **Make:** Honda\n     - **Model:** Civic\n     - **Year:** 2019\n     - **VIN:** 2HGFC2F59KH123456\n   - **Coverage Types:** Liability, Collision, Comprehensive\n   - **Policy Limits:**\n     - Bodily Injury: $75,000\n     - Property Damage: $40,000\n     - Collision: $20,000\n     - Comprehensive: $20,000\n\n2. **Life Policy**\n   - **Policy ID:** POL-2024-LIFE-001\n   - **Status:** Active\n   - **Premium:** $45.00\n   - **Coverage Amount:** $250,000.00\n   - **Deductible:** $0.00\n   - **Start Date:** January 15, 2024\n   - **End Date:** January 14, 2034\n   - **Billing Cycle:** Monthly\n   - **Next Payment Due:** June 15, 2024\n   - **Payment Method:** Auto Pay\n   - **Policy Type:** Term Life\n   - **Term Years:** 10\n   - **Beneficiaries:** Jane Doe, John Doe Jr.\n   - **Medical Exam Required:** No\n   - **Coverage Types:** Death Benefit, Accidental Death\n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Policy Next Payment Due:** September 1, 2024\n- **Life Policy Next Payment Due:** June 15, 2024\n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n- **Role:** Agent  \n\nIs there anything specific about your policies you'd like me to explain further?",
       "keywords_found": [
         "policy",
         "payment",
@@ -632,33 +615,33 @@
         "michael"
       ],
       "keywords_missing": [],
-      "timestamp": "2025-05-31T19:50:13.191353",
-      "response_time": 14.32
+      "timestamp": "2025-06-02T22:35:50.977130",
+      "response_time": 12.07
     },
     {
       "test_id": "specific_policy_id",
       "description": "Test specific policy ID lookup",
       "query": "Give me details for policy POL-2024-AUTO-002 for customer CUST-001",
-      "success": false,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Policy ID:** POL-2024-AUTO-002  \n   - **Type:** Auto  \n   - **Status:** Active  \n   - **Premium:** $95.00  \n   - **Coverage Amount:** $75,000.00  \n   - **Deductible:** $750.00  \n   - **Start Date:** March 1, 2024  \n   - **End Date:** February 28, 2025  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n   - **Policy Limits:**  \n     - Bodily Injury: $75,000  \n     - Property Damage: $40,000  \n     - Collision: $20,000  \n     - Comprehensive: $20,000  \n\n2. **Policy ID:** POL-2024-LIFE-001  \n   - **Type:** Life  \n   - **Status:** Active  \n   - **Premium:** $45.00  \n   - **Coverage Amount:** $250,000.00  \n   - **Deductible:** $0.00  \n   - **Start Date:** January 15, 2024  \n   - **End Date:** January 14, 2034  \n   - **Coverage Types:** Death Benefit, Accidental Death  \n\n\ud83d\udcb0 **Payment Information:**\n- **Next Payment Due for Auto Policy:** September 1, 2024  \n- **Next Payment Due for Life Policy:** June 15, 2024  \n- **Billing Cycle for Auto Policy:** Quarterly  \n- **Billing Cycle for Life Policy:** Monthly  \n- **Payment Method:** Auto Pay  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
+      "success": true,
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 2  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n**Auto Policy (POL-2024-AUTO-002)**  \n- Status: Active  \n- Premium: $95.00  \n- Coverage Amount: $75,000.00  \n- Deductible: $750.00  \n- Start Date: March 1, 2024  \n- End Date: February 28, 2025  \n- Billing Cycle: Quarterly  \n- Next Payment Due: September 1, 2024  \n- Payment Method: Auto Pay  \n- Vehicle:  \n  - Make: Honda  \n  - Model: Civic  \n  - Year: 2019  \n  - VIN: 2HGFC2F59KH123456  \n- Coverage Types: Liability, Collision, Comprehensive  \n- Policy Limits:  \n  - Bodily Injury: $75,000  \n  - Property Damage: $40,000  \n  - Collision: $20,000  \n  - Comprehensive: $20,000  \n\n\ud83d\udcb0 **Payment Information:**\n- Next Payment Due: September 1, 2024  \n- Premium Amount: $95.00  \n- Billing Cycle: Quarterly  \n\n\ud83d\udc64 **Your Contact Agent:**\n- Name: Michael Brown  \n- Email: michael.brown@insurance.com  \n- Phone: +1-555-0103  \n- Role: Agent  \n\nIs there anything specific about your policies you'd like me to explain further?",
       "keywords_found": [
         "POL-2024-AUTO-002",
-        "auto"
+        "auto",
+        "honda",
+        "civic"
       ],
       "keywords_missing": [
-        "honda",
-        "civic",
         "details"
       ],
-      "timestamp": "2025-05-31T19:50:28.518879",
-      "response_time": 10.57
+      "timestamp": "2025-06-02T22:36:04.048587",
+      "response_time": 6.4
     },
     {
       "test_id": "date_range_query",
       "description": "Test date range payment queries",
       "query": "What payments are due between now and December 2024 for CUST-001?",
       "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payments are due on the following dates:\n- **Life Insurance:** $45.00 due on **June 15, 2024**\n- **Auto Insurance:** $95.00 due on **September 1, 2024**\n\n\ud83d\udcc5 **Payment Schedule:**\n1. **June 15, 2024** - Life Insurance Premium: $45.00\n2. **September 1, 2024** - Auto Insurance Premium: $95.00\n\nWould you like help setting up automatic payments or updating your payment method?",
+      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payments are due on the following dates:\n- **Auto Insurance Payment:** $95.00 due on September 1, 2024\n- **Life Insurance Payment:** $45.00 due on June 15, 2024\n\n\ud83d\udcc5 **Payment Schedule:**\n- **Life Insurance:** Monthly payments of $45.00 starting from June 15, 2024, until January 15, 2025.\n- **Auto Insurance:** Quarterly payments of $95.00 starting from September 1, 2024, until the end of the policy on February 28, 2025.\n\nWould you like help setting up automatic payments or updating your payment method?",
       "keywords_found": [
         "payment",
         "due",
@@ -667,15 +650,15 @@
         "2024"
       ],
       "keywords_missing": [],
-      "timestamp": "2025-05-31T19:50:40.095838",
-      "response_time": 8.24
+      "timestamp": "2025-06-02T22:36:11.454488",
+      "response_time": 5.84
     },
     {
       "test_id": "formal_business_style",
       "description": "Test formal business language style",
       "query": "I would like to request a comprehensive review of all insurance policies and associated coverage details for customer identifier CUST-001",
       "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n\n1. **Auto Insurance**  \n   - **Policy ID:** POL-2024-AUTO-002  \n   - **Status:** Active  \n   - **Premium:** $95.00 (Quarterly)  \n   - **Coverage Amount:** $75,000.00  \n   - **Deductible:** $750.00  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n   - **Policy Limits:**  \n     - Bodily Injury: $75,000  \n     - Property Damage: $40,000  \n     - Collision: $20,000  \n     - Comprehensive: $20,000  \n   - **Vehicle:** 2019 Honda Civic (VIN: 2HGFC2F59KH123456)  \n   - **Next Payment Due:** September 1, 2024  \n\n2. **Life Insurance**  \n   - **Policy ID:** POL-2024-LIFE-001  \n   - **Status:** Active  \n   - **Premium:** $45.00 (Monthly)  \n   - **Coverage Amount:** $250,000.00  \n   - **Deductible:** $0.00  \n   - **Policy Type:** Term Life (10 years)  \n   - **Beneficiaries:** Jane Doe, John Doe Jr.  \n   - **Coverage Types:** Death Benefit, Accidental Death  \n   - **Next Payment Due:** June 15, 2024  \n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Insurance:** Next payment of $95.00 due on September 1, 2024.  \n- **Life Insurance:** Next payment of $45.00 due on June 15, 2024.  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 2  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n\n1. **Auto Insurance Policy**  \n   - **Policy ID:** POL-2024-AUTO-002  \n   - **Status:** Active  \n   - **Premium:** $95.00  \n   - **Coverage Amount:** $75,000.00  \n   - **Deductible:** $750.00  \n   - **Start Date:** March 1, 2024  \n   - **End Date:** February 28, 2025  \n   - **Billing Cycle:** Quarterly  \n   - **Next Payment Due:** September 1, 2024  \n   - **Payment Method:** Auto Pay  \n   - **Vehicle:**  \n     - **Make:** Honda  \n     - **Model:** Civic  \n     - **Year:** 2019  \n     - **VIN:** 2HGFC2F59KH123456  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n   - **Policy Limits:**  \n     - Bodily Injury: $75,000  \n     - Property Damage: $40,000  \n     - Collision: $20,000  \n     - Comprehensive: $20,000  \n\n2. **Life Insurance Policy**  \n   - **Policy ID:** POL-2024-LIFE-001  \n   - **Status:** Active  \n   - **Premium:** $45.00  \n   - **Coverage Amount:** $250,000.00  \n   - **Deductible:** $0.00  \n   - **Start Date:** January 15, 2024  \n   - **End Date:** January 14, 2034  \n   - **Billing Cycle:** Monthly  \n   - **Next Payment Due:** June 15, 2024  \n   - **Payment Method:** Auto Pay  \n   - **Policy Type:** Term Life  \n   - **Term Years:** 10  \n   - **Beneficiaries:** Jane Doe, John Doe Jr.  \n   - **Medical Exam Required:** No  \n   - **Coverage Types:** Death Benefit, Accidental Death  \n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Insurance:**  \n  - Next Payment Due: September 1, 2024  \n  - Amount: $95.00  \n  - Billing Cycle: Quarterly  \n\n- **Life Insurance:**  \n  - Next Payment Due: June 15, 2024  \n  - Amount: $45.00  \n  - Billing Cycle: Monthly  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n- **Role:** Agent  \n\nIs there anything specific about your policies you'd like me to explain further?",
       "keywords_found": [
         "policy",
         "coverage",
@@ -685,31 +668,32 @@
       "keywords_missing": [
         "review"
       ],
-      "timestamp": "2025-05-31T19:50:49.332078",
-      "response_time": 10.69
+      "timestamp": "2025-06-02T22:36:18.304048",
+      "response_time": 12.32
     },
     {
       "test_id": "casual_conversational",
       "description": "Test casual conversational style",
       "query": "Hey, can you just quickly tell me what kind of insurance I have? I'm customer CUST-001",
-      "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Insurance**\n   - **Policy ID:** POL-2024-AUTO-002\n   - **Status:** Active\n   - **Premium:** $95.00\n   - **Coverage Amount:** $75,000.00\n   - **Deductible:** $750.00\n   - **Coverage Types:** Liability, Collision, Comprehensive\n   - **Next Payment Due:** September 1, 2024\n\n2. **Life Insurance**\n   - **Policy ID:** POL-2024-LIFE-001\n   - **Status:** Active\n   - **Premium:** $45.00\n   - **Coverage Amount:** $250,000.00\n   - **Deductible:** $0.00\n   - **Policy Type:** Term Life (10 years)\n   - **Next Payment Due:** June 15, 2024\n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Insurance:** Next payment of $95.00 due on September 1, 2024 (Billing Cycle: Quarterly)\n- **Life Insurance:** Next payment of $45.00 due on June 15, 2024 (Billing Cycle: Monthly)\n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
+      "success": false,
+      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please log in or provide your customer ID to get specific policy details.",
       "keywords_found": [
-        "insurance",
-        "auto",
-        "life",
         "policy"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T19:51:01.025024",
-      "response_time": 9.67
+      "keywords_missing": [
+        "insurance",
+        "auto",
+        "life"
+      ],
+      "timestamp": "2025-06-02T22:36:31.622189",
+      "response_time": 0.04
     },
     {
       "test_id": "technical_jargon",
       "description": "Test technical insurance jargon handling",
       "query": "Provide actuarial data and risk assessment parameters for policyholder CUST-001",
       "success": false,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Insurance (Policy ID: POL-2024-AUTO-002)**  \n   - Status: Active  \n   - Premium: $95.00  \n   - Coverage Amount: $75,000.00  \n   - Deductible: $750.00  \n   - Start Date: March 1, 2024  \n   - End Date: February 28, 2025  \n   - Coverage Types: Liability, Collision, Comprehensive  \n   - Policy Limits:  \n     - Bodily Injury: $75,000  \n     - Property Damage: $40,000  \n     - Collision: $20,000  \n     - Comprehensive: $20,000  \n\n2. **Life Insurance (Policy ID: POL-2024-LIFE-001)**  \n   - Status: Active  \n   - Premium: $45.00  \n   - Coverage Amount: $250,000.00  \n   - Deductible: $0.00  \n   - Start Date: January 15, 2024  \n   - End Date: January 14, 2034  \n   - Policy Type: Term Life (10 years)  \n   - Coverage Types: Death Benefit, Accidental Death  \n   - Beneficiaries: Jane Doe, John Doe Jr.  \n\n\ud83d\udcb0 **Payment Information:**\n- Next Payment Due for Auto Policy: September 1, 2024  \n- Next Payment Due for Life Policy: June 15, 2024  \n- Billing Cycle for Auto: Quarterly  \n- Billing Cycle for Life: Monthly  \n\n\ud83d\udc64 **Your Contact Agent:**\n- Name: Michael Brown  \n- Email: michael.brown@insurance.com  \n- Phone: +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 2  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n\n1. **Auto Policy (POL-2024-AUTO-002)**  \n   - **Status:** Active  \n   - **Premium:** $95.00  \n   - **Coverage Amount:** $75,000.00  \n   - **Deductible:** $750.00  \n   - **Coverage Types:** Liability, Collision, Comprehensive  \n   - **Policy Limits:**  \n     - Bodily Injury: $75,000.00  \n     - Property Damage: $40,000.00  \n     - Collision: $20,000.00  \n     - Comprehensive: $20,000.00  \n   - **Vehicle Details:**  \n     - Make: Honda  \n     - Model: Civic  \n     - Year: 2019  \n     - VIN: 2HGFC2F59KH123456  \n   - **Policy Duration:** March 1, 2024 - February 28, 2025  \n   - **Next Payment Due:** September 1, 2024  \n\n2. **Life Policy (POL-2024-LIFE-001)**  \n   - **Status:** Active  \n   - **Premium:** $45.00  \n   - **Coverage Amount:** $250,000.00  \n   - **Deductible:** $0.00  \n   - **Policy Type:** Term Life (10 years)  \n   - **Coverage Types:** Death Benefit, Accidental Death  \n   - **Beneficiaries:** Jane Doe, John Doe Jr.  \n   - **Medical Exam Required:** No  \n   - **Policy Duration:** January 15, 2024 - January 14, 2034  \n   - **Next Payment Due:** June 15, 2024  \n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Policy Payment Cycle:** Quarterly  \n- **Next Payment Due for Auto Policy:** $95.00 on September 1, 2024  \n- **Life Policy Payment Cycle:** Monthly  \n- **Next Payment Due for Life Policy:** $45.00 on June 15, 2024  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n- **Role:** Agent  \n\nIs there anything specific about your policies you'd like me to explain further?",
       "keywords_found": [
         "policy",
         "coverage"
@@ -718,33 +702,32 @@
         "assessment",
         "risk"
       ],
-      "timestamp": "2025-05-31T19:51:11.700218",
-      "response_time": 8.52
+      "timestamp": "2025-06-02T22:36:32.661675",
+      "response_time": 9.02
     },
     {
       "test_id": "special_characters_query",
       "description": "Test special characters in queries",
       "query": "What's my coverage amount ($) & payment due dates (?) for customer CUST-001???",
       "success": true,
-      "response": "**PAYMENT INFORMATION FOR CUSTOMER CUST-001:**\n\n\ud83d\udcb0 **Upcoming Payments:**\nYour next payments are due on the following dates:\n- **Life Insurance Policy:** $45.00 due on **June 15, 2024**\n- **Auto Insurance Policy:** $95.00 due on **September 1, 2024**\n\n\ud83d\udcc5 **Payment Schedule:**\n- The life insurance policy has a monthly billing cycle, with the next payment due on June 15, 2024.\n- The auto insurance policy has a quarterly billing cycle, with the next payment due on September 1, 2024.\n\nWould you like help setting up automatic payments or updating your payment method?",
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 2  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n\n1. **Auto Policy (POL-2024-AUTO-002)**  \n   \u2022 Status: Active  \n   \u2022 Coverage Amount: $75,000.00  \n   \u2022 Premium: $95.00  \n   \u2022 Deductible: $750.00  \n   \u2022 Start Date: March 1, 2024  \n   \u2022 End Date: February 28, 2025  \n   \u2022 Billing Cycle: Quarterly  \n   \u2022 Next Payment Due: September 1, 2024  \n   \u2022 Vehicle: 2019 Honda Civic (VIN: 2HGFC2F59KH123456)  \n   \u2022 Coverage Types: Liability, Collision, Comprehensive  \n\n2. **Life Policy (POL-2024-LIFE-001)**  \n   \u2022 Status: Active  \n   \u2022 Coverage Amount: $250,000.00  \n   \u2022 Premium: $45.00  \n   \u2022 Deductible: $0.00  \n   \u2022 Start Date: January 15, 2024  \n   \u2022 End Date: January 14, 2034  \n   \u2022 Billing Cycle: Monthly  \n   \u2022 Next Payment Due: June 15, 2024  \n   \u2022 Coverage Types: Death Benefit, Accidental Death  \n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Policy:** Next payment of $95.00 due on September 1, 2024.  \n- **Life Policy:** Next payment of $45.00 due on June 15, 2024.  \n\n\ud83d\udc64 **Your Contact Agent:**\n\u2022 Name: Michael Brown  \n\u2022 Email: michael.brown@insurance.com  \n\u2022 Phone: +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
       "keywords_found": [
+        "coverage",
         "payment",
         "due",
         "$95",
         "$45"
       ],
-      "keywords_missing": [
-        "coverage"
-      ],
-      "timestamp": "2025-05-31T19:51:21.226567",
-      "response_time": 5.07
+      "keywords_missing": [],
+      "timestamp": "2025-06-02T22:36:42.683454",
+      "response_time": 9.08
     },
     {
       "test_id": "very_long_query",
       "description": "Test very long query handling",
       "query": "I am writing a very long query to test the system's ability to handle extensive customer requests with lots of details and information and I want to know about my policies and coverage and payments and everything else related to my insurance for customer CUST-001 and I hope this works correctly",
       "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n1. **Auto Insurance (Policy ID: POL-2024-AUTO-002)**  \n   - Status: Active  \n   - Premium: $95.00  \n   - Coverage Amount: $75,000.00  \n   - Deductible: $750.00  \n   - Start Date: March 1, 2024  \n   - End Date: February 28, 2025  \n   - Billing Cycle: Quarterly  \n   - Next Payment Due: September 1, 2024  \n   - Coverage Types: Liability, Collision, Comprehensive  \n   - Policy Limits:  \n     - Bodily Injury: $75,000  \n     - Property Damage: $40,000  \n     - Collision: $20,000  \n     - Comprehensive: $20,000  \n   - Vehicle: 2019 Honda Civic (VIN: 2HGFC2F59KH123456)  \n\n2. **Life Insurance (Policy ID: POL-2024-LIFE-001)**  \n   - Status: Active  \n   - Premium: $45.00  \n   - Coverage Amount: $250,000.00  \n   - Deductible: $0.00  \n   - Start Date: January 15, 2024  \n   - End Date: January 14, 2034  \n   - Billing Cycle: Monthly  \n   - Next Payment Due: June 15, 2024  \n   - Policy Type: Term Life (10 years)  \n   - Coverage Types: Death Benefit, Accidental Death  \n   - Beneficiaries: Jane Doe, John Doe Jr.  \n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Insurance:**  \n  - Next Payment Due: September 1, 2024  \n  - Payment Method: Auto Pay  \n\n- **Life Insurance:**  \n  - Next Payment Due: June 15, 2024  \n  - Payment Method: Auto Pay  \n\n\ud83d\udc64 **Your Contact Agent:**\n- Name: Michael Brown  \n- Email: michael.brown@insurance.com  \n- Phone: +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 2  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n\n1. **Auto Policy**\n   - **Policy ID:** POL-2024-AUTO-002\n   - **Status:** Active\n   - **Premium:** $95.00\n   - **Coverage Amount:** $75,000.00\n   - **Deductible:** $750.00\n   - **Coverage Types:** Liability, Collision, Comprehensive\n   - **Policy Limits:**\n     - Bodily Injury: $75,000\n     - Property Damage: $40,000\n     - Collision: $20,000\n     - Comprehensive: $20,000\n   - **Vehicle Details:**\n     - Make: Honda\n     - Model: Civic\n     - Year: 2019\n     - VIN: 2HGFC2F59KH123456\n   - **Billing Cycle:** Quarterly\n   - **Next Payment Due:** September 1, 2024\n   - **Payment Method:** Auto Pay\n\n2. **Life Policy**\n   - **Policy ID:** POL-2024-LIFE-001\n   - **Status:** Active\n   - **Premium:** $45.00\n   - **Coverage Amount:** $250,000.00\n   - **Deductible:** $0.00\n   - **Policy Type:** Term Life (10 years)\n   - **Coverage Types:** Death Benefit, Accidental Death\n   - **Beneficiaries:** Jane Doe, John Doe Jr.\n   - **Medical Exam Required:** No\n   - **Billing Cycle:** Monthly\n   - **Next Payment Due:** June 15, 2024\n   - **Payment Method:** Auto Pay\n\n\ud83d\udcb0 **Payment Information:**\n- **Auto Policy:** Next payment of $95.00 due on September 1, 2024 (Quarterly).\n- **Life Policy:** Next payment of $45.00 due on June 15, 2024 (Monthly).\n\n\ud83d\udc64 **Your Contact Agent:**\n- **Name:** Michael Brown\n- **Email:** michael.brown@insurance.com\n- **Phone:** +1-555-0103\n- **Role:** Agent\n\nIs there anything specific about your policies you'd like me to explain further?",
       "keywords_found": [
         "policy",
         "coverage",
@@ -752,24 +735,24 @@
         "insurance"
       ],
       "keywords_missing": [],
-      "timestamp": "2025-05-31T19:51:27.299970",
-      "response_time": 10.61
+      "timestamp": "2025-06-02T22:36:52.764543",
+      "response_time": 9.38
     },
     {
       "test_id": "minimal_query",
       "description": "Test minimal query format",
       "query": "CUST-001 policy?",
       "success": true,
-      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 3  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n\n1. **Auto Insurance (Policy ID: POL-2024-AUTO-002)**  \n   - Status: Active  \n   - Premium: $95.00  \n   - Coverage Amount: $75,000.00  \n   - Deductible: $750.00  \n   - Start Date: March 1, 2024  \n   - End Date: February 28, 2025  \n   - Next Payment Due: September 1, 2024  \n   - Coverage Types: Liability, Collision, Comprehensive  \n   - Policy Limits:  \n     - Bodily Injury: $75,000  \n     - Property Damage: $40,000  \n     - Collision: $20,000  \n     - Comprehensive: $20,000  \n\n2. **Life Insurance (Policy ID: POL-2024-LIFE-001)**  \n   - Status: Active  \n   - Premium: $45.00  \n   - Coverage Amount: $250,000.00  \n   - Deductible: $0.00  \n   - Start Date: January 15, 2024  \n   - End Date: January 14, 2034  \n   - Next Payment Due: June 15, 2024  \n   - Policy Type: Term Life (10 years)  \n   - Beneficiaries: Jane Doe, John Doe Jr.  \n   - Coverage Types: Death Benefit, Accidental Death  \n\n\ud83d\udcb0 **Payment Information:**\n- Auto Insurance: Next payment of $95.00 due on September 1, 2024 (Billing Cycle: Quarterly)  \n- Life Insurance: Next payment of $45.00 due on June 15, 2024 (Billing Cycle: Monthly)  \n\n\ud83d\udc64 **Your Contact Agent:**\n- Name: Michael Brown  \n- Email: michael.brown@insurance.com  \n- Phone: +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
+      "response": "Thank you for your policy inquiry.\n\n**POLICY SUMMARY FOR CUSTOMER CUST-001:**\n\n\ud83d\udccb **Overview:**\n\u2022 Total Policies: 2  \n\u2022 Policy Types: Auto, Life  \n\u2022 Total Coverage: $325,000.00  \n\n\ud83d\udcca **Your Policies:**\n\n**Auto Policy:**\n- **Policy ID:** POL-2024-AUTO-002  \n- **Status:** Active  \n- **Premium:** $95.00  \n- **Coverage Amount:** $75,000.00  \n- **Deductible:** $750.00  \n- **Start Date:** March 1, 2024  \n- **End Date:** February 28, 2025  \n- **Billing Cycle:** Quarterly  \n- **Next Payment Due:** September 1, 2024  \n- **Payment Method:** Auto Pay  \n- **Vehicle:** 2019 Honda Civic (VIN: 2HGFC2F59KH123456)  \n- **Coverage Types:** Liability, Collision, Comprehensive  \n- **Policy Limits:**  \n  - Bodily Injury: $75,000  \n  - Property Damage: $40,000  \n  - Collision: $20,000  \n  - Comprehensive: $20,000  \n\n**Life Policy:**\n- **Policy ID:** POL-2024-LIFE-001  \n- **Status:** Active  \n- **Premium:** $45.00  \n- **Coverage Amount:** $250,000.00  \n- **Deductible:** $0.00  \n- **Start Date:** January 15, 2024  \n- **End Date:** January 14, 2034  \n- **Billing Cycle:** Monthly  \n- **Next Payment Due:** June 15, 2024  \n- **Payment Method:** Auto Pay  \n- **Policy Type:** Term Life (10 years)  \n- **Beneficiaries:** Jane Doe, John Doe Jr.  \n- **Medical Exam Required:** No  \n- **Coverage Types:** Death Benefit, Accidental Death  \n\n\ud83d\udcb0 **Payment Information:**\n- **Next Payment Due for Auto Policy:** September 1, 2024  \n- **Next Payment Due for Life Policy:** June 15, 2024  \n\n\ud83d\udc64 **Your Contact Agent:**\n- **Agent Name:** Michael Brown  \n- **Email:** michael.brown@insurance.com  \n- **Phone:** +1-555-0103  \n\nIs there anything specific about your policies you'd like me to explain further?",
       "keywords_found": [
         "policy",
         "auto",
         "life"
       ],
       "keywords_missing": [],
-      "timestamp": "2025-05-31T19:51:38.916138",
-      "response_time": 10.84
+      "timestamp": "2025-06-02T22:37:03.149656",
+      "response_time": 10.62
     }
   ],
-  "timestamp": "2025-05-31T19:51:50.761274"
+  "timestamp": "2025-06-02T22:37:14.770161"
 }

@@ -125,7 +125,7 @@ class DomainAgent(A2AServer):
         # Initialize prompt loader
         self.prompts = PromptLoader()
         
-        # Set up OpenAI client for LLM features
+        # Set up OpenAI client for LLM features - required for LLM-only mode
         self.openai_client = None
         try:
             api_key = os.getenv("OPENROUTER_API_KEY")
@@ -134,15 +134,20 @@ class DomainAgent(A2AServer):
                     base_url="https://openrouter.ai/api/v1",
                     api_key=api_key
                 )
-                logger.info("🔥 DOMAIN AGENT: OpenAI client initialized")
+                logger.info("🔥 DOMAIN AGENT: OpenAI client initialized for LLM-based analysis")
             else:
-                logger.warning("🔥 DOMAIN AGENT: No OpenAI API key found - using rule-based analysis only")
+                raise ValueError("OPENROUTER_API_KEY environment variable is required for LLM-based operation")
         except Exception as e:
-            logger.warning(f"🔥 DOMAIN AGENT: Failed to initialize OpenAI: {e}")
+            logger.error(f"🔥 DOMAIN AGENT: Failed to initialize OpenAI: {e}")
+            raise RuntimeError(f"Domain Agent requires OpenAI client for LLM-based operation: {e}")
         
         # Initialize modular components
-        self.intent_analyzer = IntentAnalyzer(self.openai_client)
-        self.response_formatter = ResponseFormatter(self.openai_client)
+        try:
+            self.intent_analyzer = IntentAnalyzer(self.openai_client)
+            self.response_formatter = ResponseFormatter(self.openai_client)
+        except Exception as e:
+            logger.error(f"🔥 DOMAIN AGENT: Failed to initialize components: {e}")
+            raise RuntimeError(f"Failed to initialize LLM-based components: {e}")
         
         # Technical Agent setup
         self.technical_agent_url = os.getenv("TECHNICAL_AGENT_URL", "http://insurance-ai-poc-technical-agent:8002")
@@ -164,20 +169,12 @@ class DomainAgent(A2AServer):
         return self.technical_client
     
     def analyze_customer_intent(self, user_text: str) -> Dict[str, Any]:
-        """Analyze customer intent without extracting customer ID (only from session)"""
+        """Analyze customer intent using LLM-based IntentAnalyzer"""
         start_time = time.time()
         
         try:
-            # Simplified intent analysis - only determine intent, not customer ID
-            result = {
-                "primary_intent": "policy_inquiry" if any(word in user_text.lower() for word in ["policy", "policies", "coverage"]) else
-                                "payment_inquiry" if any(word in user_text.lower() for word in ["payment", "premium", "billing"]) else
-                                "agent_contact" if any(word in user_text.lower() for word in ["agent", "contact"]) else
-                                "claim_status" if any(word in user_text.lower() for word in ["claim", "claims"]) else
-                                "general_inquiry",
-                "confidence": 0.8,
-                "method": "rule_based"
-            }
+            # Use the IntentAnalyzer for LLM-based intent analysis
+            result = self.intent_analyzer.analyze_customer_intent(user_text)
             
             # Record intent analysis metrics
             if MONITORING_ENABLED and monitoring:
@@ -199,35 +196,59 @@ class DomainAgent(A2AServer):
                 monitoring.record_intent_analysis(
                     intent="error",
                     confidence=0.0,
-                    method="unknown",
+                    method="llm_failed",
                     success=False,
                     duration_seconds=duration
                 )
-            raise
+            
+            logger.error(f"🔥 DOMAIN AGENT: Intent analysis failed: {e}")
+            # Re-raise the error - no fallback
+            raise RuntimeError(f"Intent analysis failed: {e}")
     
     def format_comprehensive_response(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
         """Format comprehensive response using modular formatter"""
         return self.response_formatter.format_comprehensive_response(intent, customer_id, technical_response, user_question)
     
     def plan_response(self, user_text: str, intent_analysis: Dict[str, Any], session_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Plan what to do based on customer intent and session data"""
+        """Plan what to do based on customer intents and session data"""
         
-        intent = intent_analysis.get("primary_intent", "general_inquiry")
+        intents = intent_analysis.get("primary_intents", [])
+        if not isinstance(intents, list):
+            # Handle backward compatibility if single intent is returned
+            single_intent = intent_analysis.get("primary_intent")
+            intents = [single_intent] if single_intent else ["general_inquiry"]
+        
         customer_id = session_data.get("customer_id")  # Only from session data
         
         plan = {
             "action": "general_help",
             "customer_id": customer_id,
             "technical_request": None,
-            "response_template": "general_help"
+            "response_template": "general_help",
+            "intents": intents
         }
         
         # Plan what to ask Technical Agent - only if we have customer ID from session
-        if intent in ["policy_inquiry", "coverage_inquiry", "payment_inquiry", "agent_contact"] and customer_id:
+        if customer_id and any(intent in ["policy_inquiry", "coverage_inquiry", "payment_inquiry", "agent_contact"] for intent in intents):
             plan["action"] = "ask_technical_agent"
-            plan["technical_request"] = f"Get comprehensive policies for customer {customer_id}"
-            plan["response_template"] = intent
-        elif intent == "claim_status":
+            
+            # Create comprehensive request based on all intents
+            if len(intents) > 1:
+                plan["technical_request"] = f"Get comprehensive information for customer {customer_id} covering: {', '.join(intents)}"
+                plan["response_template"] = "comprehensive_multi_intent"
+            elif "policy_inquiry" in intents:
+                plan["technical_request"] = f"Get comprehensive policies for customer {customer_id}"
+                plan["response_template"] = "policy_inquiry"
+            elif "coverage_inquiry" in intents:
+                plan["technical_request"] = f"Get coverage information for customer {customer_id}"
+                plan["response_template"] = "coverage_inquiry"
+            elif "payment_inquiry" in intents:
+                plan["technical_request"] = f"Get payment information for customer {customer_id}"
+                plan["response_template"] = "payment_inquiry"
+            elif "agent_contact" in intents:
+                plan["technical_request"] = f"Get agent contact information for customer {customer_id}"
+                plan["response_template"] = "agent_contact"
+        elif "claim_status" in intents:
             plan["action"] = "claims_not_available"
             plan["response_template"] = "claims_not_available"
         

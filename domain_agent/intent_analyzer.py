@@ -1,6 +1,6 @@
 """
 Intent analysis module for Domain Agent
-Handles LLM and rule-based intent analysis
+Handles LLM-based intent analysis only
 """
 
 import json
@@ -26,29 +26,24 @@ logger = logging.getLogger(__name__)
 
 
 class IntentAnalyzer:
-    """Handles customer intent analysis using LLM and rules"""
+    """Handles customer intent analysis using LLM only"""
     
     def __init__(self, openai_client=None):
         """Initialize the intent analyzer"""
+        if not openai_client:
+            raise ValueError("OpenAI client is required for LLM-based intent analysis. No fallback to rules.")
+        
         self.openai_client = openai_client
         self.prompts = PromptLoader()
     
     def analyze_customer_intent(self, user_text: str) -> Dict[str, Any]:
-        """Analyze customer intent and extract information"""
-        logger.info(f"🔥 DOMAIN AGENT: Analyzing intent for: {user_text}")
+        """Analyze customer intent using LLM only"""
+        logger.info(f"🔥 DOMAIN AGENT: Analyzing intent with LLM for: {user_text}")
         
-        # Try LLM analysis first if available
-        if self.openai_client:
-            try:
-                llm_result = self._analyze_with_llm(user_text)
-                logger.info(f"🔥 DOMAIN AGENT: LLM intent analysis result: {llm_result}")
-                return llm_result
-            except Exception as e:
-                logger.warning(f"🔥 DOMAIN AGENT: LLM analysis failed: {e}, falling back to rules")
-        
-        # Fallback to rule-based analysis
-        else:
-            return None
+        # Use LLM analysis - no fallbacks
+        llm_result = self._analyze_with_llm(user_text)
+        logger.info(f"🔥 DOMAIN AGENT: LLM intent analysis result: {llm_result}")
+        return llm_result
     
     def _analyze_with_llm(self, user_text: str) -> Dict[str, Any]:
         """Use LLM to understand customer intent"""
@@ -102,7 +97,7 @@ class IntentAnalyzer:
                     result["method"] = "llm"
                     return result
                 else:
-                    raise ValueError(f"Could not extract JSON from LLM response: {result_text}")
+                    raise ValueError(f"Could not extract valid JSON from LLM response: {result_text}")
                     
         except Exception as e:
             duration = time.time() - start_time
@@ -124,4 +119,4 @@ class IntentAnalyzer:
                 )
             
             logger.error(f"🔥 DOMAIN AGENT: LLM analysis failed: {e}")
-            raise ValueError(f"LLM analysis failed: {e}")
+            raise RuntimeError(f"LLM-based intent analysis failed: {e}. No fallback available.")

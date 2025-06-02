@@ -4,14 +4,9 @@
 intent_analysis:
   analyze_intent_prompt: |
     You are analyzing customer intent to determine what information they need.
-    You are an intelligent insurance domain agent parser. Analyze this customer request and extract the intent and customer information.
+    You are an intelligent insurance domain agent parser. Analyze this customer request and extract ALL intents.
     
-    IMPORTANT: Customer IDs can appear in many formats:
-    - Standard formats: user_003, CUST-001, customer-123, cust001, USER001
-    - Casual mentions: "customer john", "user named Sarah", "client ID ABC123"
-    - Mixed case: User_003, CUSTOMER_001, Cust-ABC
-    - With prefixes: "for customer user_003", "check user CUST-001"
-    - Natural language: "policies for user 003", "customer with ID 001"
+    IMPORTANT: Customers may ask multiple questions in one request. Extract ALL relevant intents.
     
     Intent Classification Rules:
     - payment_inquiry: User asks about payments, premiums, billing, due dates, amounts, deductibles
@@ -25,23 +20,23 @@ intent_analysis:
     
     CRITICAL JSON FORMAT REQUIREMENTS:
     1. You MUST respond with ONLY valid JSON - no markdown, no explanations, no extra text
-    2. Use exactly these field names: "primary_intent", "customer_id", "confidence"
-    3. primary_intent must be one of: payment_inquiry, coverage_inquiry, policy_inquiry, agent_contact, claim_status, general_inquiry
-    4. customer_id must be the extracted ID string or null (not "null" in quotes)
+    2. Use exactly these field names: "primary_intents", "confidence"
+    3. primary_intents must be an array of intents: ["payment_inquiry", "coverage_inquiry", etc.]
+    4. Include ALL relevant intents, even if there are multiple
     5. confidence must be a number between 0.0 and 1.0
     6. Do not include any other fields or comments
     
     Required JSON Structure:
     {{
-        "primary_intent": "payment_inquiry",
-        "customer_id": "CUST-001", 
+        "primary_intents": ["payment_inquiry", "coverage_inquiry"],
         "confidence": 0.9
     }}
     
     Examples:
-    - "What are my premium amounts for customer CUST-001?" → {{"primary_intent": "payment_inquiry", "customer_id": "CUST-001", "confidence": 0.9}}
-    - "Tell me about my policies" → {{"primary_intent": "policy_inquiry", "customer_id": null, "confidence": 0.8}}
-    - "Who is my agent for user_003?" → {{"primary_intent": "agent_contact", "customer_id": "user_003", "confidence": 0.9}}
+    - "What are my premium amounts?" → {{"primary_intents": ["payment_inquiry"], "confidence": 0.9}}
+    - "Tell me about my policies and when my next payment is due" → {{"primary_intents": ["policy_inquiry", "payment_inquiry"], "confidence": 0.9}}
+    - "Who is my agent and what coverage do I have?" → {{"primary_intents": ["agent_contact", "coverage_inquiry"], "confidence": 0.9}}
+    - "Show me everything about my insurance" → {{"primary_intents": ["policy_inquiry", "coverage_inquiry", "payment_inquiry", "agent_contact"], "confidence": 0.8}}
     
     RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT:
 

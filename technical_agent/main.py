@@ -11,6 +11,8 @@ import re
 import logging
 import asyncio
 import time
+import yaml
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 # Add current directory to Python path for imports
@@ -22,6 +24,8 @@ from fastmcp import Client
 from openai import OpenAI
 
 from request_parser import RequestParser
+from prompt_loader import PromptLoader
+from service_discovery import ServiceDiscovery
 
 # Import monitoring
 try:
@@ -61,11 +65,18 @@ class TechnicalAgent(A2AServer):
         # Initialize with agent card
         super().__init__()
         
+        # Load prompts using existing PromptLoader
+        self.prompts = PromptLoader()
+        
+        # Initialize Service Discovery
+        self.service_discovery = ServiceDiscovery()
+        self.services_initialized = False
+        
         # Policy FastMCP Server configuration - Use trailing slash to avoid 307 redirects
         self.policy_server_url = "http://insurance-ai-poc-policy-server:8001/mcp/"
         self.policy_client = None
         
-        # Initialize OpenAI client if API key is available
+        # Initialize OpenAI client - required for LLM-only mode
         self.openai_client = None
         try:
             api_key = os.getenv("OPENROUTER_API_KEY")
@@ -74,17 +85,46 @@ class TechnicalAgent(A2AServer):
                     base_url="https://openrouter.ai/api/v1",
                     api_key=api_key
                 )
-                logger.info("OpenAI client initialized for enhanced parsing")
+                logger.info("OpenAI client initialized for LLM-based parsing")
             else:
-                logger.warning("No OpenAI API key found, using rule-based parsing only")
+                raise ValueError("OPENROUTER_API_KEY environment variable is required for LLM-based operation")
         except Exception as e:
-            logger.warning(f"Failed to initialize OpenAI client: {e}")
+            logger.error(f"Failed to initialize OpenAI client: {e}")
+            raise RuntimeError(f"Technical Agent requires OpenAI client for LLM-based operation: {e}")
         
         # Initialize request parser with OpenAI client
-        self.request_parser = RequestParser(self.openai_client)
+        try:
+            self.request_parser = RequestParser(self.openai_client)
+        except Exception as e:
+            logger.error(f"Failed to initialize request parser: {e}")
+            raise RuntimeError(f"Failed to initialize LLM-based request parser: {e}")
         
         logger.info("Enhanced Technical Agent initialized")
         logger.info(f"Will connect to Policy FastMCP Server at: {self.policy_server_url}")
+        logger.info(f"Prompts loaded: {list(self.prompts.prompts.keys()) if self.prompts.prompts else 'No prompts loaded'}")
+    
+    async def _initialize_services(self):
+        """Initialize service discovery and discover all available services"""
+        if self.services_initialized:
+            return
+        
+        try:
+            logger.info("Initializing service discovery...")
+            discovered_services = await self.service_discovery.discover_all_services()
+            
+            # Log discovery results
+            summary = self.service_discovery.get_service_summary()
+            logger.info(f"Service discovery complete: {summary['total_services']} services, {summary['total_tools']} tools")
+            
+            for service_name, service_info in summary['services'].items():
+                logger.info(f"  - {service_name}: {service_info['tools']} tools, {service_info['resources']} resources")
+            
+            self.services_initialized = True
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize services: {e}")
+            # Continue with limited functionality
+            self.services_initialized = False
     
     async def _get_policy_client(self):
         """Get or create FastMCP client connection with enhanced session management"""
@@ -110,8 +150,24 @@ class TechnicalAgent(A2AServer):
                 logger.error(f"Invalid parameters type: {type(params)}")
                 return False
             
-            # Specific validation for get_customer_policies
-            if tool_name == "get_customer_policies":
+            # Get tool information from service discovery if available
+            if self.services_initialized:
+                discovered_tool = self.service_discovery.get_tool_by_name(tool_name)
+                if discovered_tool:
+                    # Validate against discovered tool parameters
+                    if discovered_tool.parameters and 'required' in discovered_tool.parameters:
+                        required_params = discovered_tool.parameters['required']
+                        for required_param in required_params:
+                            if required_param not in params or not params[required_param]:
+                                logger.error(f"Missing required parameter {required_param} for tool {tool_name}")
+                                return False
+                else:
+                    logger.warning(f"Tool {tool_name} not found in service discovery")
+            
+            # Legacy validation for known tools
+            if tool_name in ["get_customer_policies", "get_policies", "get_agent", "get_policy_types", 
+                           "get_policy_list", "get_payment_information", "get_coverage_information", 
+                           "get_deductibles", "get_recommendations"]:
                 customer_id = params.get("customer_id")
                 if not customer_id or not isinstance(customer_id, str) or len(customer_id.strip()) == 0:
                     logger.error(f"Invalid customer_id: {customer_id}")
@@ -145,6 +201,14 @@ class TechnicalAgent(A2AServer):
                 if not self._validate_mcp_request(tool_name, params):
                     raise ValueError(f"Invalid MCP request: {tool_name} with params {params}")
                 
+                # Get service information for better routing
+                service_name = "policy_service"  # Default service
+                if self.services_initialized:
+                    discovered_tool = self.service_discovery.get_tool_by_name(tool_name)
+                    if discovered_tool:
+                        service_name = discovered_tool.service
+                        logger.info(f"Routing {tool_name} to service: {service_name}")
+                
                 # Get fresh client connection
                 client = await self._get_policy_client()
                 if not client:
@@ -154,12 +218,7 @@ class TechnicalAgent(A2AServer):
                 logger.info(f"Attempt {attempt + 1}: Calling MCP tool {tool_name} with params {params}")
                 
                 async with client:
-                    if tool_name == "get_customer_policies":
-                        result = await client.call_tool("get_customer_policies", params)
-                    elif tool_name == "health_check":
-                        result = await client.call_tool("health_check", params or {})
-                    else:
-                        raise ValueError(f"Unknown tool: {tool_name}")
+                    result = await client.call_tool(tool_name, params)
                 
                 duration = time.time() - start_time
                 
@@ -201,73 +260,21 @@ class TechnicalAgent(A2AServer):
         raise last_error
     
     @skill(
-        name="Get Customer Policies",
-        description="Get all policies for a specific customer via Policy FastMCP server",
-        tags=["policy", "customer", "fastmcp"]
-    )
-    async def get_customer_policies_skill(self, customer_id: str) -> Dict[str, Any]:
-        """Get policies for a customer using the Policy FastMCP server"""
-        try:
-            logger.info(f"Fetching policies for customer: {customer_id}")
-            
-            # Use the enhanced retry mechanism for MCP calls
-            result = await self._call_mcp_tool_with_retry("get_customer_policies", {"customer_id": customer_id})
-                
-            # Process the result properly
-            policies_data = []
-            if result:
-                logger.info(f"Raw MCP result: {result}")
-                for content in result:
-                    if hasattr(content, 'text'):
-                        try:
-                            # Try to parse as JSON first
-                            data = json.loads(content.text)
-                            if isinstance(data, list):
-                                policies_data = data
-                            else:
-                                policies_data = [data]
-                            logger.info(f"Parsed JSON data: {policies_data}")
-                            break
-                        except json.JSONDecodeError:
-                            # If not JSON, treat as text
-                            logger.warning(f"Could not parse as JSON: {content.text}")
-                            policies_data.append({"text": content.text})
-                    elif hasattr(content, 'content'):
-                        policies_data.append(content.content)
-                    else:
-                        logger.info(f"Unknown content type: {type(content)} - {content}")
-            else:
-                logger.warning("No result returned from MCP call")
-                
-            logger.info(f"Successfully retrieved {len(policies_data)} policies for customer {customer_id}")
-            
-            return {
-                "success": True,
-                "customer_id": customer_id,
-                "policies": policies_data,
-                "count": len(policies_data)
-            }
-                
-        except Exception as e:
-            logger.error(f"Error fetching policies for customer {customer_id}: {e}")
-            return {
-                "success": False,
-                "customer_id": customer_id,
-                "error": str(e),
-                "policies": []
-            }
-    
-    @skill(
         name="Health Check",
         description="Check if the Technical Agent and connected services are healthy",
         tags=["health", "status"]
     )
     async def health_check(self) -> Dict[str, Any]:
         """Health check for the technical agent and connected services"""
+        # Ensure services are initialized
+        await self._initialize_services()
+        
         status = {
             "technical_agent": "healthy",
             "policy_server": "unknown",
             "llm_enabled": bool(self.openai_client),
+            "service_discovery": "unknown",
+            "discovered_services": {},
             "timestamp": None
         }
         
@@ -285,16 +292,60 @@ class TechnicalAgent(A2AServer):
             status["policy_server"] = f"unhealthy: {str(e)}"
             logger.warning(f"Policy FastMCP server health check failed: {e}")
         
+        # Service discovery status
+        if self.services_initialized:
+            status["service_discovery"] = "healthy"
+            summary = self.service_discovery.get_service_summary()
+            status["discovered_services"] = summary
+        else:
+            status["service_discovery"] = "not_initialized"
+        
         import datetime
         status["timestamp"] = datetime.datetime.now().isoformat()
         
         return status
     
+    @skill(
+        name="Refresh Services",
+        description="Refresh service discovery and update available tools",
+        tags=["admin", "discovery", "refresh"]
+    )
+    async def refresh_services(self) -> Dict[str, Any]:
+        """Manually refresh service discovery"""
+        try:
+            logger.info("Manual service refresh requested")
+            self.services_initialized = False
+            await self._initialize_services()
+            
+            summary = self.service_discovery.get_service_summary()
+            
+            return {
+                "success": True,
+                "message": "Service discovery refreshed successfully",
+                "summary": summary
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to refresh services: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Service refresh failed"
+            }
+    
     def handle_task(self, task):
         """Handle incoming A2A tasks with session-based customer identification"""
         logger.info(f"Received A2A task: {task}")
         
+        # Run the async handler
+        return asyncio.run(self._handle_task_async(task))
+    
+    async def _handle_task_async(self, task):
+        """Async task handler implementation"""
         try:
+            # Ensure services are initialized
+            await self._initialize_services()
+            
             # Extract message content
             message_data = task.message or {}
             content = message_data.get("content", {})
@@ -334,10 +385,20 @@ class TechnicalAgent(A2AServer):
                 
                 logger.info(f"Session-based parsing: {parsed_request}")
             else:
-                # Fallback to LLM/rule-based parsing if no session data (for backwards compatibility)
-                logger.info("No customer ID in session, falling back to message parsing")
-                parsed_request = self.request_parser.parse_request(text)
-                logger.info(f"Fallback parsing result: {parsed_request}")
+                # Use LLM-based parsing for request without session data
+                logger.info("No customer ID in session, using LLM-based message parsing")
+                try:
+                    parsed_request = self.request_parser.parse_request(text)
+                    logger.info(f"LLM parsing result: {parsed_request}")
+                except Exception as e:
+                    logger.error(f"LLM-based parsing failed: {e}")
+                    # Return error response instead of fallback
+                    error_msg = f"Failed to parse request using LLM: {str(e)}"
+                    task.artifacts = [{
+                        "parts": [{"type": "text", "text": error_msg}]
+                    }]
+                    task.status = TaskStatus(state=TaskState.FAILED)
+                    return task
             
             intent = parsed_request.get("intent", "general_inquiry")
             customer_id = parsed_request.get("customer_id")
@@ -352,14 +413,55 @@ class TechnicalAgent(A2AServer):
             
             # Handle different intents with session context
             if intent == "get_customer_policies" and customer_id:
-                # Call our skill asynchronously
-                result = asyncio.run(self.get_customer_policies_skill(customer_id))
+                # Try the new intelligent approach first
+                try:
+                    # Use the intelligent policy assistant for better handling
+                    intelligent_result = await self.intelligent_policy_assistant(
+                        request=text,
+                        customer_id=customer_id,
+                        session=session_data,
+                        metadata=metadata,
+                        authenticated=authenticated
+                    )
+                    
+                    if intelligent_result.get("success"):
+                        # Process the intelligent result
+                        customer_name = customer_data.get('name', customer_id) if customer_data else customer_id
+                        
+                        if authenticated and customer_name != customer_id:
+                            response_prefix = f"Hello {customer_name}! "
+                        else:
+                            response_prefix = ""
+                        
+                        # Add LLM reasoning if available
+                        reasoning = intelligent_result.get("llm_reasoning", "")
+                        if reasoning and not reasoning.startswith("Request asks"):
+                            response_prefix += f"(AI Analysis: {reasoning}) "
+                        
+                        # Build response from intelligent result
+                        data = intelligent_result.get(list(intelligent_result.keys())[-1])  # Get the data key
+                        if isinstance(data, list) and len(data) > 0:
+                            response_text = f"{response_prefix}Found information for customer {customer_id}:\n"
+                            response_text += json.dumps(intelligent_result, indent=2)
+                        else:
+                            response_text = f"{response_prefix}No data found for customer {customer_id}"
+                        
+                        task.artifacts = [{
+                            "parts": [{"type": "text", "text": response_text}]
+                        }]
+                        task.status = TaskStatus(state=TaskState.COMPLETED)
+                        return task
+                    
+                except Exception as e:
+                    logger.warning(f"Intelligent assistant failed, falling back to legacy: {e}")
                 
-                # Send comprehensive JSON data directly to domain agent
+                # Fallback to legacy comprehensive API
+                result = await self._generic_mcp_skill("get_customer_policies", {"customer_id": customer_id}, "policies")
+                
+                # Process legacy result as before
                 if result["success"]:
                     customer_name = customer_data.get('name', customer_id) if customer_data else customer_id
                     
-                    # Add personalized greeting if we have customer name from session
                     if authenticated and customer_name != customer_id:
                         response_prefix = f"Hello {customer_name}! "
                     else:
@@ -368,32 +470,20 @@ class TechnicalAgent(A2AServer):
                     if original_mention and original_mention != customer_id and not original_mention.startswith("session:"):
                         response_prefix += f"(identified from: '{original_mention}') "
                     
-                    if result["count"] > 0:
-                        # Send the comprehensive JSON data directly to domain agent
-                        # This preserves all payment info, agent details, vehicle info, coverage limits, etc.
+                    if result.get("policies") and len(result["policies"]) > 0:
                         comprehensive_data = {
                             "customer_id": customer_id,
-                            "total_policies": result["count"],
+                            "total_policies": len(result["policies"]),
                             "policies": result["policies"],
                             "response_prefix": response_prefix,
                             "method": method,
                             "confidence": confidence if method != "session" else 1.0
                         }
-                        
-                        # Convert to JSON string for domain agent processing
                         response_text = json.dumps(comprehensive_data, indent=2)
                     else:
-                        response_text = f"{response_prefix}Found {result['count']} policies for customer {customer_id}"
-                    
-                    # Add session/parsing info if not from authenticated session
-                    if method == "session":
-                        logger.info("Information retrieved for authenticated customer")
-                    elif method == "llm" and confidence < 0.8:
-                        logger.info(f"Parsed with {confidence:.1%} confidence using {method} method")
+                        response_text = f"{response_prefix}Found 0 policies for customer {customer_id}"
                 else:
                     response_text = f"Error retrieving policies for customer {customer_id}: {result['error']}"
-                    if original_mention and original_mention != customer_id and not original_mention.startswith("session:"):
-                        response_text += f" (identified from: '{original_mention}')"
                 
                 task.artifacts = [{
                     "parts": [{"type": "text", "text": response_text}]
@@ -402,7 +492,7 @@ class TechnicalAgent(A2AServer):
             
             elif intent == "health_check":
                 # Health check request
-                health_result = asyncio.run(self.health_check())
+                health_result = await self.health_check()
                 
                 response_text = "Technical Agent Health Status:\n"
                 for service, status in health_result.items():
@@ -418,31 +508,18 @@ class TechnicalAgent(A2AServer):
                     "parts": [{"type": "text", "text": response_text}]
                 }]
                 task.status = TaskStatus(state=TaskState.COMPLETED)
-            
-            elif intent == "get_customer_policies" and not customer_id:
-                # Customer policies requested but no ID found
-                response_text = "I understand you want to look up customer policies, but I couldn't identify a specific customer ID.\n\n"
-                
-                if authenticated:
-                    response_text += "Please make sure your session includes your customer ID, or log in again.\n\n"
-                else:
-                    response_text += "Please specify a customer ID in one of these formats:\n"
-                    response_text += "- user_003\n- CUST-001\n- customer ABC123\n- client 001\n\n"
-                
-                if original_mention and not original_mention.startswith("session:"):
-                    response_text += f"(I found '{original_mention}' but couldn't parse it as a valid customer ID)"
-                
-                task.artifacts = [{
-                    "parts": [{"type": "text", "text": response_text}]
-                }]
-                task.status = TaskStatus(state=TaskState.INPUT_REQUIRED)
-                
             else:
                 # General inquiry or unknown request
                 response_text = "I can help with:\n"
                 response_text += "- Looking up customer policies (customer ID from session or provide manually)\n"
                 response_text += "- Health status checks\n"
                 response_text += "- General insurance inquiries\n\n"
+                
+                # Add discovered tools if available
+                if self.services_initialized:
+                    available_tools = self.service_discovery.get_available_tools()
+                    response_text += f"Available tools: {', '.join(available_tools.keys())}\n\n"
+                
                 response_text += "What would you like assistance with?"
                 
                 # Include session/parsing details if confidence is low
@@ -462,6 +539,327 @@ class TechnicalAgent(A2AServer):
             task.status = TaskStatus(state=TaskState.FAILED)
         
         return task
+
+    # ============================================
+    # INTELLIGENT LLM-POWERED SKILL
+    # ============================================
+
+    @skill(
+        name="Intelligent Policy Assistant",
+        description="AI-powered assistant that creates comprehensive execution plans for complex insurance requests",
+        tags=["ai", "intelligent", "policy", "assistant", "planning"]
+    )
+    async def intelligent_policy_assistant(self, request: str, customer_id: str = None, **context) -> Dict[str, Any]:
+        """
+        Intelligent skill that analyzes requests and creates comprehensive execution plans
+        
+        Can handle both simple single-tool requests and complex multi-tool planning
+        
+        Args:
+            request: Natural language request (e.g., "Give me a complete overview of customer CUST-001")
+            customer_id: Optional customer ID if known from context
+            **context: Additional context like session data, metadata, etc.
+        """
+        try:
+            # Ensure services are initialized
+            await self._initialize_services()
+            
+            logger.info(f"Processing intelligent request: {request}")
+            
+            # Use LLM to create an execution plan
+            execution_plan = await self._create_execution_plan(request, customer_id, context)
+            
+            if not execution_plan.get("success"):
+                return {
+                    "success": False,
+                    "error": execution_plan.get("error", "Failed to create execution plan"),
+                    "request": request
+                }
+            
+            plan_type = execution_plan.get("plan_type", "single_tool")
+            tool_calls = execution_plan.get("tool_calls", [])
+            execution_order = execution_plan.get("execution_order", "parallel")
+            reasoning = execution_plan.get("reasoning", "")
+            
+            logger.info(f"Created {plan_type} plan with {len(tool_calls)} tool calls")
+            logger.info(f"Execution order: {execution_order}")
+            logger.info(f"Reasoning: {reasoning}")
+            
+            # Execute the plan
+            if plan_type == "single_tool" and len(tool_calls) == 1:
+                # Single tool execution
+                tool_call = tool_calls[0]
+                result = await self._generic_mcp_skill(
+                    tool_call["tool_name"], 
+                    tool_call["parameters"], 
+                    tool_call["result_key"]
+                )
+                
+                result["execution_plan"] = execution_plan
+                result["original_request"] = request
+                return result
+                
+            elif plan_type == "multi_tool":
+                # Multi-tool execution
+                return await self._execute_multi_tool_plan(tool_calls, execution_order, execution_plan, request)
+            
+            else:
+                return {
+                    "success": False,
+                    "error": "Invalid execution plan format",
+                    "request": request,
+                    "plan": execution_plan
+                }
+                
+        except Exception as e:
+            logger.error(f"Error in intelligent policy assistant: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "request": request
+            }
+
+    async def _create_execution_plan(self, request: str, customer_id: str = None, context: Dict = None) -> Dict[str, Any]:
+        """Create an intelligent execution plan using LLM"""
+        
+        if not self.openai_client:
+            logger.warning("No LLM available for planning")
+            return {
+                "success": False,
+                "error": "LLM not available for intelligent planning"
+            }
+        
+        try:
+            # Get available tools from service discovery
+            if self.services_initialized:
+                available_tools = self.service_discovery.get_available_tools()
+                tools_description = self.service_discovery.build_tools_description()
+            else:
+                # Fallback to hardcoded tools if discovery failed
+                available_tools = {
+                    "get_policies": "Get basic list of customer policies (requires customer_id)",
+                    "get_agent": "Get agent contact information for customer (requires customer_id)",
+                    "get_policy_types": "Get policy types for customer (requires customer_id)",
+                    "get_policy_list": "Get detailed policy list with dates and coverage (requires customer_id)",
+                    "get_payment_information": "Get payment details and due dates (requires customer_id)",
+                    "get_coverage_information": "Get coverage details and limits (requires customer_id)",
+                    "get_deductibles": "Get deductible amounts (requires customer_id)",
+                    "get_recommendations": "Get product recommendations (requires customer_id)",
+                    "get_policy_details": "Get complete details for specific policy (requires policy_id)",
+                    "get_customer_policies": "Legacy comprehensive API (requires customer_id)"
+                }
+                tools_description = "\n".join([f"- {name}: {desc}" for name, desc in available_tools.items()])
+            
+            # Get multi-tool planning prompt
+            prompt = self.prompts.get_multi_tool_planning_prompt(request, customer_id, context, tools_description)
+            
+            if not prompt:
+                logger.warning("No multi-tool planning prompt found")
+                return {
+                    "success": False,
+                    "error": "No planning prompt configured"
+                }
+
+            response = self.openai_client.chat.completions.create(
+                model="anthropic/claude-3-haiku",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=1000
+            )
+            
+            # Parse LLM response
+            llm_content = response.choices[0].message.content.strip()
+            logger.info(f"LLM planning response: {llm_content}")
+            
+            # Extract JSON from the response
+            json_match = re.search(r'\{.*\}', llm_content, re.DOTALL)
+            if json_match:
+                plan = json.loads(json_match.group())
+                
+                # Validate the execution plan
+                if self._validate_execution_plan(plan, available_tools):
+                    plan["success"] = True
+                    plan["method"] = "llm_planning"
+                    return plan
+                else:
+                    logger.warning("Execution plan validation failed")
+                    return {
+                        "success": False,
+                        "error": "Execution plan validation failed"
+                    }
+            else:
+                logger.warning("Could not extract JSON from LLM planning response")
+                return {
+                    "success": False,
+                    "error": "Could not parse LLM planning response"
+                }
+                
+        except Exception as e:
+            logger.error(f"LLM planning failed: {e}")
+            return {
+                "success": False,
+                "error": f"LLM planning failed: {str(e)}"
+            }
+
+    def _validate_execution_plan(self, plan: Dict, available_tools: Dict) -> bool:
+        """Validate execution plan structure and tool names"""
+        try:
+            plan_type = plan.get("plan_type")
+            tool_calls = plan.get("tool_calls", [])
+            
+            if plan_type not in ["single_tool", "multi_tool"]:
+                logger.error(f"Invalid plan_type: {plan_type}")
+                return False
+                
+            if not tool_calls or not isinstance(tool_calls, list):
+                logger.error("No tool_calls in plan")
+                return False
+            
+            # Validate each tool call
+            for tool_call in tool_calls:
+                tool_name = tool_call.get("tool_name")
+                parameters = tool_call.get("parameters", {})
+                
+                if tool_name not in available_tools:
+                    logger.error(f"Invalid tool name in plan: {tool_name}")
+                    return False
+                
+                # Get parameter requirements from service discovery if available
+                if self.services_initialized:
+                    discovered_tool = self.service_discovery.get_tool_by_name(tool_name)
+                    if discovered_tool and discovered_tool.parameters:
+                        required = discovered_tool.parameters.get('required', [])
+                        for required_param in required:
+                            if not parameters.get(required_param):
+                                logger.error(f"Missing required parameter {required_param} for {tool_name}")
+                                return False
+                else:
+                    # Legacy parameter validation
+                    if tool_name in ["get_policies", "get_agent", "get_policy_types", "get_policy_list", 
+                                    "get_payment_information", "get_coverage_information", "get_deductibles", 
+                                    "get_recommendations", "get_customer_policies"]:
+                        if not parameters.get("customer_id"):
+                            logger.error(f"Missing customer_id for {tool_name}")
+                            return False
+                            
+                    elif tool_name == "get_policy_details":
+                        if not parameters.get("policy_id"):
+                            logger.error(f"Missing policy_id for {tool_name}")
+                            return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Plan validation error: {e}")
+            return False
+
+    async def _execute_multi_tool_plan(self, tool_calls: List[Dict], execution_order: str, execution_plan: Dict, original_request: str) -> Dict[str, Any]:
+        """Execute multiple tool calls according to the plan"""
+        try:
+            results = {}
+            
+            if execution_order == "parallel":
+                # Execute all tools in parallel
+                logger.info(f"Executing {len(tool_calls)} tools in parallel")
+                tasks = []
+                for i, tool_call in enumerate(tool_calls):
+                    task = self._generic_mcp_skill(
+                        tool_call["tool_name"],
+                        tool_call["parameters"],
+                        tool_call["result_key"]
+                    )
+                    tasks.append((f"tool_{i}_{tool_call['tool_name']}", task))
+                
+                # Wait for all tasks to complete
+                for tool_id, task in tasks:
+                    result = await task
+                    results[tool_id] = result
+                    
+            else:  # sequential
+                # Execute tools one by one
+                logger.info(f"Executing {len(tool_calls)} tools sequentially")
+                for i, tool_call in enumerate(tool_calls):
+                    tool_id = f"tool_{i}_{tool_call['tool_name']}"
+                    result = await self._generic_mcp_skill(
+                        tool_call["tool_name"],
+                        tool_call["parameters"],
+                        tool_call["result_key"]
+                    )
+                    results[tool_id] = result
+            
+            # Combine all results
+            return {
+                "success": True,
+                "plan_type": "multi_tool",
+                "execution_order": execution_order,
+                "tool_results": results,
+                "execution_plan": execution_plan,
+                "original_request": original_request,
+                "summary": {
+                    "total_tools": len(tool_calls),
+                    "successful_tools": sum(1 for r in results.values() if r.get("success")),
+                    "failed_tools": sum(1 for r in results.values() if not r.get("success"))
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Multi-tool execution failed: {e}")
+            return {
+                "success": False,
+                "error": f"Multi-tool execution failed: {str(e)}",
+                "partial_results": results,
+                "execution_plan": execution_plan,
+                "original_request": original_request
+            }
+
+    # ============================================
+    # GENERIC MCP TOOL INFRASTRUCTURE (unchanged)
+    # ============================================
+
+    # ============================================
+    # GENERIC MCP TOOL SKILL
+    # ============================================
+
+    async def _generic_mcp_skill(self, tool_name: str, params: Dict[str, Any], result_key: str = "data") -> Dict[str, Any]:
+        """Generic method to handle any MCP tool call with consistent error handling and response formatting"""
+        try:
+            logger.info(f"Executing MCP tool: {tool_name} with params: {params}")
+            
+            result = await self._call_mcp_tool_with_retry(tool_name, params)
+            
+            processed_data = []
+            if result:
+                for content in result:
+                    if hasattr(content, 'text'):
+                        try:
+                            data = json.loads(content.text)
+                            # Handle both list and single object responses
+                            if isinstance(data, list):
+                                processed_data = data
+                            elif isinstance(data, dict):
+                                processed_data = [data] if tool_name != "get_agent" else data
+                            else:
+                                processed_data = [{"text": content.text}]
+                            break
+                        except json.JSONDecodeError:
+                            processed_data = [{"text": content.text}]
+            
+            logger.info(f"Successfully executed {tool_name}")
+            return {
+                "success": True,
+                "tool_name": tool_name,
+                "params": params,
+                result_key: processed_data
+            }
+            
+        except Exception as e:
+            logger.error(f"Error executing {tool_name}: {e}")
+            return {
+                "success": False,
+                "tool_name": tool_name,
+                "params": params,
+                "error": str(e)
+            }
 
 if __name__ == "__main__":
     # Check command line arguments for port

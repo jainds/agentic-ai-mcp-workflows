@@ -1,0 +1,49 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "insurance-ai-poc.fullname" . }}-monitoring
+  namespace: insurance-ai-agentic
+  labels:
+    {{- include "insurance-ai-poc.labels" . | nindent 4 }}
+    component: monitoring
+spec:
+  ports:
+    - name: health
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: {{ include "insurance-ai-poc.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    component: domain-agent
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "insurance-ai-poc.fullname" . }}-monitoring-config
+  namespace: insurance-ai-agentic
+  labels:
+    {{- include "insurance-ai-poc.labels" . | nindent 4 }}
+    component: monitoring
+data:
+  monitoring.yaml: |
+    monitoring:
+      enabled: {{ .Values.monitoring.enabled }}
+      langfuse:
+        host: {{ .Values.monitoring.langfuse.host | quote }}
+      prometheus:
+        job_name: {{ .Values.monitoring.prometheus.jobName | quote }}
+      health_checks:
+        enabled: {{ .Values.monitoring.healthChecks.enabled }}
+        interval: {{ .Values.monitoring.healthChecks.interval }}
+        timeout: {{ .Values.monitoring.healthChecks.timeout }}
+      components:
+        - name: "domain-agent"
+          url: "http://{{ include "insurance-ai-poc.fullname" . }}-domain-agent:{{ .Values.domainAgent.port }}"
+        - name: "technical-agent"  
+          url: "http://{{ include "insurance-ai-poc.fullname" . }}-technical-agent:{{ .Values.technicalAgent.port }}"
+        - name: "policy-server"
+          url: "http://{{ include "insurance-ai-poc.fullname" . }}-policy-server:{{ .Values.policyServer.port }}"
+{{- end }} 

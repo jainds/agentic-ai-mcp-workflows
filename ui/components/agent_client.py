@@ -73,7 +73,14 @@ class DomainAgentClient:
                 "metadata": {
                     "ui_mode": "advanced" if UIConfig.is_advanced_mode() else "simple",
                     "timestamp": datetime.now().isoformat(),
-                    "message_id": str(uuid.uuid4())
+                    "message_id": str(uuid.uuid4()),
+                    # Include session data in metadata so domain agent can access it
+                    "session": {
+                        "customer_id": customer_id,
+                        "session_id": st.session_state.get('session_id', str(uuid.uuid4())),
+                        "authenticated": st.session_state.get('authenticated', False),
+                        "customer_data": st.session_state.get('customer_data', {})
+                    }
                 }
             }
             
@@ -216,7 +223,14 @@ def send_chat_message_simple(message: str, customer_id: str) -> Dict[str, Any]:
             "metadata": {
                 "ui_mode": "simple",
                 "timestamp": datetime.now().isoformat(),
-                "message_id": str(uuid.uuid4())
+                "message_id": str(uuid.uuid4()),
+                # Include session data in metadata so domain agent can access it
+                "session": {
+                    "customer_id": customer_id,
+                    "session_id": st.session_state.get('session_id', str(uuid.uuid4())),
+                    "authenticated": st.session_state.get('authenticated', False),
+                    "customer_data": st.session_state.get('customer_data', {})
+                }
             }
         }
         

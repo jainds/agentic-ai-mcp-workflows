@@ -9,6 +9,8 @@ import os
 import json
 import re
 import logging
+import time
+import threading
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
@@ -26,6 +28,21 @@ from prompt_loader import PromptLoader
 from intent_analyzer import IntentAnalyzer
 from response_formatter import ResponseFormatter
 
+# Import monitoring
+try:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from monitoring.setup.monitoring_setup import get_monitoring_manager
+    monitoring = get_monitoring_manager()
+    MONITORING_ENABLED = monitoring.is_monitoring_enabled()
+    if MONITORING_ENABLED:
+        print("✅ Domain Agent: Monitoring enabled")
+    else:
+        print("⚠️  Domain Agent: Monitoring disabled (providers not available)")
+except Exception as e:
+    print(f"⚠️  Domain Agent: Monitoring not available: {e}")
+    monitoring = None
+    MONITORING_ENABLED = False
+
 # Load environment variables
 load_dotenv()
 
@@ -38,6 +55,61 @@ structlog.configure(
 )
 
 logger = structlog.get_logger(__name__)
+
+# Thread-local storage for session data
+_thread_local = threading.local()
+
+def set_current_session_data(session_data: Dict[str, Any]):
+    """Set session data for current thread/request"""
+    _thread_local.session_data = session_data
+    logger.info(f"🔥 DOMAIN AGENT: Set thread-local session data: {session_data}")
+
+def get_current_session_data() -> Dict[str, Any]:
+    """Get session data for current thread/request"""
+    session_data = getattr(_thread_local, 'session_data', {})
+    logger.info(f"🔥 DOMAIN AGENT: Retrieved thread-local session data: {session_data}")
+    return session_data
+
+def clear_current_session_data():
+    """Clear session data for current thread/request"""
+    if hasattr(_thread_local, 'session_data'):
+        delattr(_thread_local, 'session_data')
+
+# Monkey-patch the handle_task method to extract session data from the request
+def extract_session_from_raw_request():
+    """
+    Extract session data from the raw HTTP request context.
+    This is a fallback method when middleware isn't available.
+    """
+    try:
+        # Try to access the current request from different possible contexts
+        import inspect
+        
+        # Walk up the call stack to find any request-like objects
+        frame = inspect.currentframe()
+        while frame:
+            for var_name, var_value in frame.f_locals.items():
+                # Look for request-like objects
+                if hasattr(var_value, 'json') and callable(getattr(var_value, 'json')):
+                    try:
+                        payload = var_value.json()
+                        if isinstance(payload, dict) and 'session' in payload:
+                            logger.info(f"🔥 DOMAIN AGENT: Found session data in request object: {payload['session']}")
+                            return payload['session']
+                    except:
+                        pass
+                
+                # Look for direct payload data
+                if isinstance(var_value, dict) and 'session' in var_value:
+                    logger.info(f"🔥 DOMAIN AGENT: Found session data in payload: {var_value['session']}")
+                    return var_value['session']
+            
+            frame = frame.f_back
+    
+    except Exception as e:
+        logger.warning(f"🔥 DOMAIN AGENT: Could not extract session from request: {e}")
+    
+    return {}
 
 @agent(
     name="Domain Agent", 
@@ -92,22 +164,56 @@ class DomainAgent(A2AServer):
         return self.technical_client
     
     def analyze_customer_intent(self, user_text: str) -> Dict[str, Any]:
-        """Analyze customer intent and extract information using modular analyzer"""
-        return self.intent_analyzer.analyze_customer_intent(user_text)
+        """Analyze customer intent without extracting customer ID (only from session)"""
+        start_time = time.time()
+        
+        try:
+            # Simplified intent analysis - only determine intent, not customer ID
+            result = {
+                "primary_intent": "policy_inquiry" if any(word in user_text.lower() for word in ["policy", "policies", "coverage"]) else
+                                "payment_inquiry" if any(word in user_text.lower() for word in ["payment", "premium", "billing"]) else
+                                "agent_contact" if any(word in user_text.lower() for word in ["agent", "contact"]) else
+                                "claim_status" if any(word in user_text.lower() for word in ["claim", "claims"]) else
+                                "general_inquiry",
+                "confidence": 0.8,
+                "method": "rule_based"
+            }
+            
+            # Record intent analysis metrics
+            if MONITORING_ENABLED and monitoring:
+                duration = time.time() - start_time
+                monitoring.record_intent_analysis(
+                    intent=result.get("primary_intent", "unknown"),
+                    confidence=result.get("confidence", 0.0),
+                    method=result.get("method", "unknown"),
+                    success=True,
+                    duration_seconds=duration
+                )
+            
+            return result
+            
+        except Exception as e:
+            # Record failed intent analysis
+            if MONITORING_ENABLED and monitoring:
+                duration = time.time() - start_time
+                monitoring.record_intent_analysis(
+                    intent="error",
+                    confidence=0.0,
+                    method="unknown",
+                    success=False,
+                    duration_seconds=duration
+                )
+            raise
     
     def format_comprehensive_response(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
         """Format comprehensive response using modular formatter"""
         return self.response_formatter.format_comprehensive_response(intent, customer_id, technical_response, user_question)
     
     def plan_response(self, user_text: str, intent_analysis: Dict[str, Any], session_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Plan what to do based on customer intent"""
+        """Plan what to do based on customer intent and session data"""
         
         intent = intent_analysis.get("primary_intent", "general_inquiry")
-        customer_id = intent_analysis.get("customer_id")
-        
-        # Use session customer ID if available
-        if not customer_id and session_data.get("customer_id"):
-            customer_id = session_data["customer_id"]
+        customer_id = session_data.get("customer_id")  # Only from session data
         
         plan = {
             "action": "general_help",
@@ -116,7 +222,7 @@ class DomainAgent(A2AServer):
             "response_template": "general_help"
         }
         
-        # Plan what to ask Technical Agent
+        # Plan what to ask Technical Agent - only if we have customer ID from session
         if intent in ["policy_inquiry", "coverage_inquiry", "payment_inquiry", "agent_contact"] and customer_id:
             plan["action"] = "ask_technical_agent"
             plan["technical_request"] = f"Get comprehensive policies for customer {customer_id}"
@@ -134,6 +240,7 @@ class DomainAgent(A2AServer):
     )
     def ask(self, task):
         """Handle customer conversation requests"""
+        request_start_time = time.time()
         logger.info(f"🔥 DOMAIN AGENT: Received task: {task}")
         
         try:
@@ -144,39 +251,69 @@ class DomainAgent(A2AServer):
             
             logger.info(f"🔥 DOMAIN AGENT: Processing message: {user_text}")
             
-            # Extract session data - try multiple approaches
+            # Extract metadata - this is where we can get session data in A2A protocol
+            metadata = getattr(task, 'metadata', {}) or {}
+            ui_mode = metadata.get('ui_mode', 'unknown')
+            
+            # Check if session data is embedded in metadata
             session_data = {}
+            session_customer_id = None
+            authenticated = False
+            customer_data = {}
             
-            # Approach 1: From task.session attribute
-            if hasattr(task, 'session') and task.session:
-                session_data = task.session
-                logger.info(f"🔥 DOMAIN AGENT: Session data from task.session: {session_data}")
+            # Try multiple approaches to extract session data
+            # Approach 1: Check if session data is in metadata
+            if 'session' in metadata:
+                session_data = metadata['session']
+                session_customer_id = session_data.get('customer_id')
+                authenticated = session_data.get('authenticated', False)
+                customer_data = session_data.get('customer_data', {})
+                logger.info(f"🔥 DOMAIN AGENT: Found session data in metadata: {session_data}")
             
-            # Approach 2: From getattr
-            elif getattr(task, 'session', None):
-                session_data = getattr(task, 'session', {})
-                logger.info(f"🔥 DOMAIN AGENT: Session data from getattr: {session_data}")
+            # Approach 2: Try the thread-local storage
+            elif get_current_session_data():
+                session_data = get_current_session_data()
+                session_customer_id = session_data.get('customer_id')
+                authenticated = session_data.get('authenticated', False)
+                customer_data = session_data.get('customer_data', {})
+                logger.info(f"🔥 DOMAIN AGENT: Found session data in thread-local: {session_data}")
             
-            # Approach 3: Check if session data is in metadata
-            elif hasattr(task, 'metadata') and task.metadata and 'session' in task.metadata:
-                session_data = task.metadata.get('session', {})
-                logger.info(f"🔥 DOMAIN AGENT: Session data from metadata: {session_data}")
-            
-            # Approach 4: Check if there's a request context (for direct HTTP calls)
+            # Approach 3: Try the raw request extraction
             else:
-                try:
-                    from flask import request
-                    if request and request.is_json:
-                        request_data = request.get_json()
-                        if request_data and 'session' in request_data:
-                            session_data = request_data['session']
-                            logger.info(f"🔥 DOMAIN AGENT: Session data from Flask request: {session_data}")
-                except:
-                    pass
+                extracted_session = extract_session_from_raw_request()
+                if extracted_session:
+                    session_data = extracted_session
+                    session_customer_id = session_data.get('customer_id')
+                    authenticated = session_data.get('authenticated', False)
+                    customer_data = session_data.get('customer_data', {})
+                    logger.info(f"🔥 DOMAIN AGENT: Found session data via extraction: {session_data}")
             
+            # Approach 4: Check if customer ID is embedded in message content
+            if not session_customer_id:
+                # Look for customer ID patterns in the message
+                import re
+                customer_pattern = r'\b(CUST-\w+)\b'
+                match = re.search(customer_pattern, user_text)
+                if match:
+                    session_customer_id = match.group(1)
+                    session_data = {'customer_id': session_customer_id, 'authenticated': True}
+                    logger.info(f"🔥 DOMAIN AGENT: Extracted customer ID from message: {session_customer_id}")
+            
+            logger.info(f"🔥 DOMAIN AGENT: Session-based identification - Customer ID: {session_customer_id}, Authenticated: {authenticated}, UI Mode: {ui_mode}")
             logger.info(f"🔥 DOMAIN AGENT: Final session data: {session_data}")
             
-            # Step 1: Analyze customer intent
+            # Only proceed if we have a customer ID from session - NO FALLBACKS
+            if not session_customer_id:
+                logger.warning("🔥 DOMAIN AGENT: No customer ID found in any source. Session-only mode requires authenticated session.")
+                final_response = "I need you to be logged in with a valid session to access your policy information. Please log in and try again."
+                
+                task.artifacts = [{
+                    "parts": [{"type": "text", "text": final_response}]
+                }]
+                task.status = TaskStatus(state=TaskState.INPUT_REQUIRED)
+                return task
+            
+            # Step 1: Analyze customer intent (simplified, no customer ID extraction)
             intent_analysis = self.analyze_customer_intent(user_text)
             logger.info(f"🔥 DOMAIN AGENT: Intent: {intent_analysis}")
             
@@ -218,10 +355,38 @@ class DomainAgent(A2AServer):
                 final_response = "Claims information is currently being updated. Please contact your agent for claim status."
             
             else:
-                # General help response
-                final_response = "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need."
+                # General help response - no customer ID available
+                if authenticated:
+                    final_response = "I can help you with your insurance needs. However, I need your customer ID in the session to retrieve your specific policy information. Please log in again or provide your customer ID."
+                else:
+                    final_response = "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please log in or provide your customer ID to get specific policy details."
             
             logger.info(f"🔥 DOMAIN AGENT: Sending response: {final_response[:100]}...")
+            
+            # Record successful request metrics
+            if MONITORING_ENABLED and monitoring:
+                request_duration = time.time() - request_start_time
+                customer_id = session_data.get("customer_id", "unknown")
+                
+                # Record overall request success
+                monitoring.increment_counter(
+                    "domain_agent_requests_total",
+                    labels={
+                        "status": "success",
+                        "intent": intent_analysis.get("primary_intent", "unknown"),
+                        "action": response_plan.get("action", "unknown")
+                    }
+                )
+                
+                # Record request duration
+                monitoring.record_duration(
+                    "domain_agent_request_duration",
+                    request_duration,
+                    labels={
+                        "intent": intent_analysis.get("primary_intent", "unknown"),
+                        "action": response_plan.get("action", "unknown")
+                    }
+                )
             
             # Return response
             task.artifacts = [{
@@ -231,6 +396,29 @@ class DomainAgent(A2AServer):
             
         except Exception as e:
             logger.error(f"🔥 DOMAIN AGENT: Error: {e}")
+            
+            # Record failed request metrics
+            if MONITORING_ENABLED and monitoring:
+                request_duration = time.time() - request_start_time
+                
+                monitoring.increment_counter(
+                    "domain_agent_requests_total",
+                    labels={
+                        "status": "error",
+                        "intent": "error",
+                        "action": "error"
+                    }
+                )
+                
+                monitoring.record_duration(
+                    "domain_agent_request_duration",
+                    request_duration,
+                    labels={
+                        "intent": "error",
+                        "action": "error"
+                    }
+                )
+            
             error_response = f"I apologize, but I encountered an error processing your request. Please try again."
             task.artifacts = [{
                 "parts": [{"type": "text", "text": error_response}]
@@ -242,6 +430,12 @@ class DomainAgent(A2AServer):
     def handle_task(self, task):
         """Handle incoming A2A tasks - main entry point"""
         logger.info(f"🔥🔥🔥 DOMAIN AGENT HANDLE_TASK CALLED: {task}")
+        
+        # Extract session data from the request
+        session_data = extract_session_from_raw_request()
+        if session_data:
+            set_current_session_data(session_data)
+        
         return self.ask(task)
     
     def process_task(self, task):
@@ -281,16 +475,13 @@ class DomainAgent(A2AServer):
             logger.error(f"Failed to parse technical response: {e}")
             return []
 
-
 if __name__ == "__main__":
-    # Check command line arguments for port
-    port = 8003
-    if len(sys.argv) > 1:
-        port = int(sys.argv[1])
+    import logging
     
-    logger.info(f"Starting Domain Agent on port {port}")
+    # Create and run the domain agent
+    domain_agent = DomainAgent()
+    
+    # Start the A2A server
+    logger.info("Starting Domain Agent on port 8003")
     logger.info("Domain Agent provides conversational interface for insurance customers")
-    
-    # Create and run the agent
-    agent = DomainAgent()
-    run_server(agent, port=port) 
+    run_server(domain_agent, host="0.0.0.0", port=8003) 

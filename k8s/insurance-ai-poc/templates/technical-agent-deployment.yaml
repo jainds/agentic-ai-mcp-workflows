@@ -45,13 +45,58 @@ spec:
                   name: {{ .Values.secrets.secretName }}
                   key: ANTHROPIC_API_KEY
                   optional: true
+            # Monitoring secrets
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: LANGFUSE_SECRET_KEY
+                  optional: true
+            - name: LANGFUSE_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: LANGFUSE_PUBLIC_KEY
+                  optional: true
+            - name: PROMETHEUS_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: PROMETHEUS_GATEWAY_URL
+                  optional: true
+            - name: GRAFANA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.secretName }}
+                  key: GRAFANA_API_KEY
+                  optional: true
             {{- else }}
             # Fallback to values (backward compatibility, not recommended for production)
             - name: OPENAI_API_KEY
               value: {{ .Values.env.OPENAI_API_KEY | default .Values.secrets.apiKeys.openaiApiKey | quote }}
             - name: ANTHROPIC_API_KEY
               value: {{ .Values.env.ANTHROPIC_API_KEY | default .Values.secrets.apiKeys.anthropicApiKey | quote }}
+            # Monitoring environment variables
+            - name: LANGFUSE_SECRET_KEY
+              value: {{ .Values.monitoring.langfuse.secretKey | default "" | quote }}
+            - name: LANGFUSE_PUBLIC_KEY
+              value: {{ .Values.monitoring.langfuse.publicKey | default "" | quote }}
+            - name: LANGFUSE_HOST
+              value: {{ .Values.monitoring.langfuse.host | default "https://cloud.langfuse.com" | quote }}
+            - name: PROMETHEUS_GATEWAY_URL
+              value: {{ .Values.monitoring.prometheus.gatewayUrl | default "" | quote }}
+            - name: PROMETHEUS_JOB_NAME
+              value: {{ .Values.monitoring.prometheus.jobName | default "insurance-ai-technical-agent" | quote }}
+            - name: GRAFANA_API_KEY
+              value: {{ .Values.monitoring.grafana.apiKey | default "" | quote }}
             {{- end }}
+            # Common monitoring environment variables
+            - name: ENVIRONMENT
+              value: {{ .Values.environment | default "development" | quote }}
+            - name: SERVICE_NAME
+              value: "technical-agent"
+            - name: SERVICE_VERSION
+              value: {{ .Chart.AppVersion | quote }}
           workingDir: /app
           command: ["python", "technical_agent/main.py"]
           resources:

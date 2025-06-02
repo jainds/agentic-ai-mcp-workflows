@@ -38,4 +38,24 @@ class PromptLoader:
     def get_error_response(self, error_type: str) -> str:
         """Get error response template"""
         templates = self.prompts.get("error_responses", {})
-        return templates.get(error_type, "An error occurred while processing your request.") 
+        return templates.get(error_type, "An error occurred while processing your request.")
+    
+    def get_tool_selection_prompt(self, request: str, customer_id: str, context: Dict[str, Any], tools_description: str) -> str:
+        """Get the intelligent API tool selection prompt"""
+        template = self.prompts.get("intelligent_api_selection", {}).get("tool_selection_prompt", "")
+        return template.format(
+            request=request,
+            customer_id=customer_id,
+            context=context,
+            tools_description=tools_description
+        )
+    
+    def get_multi_tool_planning_prompt(self, request: str, customer_id: str, context: Dict[str, Any], tools_description: str) -> str:
+        """Get the multi-tool planning prompt for complex requests"""
+        template = self.prompts.get("intelligent_api_selection", {}).get("multi_tool_planning_prompt", "")
+        return template.format(
+            request=request,
+            customer_id=customer_id,
+            context=context,
+            tools_description=tools_description
+        ) 

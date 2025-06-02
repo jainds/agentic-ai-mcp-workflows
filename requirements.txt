@@ -23,7 +23,7 @@ openai==1.82.0
 python-dotenv==1.1.0
 
 # Monitoring and Observability
-langfuse==2.51.0
+langfuse==2.60.3
 prometheus-client==0.21.1
 opentelemetry-api==1.33.1
 opentelemetry-sdk==1.33.1

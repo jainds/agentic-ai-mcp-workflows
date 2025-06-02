@@ -451,21 +451,7 @@ def get_customer_policies(customer_id: str) -> List[Dict[str, Any]]:
         
         result.append(comprehensive_policy)
     
-    # Add summary information as the first item
-    summary = {
-        "summary": True,
-        "customer_id": customer_id,
-        "total_policies": len(result),
-        "policy_types": list(set(p.get("type") for p in customer_policies)),
-        "next_payment_dates": list(set(p.get("next_payment_due") for p in customer_policies if p.get("next_payment_due"))),
-        "assigned_agents": list(set(p.get("assigned_agent", {}).get("name") for p in result if p.get("assigned_agent", {}).get("name")))
-    }
-    
-    # Insert summary at the beginning
-    result.insert(0, summary)
-    
-    logger.info(f"LEGACY API: Returning comprehensive data: {len(result)} items (1 summary + {len(result)-1} policies)")
-    
+    logger.info(f"LEGACY API: Returning {len(result)} policy objects for customer: {customer_id}")
     return result
 
 if __name__ == "__main__":

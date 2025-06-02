@@ -3,7 +3,7 @@ replicaCount: 1
 
 image:
   repository: insurance-ai-poc
-  tag: monitoring-1748696944
+  tag: mcp-retry-1748661980
   pullPolicy: Never
 
 imagePullSecrets: []

@@ -5,13 +5,6 @@ request_parsing:
   llm_parsing_prompt: |
     You are an intelligent insurance technical agent parser. Analyze this request and extract the intent and customer information.
     
-    IMPORTANT: Customer IDs can appear in many formats:
-    - Standard formats: user_003, CUST-001, customer-123, cust001, USER001
-    - Casual mentions: "customer john", "user named Sarah", "client ID ABC123"
-    - Mixed case: User_003, CUSTOMER_001, Cust-ABC
-    - With prefixes: "for customer user_003", "check user CUST-001"
-    - Natural language: "policies for user 003", "customer with ID 001"
-    
     Possible intents:
     - get_customer_policies: User wants to retrieve/view/check policies for a customer
     - health_check: User wants to check system/service health status
@@ -20,10 +13,10 @@ request_parsing:
     Request: "{text}"
     
     Instructions:
-    1. Extract any customer identifier mentioned in ANY format (be very flexible)
-    2. Normalize customer IDs to a consistent format when possible
-    3. Determine the most likely intent based on context
-    4. Provide high confidence only when very certain
+  
+    1. Determine the most likely intent based on context
+    2. Provide high confidence only when very certain
+    3. Only respond with data that is directly relevant to the request. 
     
     Respond ONLY with valid JSON:
     {{

@@ -59,10 +59,10 @@ llm_formatting:
     RESPONSE TEMPLATE STRUCTURE:
     {response_template}
 
-    INSTRUCTIONS:
+    CRITICAL INSTRUCTIONS:
     1. Use the template structure above as your formatting guide
-    2. Extract relevant data from the comprehensive policy JSON to populate the template
-    3. Calculate totals, dates, and summaries as needed
+    2. Extract relevant data EXACTLY from the comprehensive policy JSON - DO NOT modify, interpret, or change ANY details
+    3. Calculate totals, dates, and summaries as needed using the exact data provided
     4. For payment_inquiry: Focus on payment dates, amounts, billing cycles
     5. For coverage_inquiry: Calculate total coverage amounts across policies
     6. For policy_types: List all policy types and their key details
@@ -73,7 +73,23 @@ llm_formatting:
     11. If data is missing for template sections, adapt gracefully, but don't make up data
     12. Restrict response to only relevant to actual customer question based on template. End with offer to help further
 
-    IMPORTANT: Extract and calculate actual values from the JSON data - don't use placeholder or mock or fake values.
+    POLICY TYPE FILTERING RULES:
+    - If customer asks about "auto policy" or "auto insurance" or "vehicle", show ONLY auto policy details prominently
+    - If customer asks about "life policy" or "life insurance", show ONLY life policy details prominently
+    - If customer asks about "home policy" or "home insurance", show ONLY home policy details prominently
+    - If customer asks about "all policies" or general inquiry, show all policies
+    - Focus the response on the specific policy type mentioned in the customer question
+
+    STRICT DATA USAGE RULES:
+    - Use EXACT vehicle make, model, year from the JSON data
+    - Use EXACT policy amounts, dates, and details as provided in the JSON
+    - DO NOT make assumptions about coverage or vehicles that are not explicitly in the data
+    - DO NOT state that vehicles are "not covered" unless explicitly stated in the policy data
+    - DO NOT mention vehicles that are not in the customer's actual policy data
+    - DO NOT create fictional scenarios about coverage gaps
+    - Stick strictly to the facts provided in the comprehensive policy JSON data
+    
+    IMPORTANT: Extract and calculate actual values from the JSON data - don't use placeholder, mock, fake, or modified values. 
 
 conversation_planning:
   technical_agent_request_prompt: |
@@ -165,6 +181,40 @@ response_formatting:
     {key_benefits}
     
     Would you like more details about any specific policy or coverage type?
+
+  auto_policy_template: |
+    **AUTO INSURANCE DETAILS FOR CUSTOMER {customer_id}:**
+    
+    🚗 **Vehicle Information:**
+    {vehicle_details}
+    
+    🛡️ **Coverage Details:**
+    {auto_coverage_details}
+    
+    💰 **Payment Information:**
+    {auto_payment_info}
+    
+    👤 **Your Agent:**
+    {agent_info}
+    
+    Is there anything specific about your auto coverage you'd like me to explain further?
+
+  life_policy_template: |
+    **LIFE INSURANCE DETAILS FOR CUSTOMER {customer_id}:**
+    
+    🛡️ **Coverage Information:**
+    {life_coverage_details}
+    
+    👥 **Beneficiaries:**
+    {beneficiary_info}
+    
+    💰 **Payment Information:**
+    {life_payment_info}
+    
+    👤 **Your Agent:**
+    {agent_info}
+    
+    Is there anything specific about your life insurance you'd like me to explain further?
 
   general_help_template: |
     Thank you for contacting our insurance support team.

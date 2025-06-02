@@ -10,6 +10,7 @@ import json
 import re
 import logging
 import asyncio
+import time
 from typing import Dict, Any, List, Optional
 
 # Add current directory to Python path for imports
@@ -21,6 +22,21 @@ from fastmcp import Client
 from openai import OpenAI
 
 from request_parser import RequestParser
+
+# Import monitoring
+try:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from monitoring.setup.monitoring_setup import get_monitoring_manager
+    monitoring = get_monitoring_manager()
+    MONITORING_ENABLED = monitoring.is_monitoring_enabled()
+    if MONITORING_ENABLED:
+        print("✅ Technical Agent: Monitoring enabled")
+    else:
+        print("⚠️  Technical Agent: Monitoring disabled (providers not available)")
+except Exception as e:
+    print(f"⚠️  Technical Agent: Monitoring not available: {e}")
+    monitoring = None
+    MONITORING_ENABLED = False
 
 # Setup logging
 structlog.configure(
@@ -119,7 +135,9 @@ class TechnicalAgent(A2AServer):
     
     async def _call_mcp_tool_with_retry(self, tool_name: str, params: Dict[str, Any], max_retries: int = 3) -> Any:
         """Call MCP tool with retry logic and better error handling"""
+        start_time = time.time()
         last_error = None
+        total_retries = 0
         
         for attempt in range(max_retries):
             try:
@@ -143,17 +161,41 @@ class TechnicalAgent(A2AServer):
                     else:
                         raise ValueError(f"Unknown tool: {tool_name}")
                 
+                duration = time.time() - start_time
+                
+                # Record successful MCP call
+                if MONITORING_ENABLED and monitoring:
+                    monitoring.record_mcp_call(
+                        tool_name=tool_name,
+                        success=True,
+                        duration_seconds=duration,
+                        retry_count=total_retries
+                    )
+                
                 logger.info(f"MCP call successful on attempt {attempt + 1}")
                 return result
                 
             except Exception as e:
                 last_error = e
+                total_retries += 1
                 logger.warning(f"MCP call attempt {attempt + 1} failed: {e}")
                 
                 if attempt < max_retries - 1:
                     wait_time = (attempt + 1) * 2
                     logger.info(f"Retrying in {wait_time} seconds...")
                     await asyncio.sleep(wait_time)
+                    
+        duration = time.time() - start_time
+        
+        # Record failed MCP call
+        if MONITORING_ENABLED and monitoring:
+            monitoring.record_mcp_call(
+                tool_name=tool_name,
+                success=False,
+                duration_seconds=duration,
+                retry_count=total_retries,
+                error=str(last_error)
+            )
                     
         logger.error(f"All MCP call attempts failed. Last error: {last_error}")
         raise last_error

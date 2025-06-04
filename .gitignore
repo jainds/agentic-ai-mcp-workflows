@@ -217,3 +217,4 @@ htmlcov/
 .pytest_cache/
 
 .history/
+.DS_Store

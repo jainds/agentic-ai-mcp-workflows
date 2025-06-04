@@ -1,0 +1,182 @@
+# Default values for insurance-ai-poc
+replicaCount: 1
+
+image:
+  repository: insurance-ai-poc
+  tag: session-fix
+  pullPolicy: Never
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+# Secrets Configuration
+secrets:
+  # Use existing secret for API keys (recommended for production)
+  useExistingSecret: true
+  secretName: "api-keys"
+  # Fallback values for development (not recommended for production)
+  apiKeys:
+    openaiApiKey: ""
+    anthropicApiKey: ""
+
+# Domain Agent Configuration
+domainAgent:
+  enabled: true
+  port: 8003
+  replicas: 1
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Technical Agent Configuration  
+technicalAgent:
+  enabled: true
+  port: 8002
+  replicas: 1
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Policy Server Configuration
+policyServer:
+  enabled: true
+  port: 8001
+  replicas: 1
+  resources:
+    limits:
+      cpu: 150m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Streamlit UI Configuration
+streamlitUI:
+  enabled: true
+  port: 8501
+  replicas: 1
+  resources:
+    limits:
+      cpu: 150m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: insurance-ai.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Environment variables
+env:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  # Deprecated: Use secrets.useExistingSecret instead
+  OPENAI_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  
+# ConfigMap for application configuration
+config:
+  domainAgent:
+    host: "0.0.0.0"
+    port: 8003
+    technicalAgentUrl: "http://insurance-ai-poc-technical-agent:8002"
+    policyServerUrl: "http://insurance-ai-poc-policy-server:8001"
+  
+  technicalAgent:
+    host: "0.0.0.0" 
+    port: 8002
+    policyServerUrl: "http://insurance-ai-poc-policy-server:8001"
+    
+  policyServer:
+    host: "0.0.0.0"
+    port: 8001
+    dataPath: "/app/data"
+    
+  streamlitUI:
+    host: "0.0.0.0"
+    port: 8501
+    domainAgentUrl: "http://insurance-ai-poc-domain-agent:8003"
+
+# Force deployment update
+deploymentUpdate:
+  timestamp: "2025-05-31-00-26"
+
+# Monitoring Configuration
+monitoring:
+  # Enable monitoring components (auto-detects based on environment variables)
+  enabled: true
+  
+  # Langfuse Configuration (LLM observability)
+  langfuse:
+    # Set these in your environment or Kubernetes secrets
+    secretKey: ""  # LANGFUSE_SECRET_KEY
+    publicKey: ""  # LANGFUSE_PUBLIC_KEY
+    host: "https://cloud.langfuse.com"  # Optional, defaults to cloud.langfuse.com
+    
+  # Prometheus Configuration (metrics collection)
+  prometheus:
+    # Optional: Prometheus Push Gateway URL for batch metrics
+    gatewayUrl: ""  # PROMETHEUS_GATEWAY_URL
+    jobName: "insurance-ai-poc"  # PROMETHEUS_JOB_NAME
+    
+  # Grafana Configuration (visualization)
+  grafana:
+    # Optional: API key for Grafana dashboard management
+    apiKey: ""  # GRAFANA_API_KEY
+    
+  # OpenTelemetry Configuration (distributed tracing)
+  opentelemetry:
+    # Will be auto-configured when other providers are available
+    enabled: false
+    
+  # Health check configuration
+  healthChecks:
+    enabled: true
+    interval: 30  # seconds
+    timeout: 10   # seconds 

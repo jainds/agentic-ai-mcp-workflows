@@ -1,0 +1,342 @@
+{
+  "timestamp": 1748929569.7454348,
+  "total_tests": 25,
+  "results": [
+    {
+      "test_name": "Policy Server Direct Connectivity",
+      "status": "FAIL",
+      "duration_ms": 7.05,
+      "details": {
+        "status_code": 404,
+        "response": "Not Found"
+      },
+      "timestamp": 1748929461.343654
+    },
+    {
+      "test_name": "Policy Server MCP Connectivity",
+      "status": "FAIL",
+      "duration_ms": 4.2,
+      "details": {
+        "status_code": 406,
+        "response": "{\"jsonrpc\":\"2.0\",\"id\":\"server-error\",\"error\":{\"code\":-32600,\"message\":\"Not Acceptable: Client must accept both application/json and text/event-stream\"}}"
+      },
+      "timestamp": 1748929461.347915
+    },
+    {
+      "test_name": "Technical Agent Connectivity",
+      "status": "PASS",
+      "duration_ms": 2140.62,
+      "details": {
+        "status_code": 200,
+        "response_received": true
+      },
+      "timestamp": 1748929463.488598
+    },
+    {
+      "test_name": "Customer Data Validation: CUST-001",
+      "status": "PASS",
+      "duration_ms": 5904.77,
+      "details": {
+        "customer_id": "CUST-001",
+        "data_found": false,
+        "response_type": "customer_not_found"
+      },
+      "timestamp": 1748929469.3934631
+    },
+    {
+      "test_name": "Customer Data Validation: user_003",
+      "status": "PASS",
+      "duration_ms": 4794.55,
+      "details": {
+        "customer_id": "user_003",
+        "data_found": false,
+        "response_type": "customer_not_found"
+      },
+      "timestamp": 1748929474.1880598
+    },
+    {
+      "test_name": "Customer Data Validation: CUST-002",
+      "status": "PASS",
+      "duration_ms": 5304.79,
+      "details": {
+        "customer_id": "CUST-002",
+        "data_found": false,
+        "response_type": "customer_not_found"
+      },
+      "timestamp": 1748929479.492905
+    },
+    {
+      "test_name": "Customer Data Validation: customer-123",
+      "status": "PASS",
+      "duration_ms": 4799.65,
+      "details": {
+        "customer_id": "customer-123",
+        "data_found": false,
+        "response_type": "customer_not_found"
+      },
+      "timestamp": 1748929484.292605
+    },
+    {
+      "test_name": "Customer Data Validation: INVALID-999",
+      "status": "PASS",
+      "duration_ms": 5246.82,
+      "details": {
+        "customer_id": "INVALID-999",
+        "data_found": false,
+        "response_type": "customer_not_found"
+      },
+      "timestamp": 1748929489.539485
+    },
+    {
+      "test_name": "MCP Tool: get_policies for CUST-001",
+      "status": "FAIL",
+      "duration_ms": 4282.67,
+      "details": {
+        "tool": "get_policies",
+        "customer_id": "CUST-001",
+        "issue": "no_data_found_for_valid_customer"
+      },
+      "timestamp": 1748929493.822214
+    },
+    {
+      "test_name": "MCP Tool: get_agent for CUST-001",
+      "status": "PASS",
+      "duration_ms": 2.24,
+      "details": {
+        "tool": "get_agent",
+        "customer_id": "CUST-001",
+        "data_retrieved": true
+      },
+      "timestamp": 1748929493.824509
+    },
+    {
+      "test_name": "MCP Tool: get_policy_list for CUST-001",
+      "status": "FAIL",
+      "duration_ms": 3211.7,
+      "details": {
+        "tool": "get_policy_list",
+        "customer_id": "CUST-001",
+        "issue": "no_data_found_for_valid_customer"
+      },
+      "timestamp": 1748929497.036263
+    },
+    {
+      "test_name": "MCP Tool: get_policy_types for CUST-001",
+      "status": "FAIL",
+      "duration_ms": 1802.38,
+      "details": {
+        "tool": "get_policy_types",
+        "customer_id": "CUST-001",
+        "issue": "no_data_found_for_valid_customer"
+      },
+      "timestamp": 1748929498.838725
+    },
+    {
+      "test_name": "MCP Tool: get_payment_information for CUST-001",
+      "status": "PASS",
+      "duration_ms": 5.02,
+      "details": {
+        "tool": "get_payment_information",
+        "customer_id": "CUST-001",
+        "data_retrieved": true
+      },
+      "timestamp": 1748929498.843829
+    },
+    {
+      "test_name": "MCP Tool: get_coverage_information for CUST-001",
+      "status": "FAIL",
+      "duration_ms": 4205.69,
+      "details": {
+        "tool": "get_coverage_information",
+        "customer_id": "CUST-001",
+        "issue": "no_data_found_for_valid_customer"
+      },
+      "timestamp": 1748929503.04962
+    },
+    {
+      "test_name": "MCP Tool: get_deductibles for CUST-001",
+      "status": "PASS",
+      "duration_ms": 2.08,
+      "details": {
+        "tool": "get_deductibles",
+        "customer_id": "CUST-001",
+        "data_retrieved": true
+      },
+      "timestamp": 1748929503.051758
+    },
+    {
+      "test_name": "MCP Tool: get_recommendations for CUST-001",
+      "status": "PASS",
+      "duration_ms": 2.15,
+      "details": {
+        "tool": "get_recommendations",
+        "customer_id": "CUST-001",
+        "data_retrieved": true
+      },
+      "timestamp": 1748929503.053961
+    },
+    {
+      "test_name": "Session Flow: Standard Session Data Flow",
+      "status": "FAIL",
+      "duration_ms": 4766.96,
+      "details": {
+        "scenario": "Standard Session Data Flow",
+        "customer_id": "CUST-001",
+        "customer_id_processed": true,
+        "response_length": 35,
+        "response_snippet": "No data found for customer CUST-001"
+      },
+      "timestamp": 1748929507.820983
+    },
+    {
+      "test_name": "Session Flow: Alternative Customer Format",
+      "status": "FAIL",
+      "duration_ms": 5617.69,
+      "details": {
+        "scenario": "Alternative Customer Format",
+        "customer_id": "user_003",
+        "customer_id_processed": true,
+        "response_length": 35,
+        "response_snippet": "No data found for customer user_003"
+      },
+      "timestamp": 1748929513.438731
+    },
+    {
+      "test_name": "Session Flow: Invalid Customer Handling",
+      "status": "FAIL",
+      "duration_ms": 4944.66,
+      "details": {
+        "scenario": "Invalid Customer Handling",
+        "customer_id": "INVALID-999",
+        "customer_id_processed": true,
+        "response_length": 38,
+        "response_snippet": "No data found for customer INVALID-999"
+      },
+      "timestamp": 1748929518.3834481
+    },
+    {
+      "test_name": "Policy Server Data Investigation",
+      "status": "PASS",
+      "duration_ms": 12272.65,
+      "details": {
+        "investigation_results": [
+          {
+            "request": "List all customers",
+            "response": "I can help with:\n- Looking up customer policies (customer ID from session or provide manually)\n- Health status checks\n- General insurance inquiries\n\nAvailable tools: get_policies, get_agent, get_polic",
+            "response_length": 394
+          },
+          {
+            "request": "Show available customer data",
+            "response": "I can help with:\n- Looking up customer policies (customer ID from session or provide manually)\n- Health status checks\n- General insurance inquiries\n\nAvailable tools: get_policies, get_agent, get_polic",
+            "response_length": 394
+          },
+          {
+            "request": "Get customer list",
+            "response": "I can help with:\n- Looking up customer policies (customer ID from session or provide manually)\n- Health status checks\n- General insurance inquiries\n\nAvailable tools: get_policies, get_agent, get_polic",
+            "response_length": 394
+          },
+          {
+            "request": "What customers do you have?",
+            "response": "I can help with:\n- Looking up customer policies (customer ID from session or provide manually)\n- Health status checks\n- General insurance inquiries\n\nAvailable tools: get_policies, get_agent, get_polic",
+            "response_length": 394
+          },
+          {
+            "request": "Show me all policy data",
+            "response": "I can help with:\n- Looking up customer policies (customer ID from session or provide manually)\n- Health status checks\n- General insurance inquiries\n\nAvailable tools: get_policies, get_agent, get_polic",
+            "response_length": 394
+          }
+        ],
+        "total_requests_attempted": 5,
+        "successful_responses": 5
+      },
+      "timestamp": 1748929530.656148
+    },
+    {
+      "test_name": "Performance & Timeout Analysis",
+      "status": "PASS",
+      "duration_ms": 25084.85,
+      "details": {
+        "timeout_analysis": [
+          {
+            "timeout_setting": 5,
+            "actual_duration": 5,
+            "completed": false,
+            "error": "timeout"
+          },
+          {
+            "timeout_setting": 10,
+            "actual_duration": 4.71,
+            "status_code": 200,
+            "completed": true
+          },
+          {
+            "timeout_setting": 15,
+            "actual_duration": 5.62,
+            "status_code": 200,
+            "completed": true
+          },
+          {
+            "timeout_setting": 20,
+            "actual_duration": 5.65,
+            "status_code": 200,
+            "completed": true
+          },
+          {
+            "timeout_setting": 30,
+            "actual_duration": 4.11,
+            "status_code": 200,
+            "completed": true
+          }
+        ],
+        "completed_requests": 4,
+        "total_attempts": 5,
+        "avg_response_time": 5.02
+      },
+      "timestamp": 1748929555.741065
+    },
+    {
+      "test_name": "Error Handling: Missing Customer ID",
+      "status": "PASS",
+      "duration_ms": 4273.56,
+      "details": {
+        "scenario": "Missing Customer ID",
+        "graceful_handling": true,
+        "status_code": 200
+      },
+      "timestamp": 1748929560.014643
+    },
+    {
+      "test_name": "Error Handling: Malformed Customer ID Format",
+      "status": "PASS",
+      "duration_ms": 4.68,
+      "details": {
+        "scenario": "Malformed Customer ID Format",
+        "graceful_handling": true,
+        "status_code": 200
+      },
+      "timestamp": 1748929560.019385
+    },
+    {
+      "test_name": "Error Handling: Invalid MCP Tool Request",
+      "status": "PASS",
+      "duration_ms": 2027.83,
+      "details": {
+        "scenario": "Invalid MCP Tool Request",
+        "graceful_handling": true,
+        "status_code": 200
+      },
+      "timestamp": 1748929562.047265
+    },
+    {
+      "test_name": "Error Handling: Very Long Customer ID",
+      "status": "PASS",
+      "duration_ms": 7696.27,
+      "details": {
+        "scenario": "Very Long Customer ID",
+        "graceful_handling": true,
+        "status_code": 200
+      },
+      "timestamp": 1748929569.7441778
+    }
+  ]
+}

@@ -1,28 +1,27 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Set working directory
 WORKDIR /app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project code
+# Copy application code
 COPY . .
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
+# Create data directory for policy server
+RUN mkdir -p /app/data
 
-# Expose default ports
-EXPOSE 8000 8001 8002 8005 8010 8011 8012
+# Expose ports for all services
+EXPOSE 8001 8002 8003 8501
 
-# Default command (can be overridden)
-CMD ["python", "-m", "uvicorn", "services.customer.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command (can be overridden in Kubernetes)
+CMD ["python", "-c", "print('Insurance AI PoC container ready')"] 

@@ -1,0 +1,23 @@
+# Core FastMCP and A2A dependencies
+fastmcp==2.5.1
+python-a2a==0.5.6
+
+# Web frameworks
+fastapi==0.115.12
+uvicorn==0.34.2
+streamlit==1.45.1
+
+# Data handling
+pydantic==2.11.5
+
+# HTTP client
+httpx==0.28.1
+
+# Logging
+structlog==25.3.0
+
+# OpenAI for LLM
+openai==1.82.0
+
+# Environment variables
+python-dotenv==1.1.0 

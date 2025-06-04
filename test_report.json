@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-05-28T12:36:57.530571",
+  "total_duration": 0.7306978702545166,
+  "suites": [
+    {
+      "name": "Unit Tests (with Coverage)",
+      "total_tests": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 0,
+      "errors": 0,
+      "duration": 0.0,
+      "coverage": 43.0,
+      "results": []
+    }
+  ],
+  "overall_coverage": 43.0,
+  "environment_info": {
+    "python_version": "3.11.11 | packaged by conda-forge | (main, Mar  3 2025, 20:44:07) [Clang 18.1.8 ]",
+    "platform": "darwin",
+    "working_directory": "/Users/piyushkumarjain/insurance-ai-poc",
+    "timestamp": "2025-05-28 12:36:57"
+  },
+  "service_health": {}
+}

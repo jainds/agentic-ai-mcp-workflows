@@ -34,6 +34,99 @@ POD_READY_TIMEOUT=180
 PORT_FORWARD_TIMEOUT=30
 
 # =============================================================================
+# Environment Setup
+# =============================================================================
+
+load_env_file() {
+    step "Loading environment variables..."
+    
+    # Check for .env file in project root
+    if [[ -f ".env" ]]; then
+        log "Found .env file in project root"
+        
+        # Source the .env file more robustly
+        set -a  # Automatically export all variables
+        
+        # Process .env file line by line to handle various formats
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$line" ]] && continue
+            
+            # Remove leading/trailing whitespace
+            line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            
+            # Skip if still empty after trimming
+            [[ -z "$line" ]] && continue
+            
+            # Export the variable
+            if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+                export "$line"
+            fi
+        done < .env
+        
+        set +a  # Stop auto-exporting
+        
+        # Count loaded variables
+        local env_vars=$(grep -v '^[[:space:]]*#' .env | grep -v '^[[:space:]]*$' | grep '=' | wc -l | tr -d ' ')
+        success "Loaded $env_vars environment variables from .env"
+        
+        # Debug: Show what was actually loaded for key variables
+        log "Checking loaded variables..."
+        
+        # Show which key variables were loaded (without values)
+        local loaded_keys=()
+        if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+            loaded_keys+=("OPENROUTER_API_KEY")
+            log "✓ OPENROUTER_API_KEY loaded (${#OPENROUTER_API_KEY} chars)"
+        else
+            warning "✗ OPENROUTER_API_KEY not found or empty"
+        fi
+        
+        if [[ -n "${OPENAI_API_KEY:-}" ]] || [[ -n "${OPENAI_KEY:-}" ]]; then
+            loaded_keys+=("OPENAI_API_KEY")
+            if [[ -n "${OPENAI_KEY:-}" ]]; then
+                log "✓ OPENAI_KEY found, will map to OPENAI_API_KEY"
+            fi
+        fi
+        
+        if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+            loaded_keys+=("ANTHROPIC_API_KEY")
+        fi
+        
+        if [[ -n "${LANGFUSE_SECRET_KEY:-}" ]]; then
+            loaded_keys+=("LANGFUSE_SECRET_KEY")
+        fi
+        
+        if [[ -n "${LANGFUSE_PUBLIC_KEY:-}" ]]; then
+            loaded_keys+=("LANGFUSE_PUBLIC_KEY")
+        fi
+        
+        if [[ ${#loaded_keys[@]} -gt 0 ]]; then
+            info "API keys found: ${loaded_keys[*]}"
+        else
+            warning "No API keys found in .env file"
+        fi
+        
+        # Handle OPENAI_KEY vs OPENAI_API_KEY naming convention
+        if [[ -n "${OPENAI_KEY:-}" ]] && [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            export OPENAI_API_KEY="$OPENAI_KEY"
+            info "Mapped OPENAI_KEY to OPENAI_API_KEY"
+        fi
+        
+    else
+        warning "No .env file found in project root"
+        info "You can create a .env file with your API keys, or export them manually"
+        info "Example .env file:"
+        echo "  OPENROUTER_API_KEY=sk-or-v1-xxxxxx"
+        echo "  OPENAI_API_KEY=sk-xxxxxx"
+        echo "  ANTHROPIC_API_KEY=sk-ant-xxxxxx"
+        echo "  LANGFUSE_SECRET_KEY=lf_sk_xxxxxx"
+        echo "  LANGFUSE_PUBLIC_KEY=lf_pk_xxxxxx"
+    fi
+}
+
+# =============================================================================
 # Utility Functions
 # =============================================================================
 
@@ -517,6 +610,7 @@ deploy() {
     trap cleanup_on_error EXIT
     
     # Run deployment steps
+    load_env_file
     check_prerequisites
     validate_environment
     build_docker_image
@@ -592,6 +686,16 @@ show_help() {
     echo "  LANGFUSE_SECRET_KEY  Optional: Langfuse secret key"
     echo "  LANGFUSE_PUBLIC_KEY  Optional: Langfuse public key"
     echo ""
+    echo "Configuration:"
+    echo "  The script automatically loads environment variables from .env file"
+    echo "  if it exists in the project root. You can also export variables manually."
+    echo ""
+    echo "Example .env file:"
+    echo "  OPENROUTER_API_KEY=sk-or-v1-xxxxxx"
+    echo "  OPENAI_API_KEY=sk-xxxxxx"
+    echo "  LANGFUSE_SECRET_KEY=lf_sk_xxxxxx"
+    echo "  LANGFUSE_PUBLIC_KEY=lf_pk_xxxxxx"
+    echo ""
 }
 
 case "${1:-deploy}" in
@@ -599,10 +703,12 @@ case "${1:-deploy}" in
         deploy
         ;;
     "build")
+        load_env_file
         check_prerequisites
         build_docker_image
         ;;
     "secrets")
+        load_env_file
         check_prerequisites
         validate_environment
         setup_namespace

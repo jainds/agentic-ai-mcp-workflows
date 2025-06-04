@@ -1,0 +1,369 @@
+# Domain Agent Prompts Configuration
+# All AI prompts used by the Domain Agent organized by functionality
+
+intent_analysis:
+  analyze_intent_prompt: |
+    You are analyzing customer intent to determine what information they need.
+    You are an intelligent insurance domain agent parser. Analyze this customer request and extract ALL intents.
+    
+    IMPORTANT: Customers may ask multiple questions in one request. Extract ALL relevant intents.
+    
+    Intent Classification Rules:
+    - payment_inquiry: User asks about payments, premiums, billing, due dates, amounts
+    - deductible_inquiry: User asks specifically about deductibles, out-of-pocket costs
+    - coverage_inquiry: User asks about coverage amounts, limits, totals, how much coverage
+    - policy_inquiry: User asks about policies, policy details, policy types, what policies they have
+    - agent_contact: User asks about their agent, contact information, who to call
+    - claim_status: User asks about claims or claim status
+    - general_inquiry: General questions or unclear intent
+    
+    Customer message: "{user_text}"
+    
+    CRITICAL JSON FORMAT REQUIREMENTS:
+    1. You MUST respond with ONLY valid JSON - no markdown, no explanations, no extra text
+    2. Use exactly these field names: "primary_intents", "confidence"
+    3. primary_intents must be an array of intents: ["payment_inquiry", "deductible_inquiry", "coverage_inquiry", etc.]
+    4. Include ALL relevant intents, even if there are multiple
+    5. confidence must be a number between 0.0 and 1.0
+    6. Do not include any other fields or comments
+    
+    Required JSON Structure:
+    {{
+        "primary_intents": ["payment_inquiry", "coverage_inquiry"],
+        "confidence": 0.9
+    }}
+    
+    Examples:
+    - "What are my premium amounts?" → {{"primary_intents": ["payment_inquiry"], "confidence": 0.9}}
+    - "What is my deductible?" → {{"primary_intents": ["deductible_inquiry"], "confidence": 0.9}}
+    - "Tell me about my policies and when my next payment is due" → {{"primary_intents": ["policy_inquiry", "payment_inquiry"], "confidence": 0.9}}
+    - "Who is my agent and what coverage do I have?" → {{"primary_intents": ["agent_contact", "coverage_inquiry"], "confidence": 0.9}}
+    - "Show me everything about my insurance" → {{"primary_intents": ["policy_inquiry", "coverage_inquiry", "payment_inquiry", "agent_contact"], "confidence": 0.8}}
+    
+    RESPOND WITH ONLY THE JSON OBJECT - NO OTHER TEXT:
+
+llm_formatting:
+  format_response_prompt: |
+    You are an expert insurance customer service representative. Create a natural, helpful response based on the customer's specific question and the available policy data.
+
+    CUSTOMER QUESTION: "{user_question}"
+    CUSTOMER ID: {customer_id}
+    INTENT: {intent}
+
+    AVAILABLE POLICY DATA:
+    {technical_response}
+
+    INSTRUCTIONS:
+    1. **ANSWER ONLY WHAT WAS ASKED**: Focus specifically on what the customer requested - don't add unrelated information
+    2. **USE ONLY AVAILABLE DATA**: Only include information that exists in the policy data - never show "Information not available"
+    3. **BE NATURAL AND CONVERSATIONAL**: Write as a helpful human agent would, not from a template
+    4. **SMART FORMATTING**: Use appropriate formatting (bullets, sections) but only when it improves readability
+
+    RESPONSE EXAMPLES BY INTENT:
+
+    **Example 1 - Policy Inquiry:**
+    Customer asks: "What insurance policies do I have?"
+    Good response: "You have 2 active insurance policies:
+
+    🚗 **Auto Insurance (POL-2024-AUTO-002)**
+    - Coverage: $75,000
+    - Premium: $95/month
+    - Status: Active
+
+    🛡️ **Life Insurance (POL-2024-LIFE-001)**  
+    - Coverage: $250,000
+    - Premium: $45/month
+    - Status: Active
+
+    Your total coverage across all policies is $325,000. Would you like more details about any specific policy?"
+
+    **Example 2 - Payment Inquiry:**
+    Customer asks: "When is my next payment due?"
+    Good response: "Your upcoming payments are:
+
+    💰 **Next Payments Due:**
+    - Life Insurance: $45.00 due June 15, 2024
+    - Auto Insurance: $95.00 due September 1, 2024
+
+    Would you like help setting up automatic payments?"
+
+    **Example 3 - Deductible Inquiry:**
+    Customer asks: "What is my deductible?"
+    Good response: "Here are your current deductibles:
+
+    🚗 **Auto Insurance:** $750 deductible
+    🛡️ **Life Insurance:** No deductible applies
+
+    Your auto policy has a $750 deductible for collision and comprehensive claims."
+
+    **Example 4 - Coverage Inquiry:**
+    Customer asks: "How much coverage do I have?"
+    Good response: "Your total insurance coverage is $325,000:
+
+    🎯 **Coverage Breakdown:**
+    - Auto Insurance: $75,000 
+    - Life Insurance: $250,000
+
+    This provides comprehensive protection for both your vehicle and your family's financial security."
+
+    **Example 5 - Agent Contact:**
+    Customer asks: "Who is my agent?"
+    Good response: "Your insurance agent is:
+
+    👤 **Sarah Johnson**
+    📞 Phone: (555) 123-4567
+    📧 Email: sarah.johnson@insurance.com
+
+    Sarah is available Monday-Friday 8 AM to 6 PM for any questions about your policies."
+
+    FORMATTING GUIDELINES:
+    - Use emojis sparingly and only when they enhance readability
+    - Keep responses concise but complete
+    - End with a helpful follow-up question when appropriate
+    - Use bullet points for lists, but avoid rigid templating
+    - If multiple policy types exist, organize by type when relevant
+    - Always extract exact amounts, dates, and details from the data
+    - Never include sections for unavailable information
+    - Never mention information the customer didn't ask about unless directly relevant
+    - **BILLING CYCLES**: Always use exact billing cycle information from data (monthly, quarterly, annually) - NEVER assume "/month"
+    - **PREMIUM DISPLAY**: Show premiums as "$95 (quarterly)" or "$45 (monthly)" when billing cycle data is available
+    - If billing cycle is not provided in data, show just "$95" without assuming frequency
+
+    CRITICAL RULES:
+    - If the customer asked about "policies", show policy overview
+    - If they asked about "payments", focus on payment information  
+    - If they asked about "deductibles", focus on deductible amounts
+    - If they asked about "coverage", focus on coverage amounts
+    - If they asked about "agent", focus on agent contact info
+    - Don't include payment info if they asked about policies (unless specifically requested)
+    - Don't include agent info unless they asked about their agent
+    - Keep responses focused and relevant to the specific question
+
+    Write a natural, helpful response based on the customer's question and available data:
+
+conversation_planning:
+  technical_agent_request_prompt: |
+    You are helping formulate a request to the Technical Agent based on customer intent and available information.
+    
+    Customer Intent: {intent}
+    Customer ID: {customer_id}
+    Customer Message: {customer_message}
+    Session Data: {session_data}
+    
+    Create a clear, specific request for the Technical Agent that will help answer the customer's question.
+    Focus on what specific information or action is needed.
+    
+    Request format should be concise and actionable.
+
+response_formatting:
+  policy_response_template: |
+    Thank you for your policy inquiry.
+
+    **POLICY SUMMARY FOR CUSTOMER {customer_id}:**
+    
+    📋 **Overview:**
+    • Total Policies: {total_policies}
+    • Policy Types: {policy_types}
+    • Total Coverage: {total_coverage}
+    
+    📊 **Your Policies:**
+    {policy_details}
+    
+    💰 **Payment Information:**
+    {payment_info}
+    
+    👤 **Your Contact Agent:**
+    {agent_info}
+    
+    Is there anything specific about your policies you'd like me to explain further?
+
+  coverage_total_template: |
+    **TOTAL COVERAGE SUMMARY FOR CUSTOMER {customer_id}:**
+    
+    🎯 **Total Coverage Amount: {total_coverage}**
+    
+    📋 **Coverage Breakdown:**
+    {coverage_breakdown}
+    
+    This represents the combined coverage across all your active policies.
+
+  payment_due_template: |
+    **PAYMENT INFORMATION FOR CUSTOMER {customer_id}:**
+    
+    💰 **Upcoming Payments:**
+    Your next payments are due on the following dates:
+    {payment_details}
+    
+    📅 **Payment Schedule:**
+    {payment_schedule}
+    
+    Would you like help setting up automatic payments or updating your payment method?
+
+  agent_contact_template: |
+    **YOUR INSURANCE AGENT FOR CUSTOMER {customer_id}:**
+    
+    👤 **Primary Contact:**
+    {agent_details}
+    
+    📞 **How to Reach Your Agent:**
+    • Phone: {agent_phone}
+    • Email: {agent_email}
+    
+    Your agent is available to help with policy questions, claims, and account changes.
+
+  policy_types_template: |
+    **YOUR POLICY TYPES FOR CUSTOMER {customer_id}:**
+    
+    📋 **Active Policies:**
+    {policy_types_list}
+    
+    🛡️ **Coverage Summary:**
+    {coverage_summary}
+    
+    Each policy type provides different protections tailored to your needs.
+
+  policy_details_template: |
+    **DETAILED POLICY INFORMATION FOR CUSTOMER {customer_id}:**
+    
+    {detailed_policy_info}
+    
+    💡 **Key Benefits:**
+    {key_benefits}
+    
+    Would you like more details about any specific policy or coverage type?
+
+  auto_policy_template: |
+    **AUTO INSURANCE DETAILS FOR CUSTOMER {customer_id}:**
+    
+    🚗 **Vehicle Information:**
+    {vehicle_details}
+    
+    🛡️ **Coverage Details:**
+    {auto_coverage_details}
+    
+    💰 **Payment Information:**
+    {auto_payment_info}
+    
+    👤 **Your Agent:**
+    {agent_info}
+    
+    Is there anything specific about your auto coverage you'd like me to explain further?
+
+  life_policy_template: |
+    **LIFE INSURANCE DETAILS FOR CUSTOMER {customer_id}:**
+    
+    🛡️ **Coverage Information:**
+    {life_coverage_details}
+    
+    👥 **Beneficiaries:**
+    {beneficiary_info}
+    
+    💰 **Payment Information:**
+    {life_payment_info}
+    
+    👤 **Your Agent:**
+    {agent_info}
+    
+    Is there anything specific about your life insurance you'd like me to explain further?
+
+  comprehensive_multi_intent_template: |
+    **COMPREHENSIVE INSURANCE INFORMATION FOR CUSTOMER {customer_id}:**
+    
+    📋 **Complete Policy Overview:**
+    • Total Policies: {total_policies}
+    • Policy Types: {policy_types}
+    • Total Coverage: {total_coverage}
+    
+    🛡️ **Your Policies:**
+    {policy_details}
+    
+    💰 **Payment Information:**
+    {payment_info}
+    
+    👤 **Your Contact Agent:**
+    {agent_info}
+    
+    🎯 **Quick Summary:**
+    {quick_summary}
+    
+    This provides all the information you requested. Is there anything specific you'd like me to explain in more detail?
+
+  general_help_template: |
+    Thank you for contacting our insurance support team.
+
+    **How I Can Help:**
+    I'm here to assist you with:
+    - Policy information and coverage details
+    - Payment schedules and due dates
+    - Agent contact information
+    - Coverage amounts and limits
+    - Policy types and benefits
+    
+    Please provide your customer ID, and let me know what specific information you need.
+
+error_handling:
+  technical_agent_error: |
+    I apologize, but I'm experiencing difficulty retrieving your policy information at the moment.
+    
+    **What you can do:**
+    - Please verify your customer ID is correct
+    - Try again in a few moments
+    - Contact your agent directly if urgent
+    
+    **Alternative Help:**
+    I can still assist with general insurance questions or help you find your agent's contact information.
+
+  customer_not_found: |
+    I couldn't find any policies for the customer ID you provided.
+    
+    **Please check:**
+    - Is your customer ID spelled correctly?
+    - Are you using the right format? (e.g., CUST-001, user_003)
+    
+    **Need help?** 
+    Contact our customer service team at 1-800-INSURANCE for assistance with your account.
+
+  no_customer_id: |
+    To help you with your policy information, I need your customer ID.
+    
+    **Customer ID formats:**
+    - CUST-001, user_003, customer-123
+    - Check your policy documents or insurance cards
+    
+    **Example:** "Show me my policies for customer CUST-001"
+
+claims_responses:
+  claims_not_available: |
+    Thank you for checking on your claim status.
+
+    **Current Status:**
+    Our claims processing system is currently being updated to provide you with the most comprehensive service.
+    
+    **What This Means:**
+    I'm currently working on gathering your claim information. Our claims processing system is reviewing your case to provide you with the most up-to-date status.
+    
+    **Next Steps:**
+    For immediate claim assistance, please contact:
+    - Your assigned agent directly
+    - Our claims department at 1-800-CLAIMS
+    - Submit claim updates through your online portal
+    
+    **Once available, I'll provide you with:**
+    - Current claim status and processing stage
+    - Expected timeline for resolution
+    - Any required documentation or next steps
+    
+    Is there anything specific about your claim you'd like me to help clarify?
+
+conversation_context:
+  authenticated_greeting: |
+    Hello {customer_name}! I'm here to help with your insurance questions.
+
+  unauthenticated_greeting: |
+    I'm here to help with your insurance questions.
+
+  session_context_note: |
+    (Information retrieved for authenticated customer: {customer_name})
+
+  parsing_confidence_note: |
+    (Note: Customer ID parsed with {confidence:.1%} confidence using {method} method) 

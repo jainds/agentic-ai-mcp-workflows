@@ -1,0 +1,126 @@
+# Technical Agent Prompts Configuration
+# All AI prompts used by the Technical Agent organized by functionality
+
+request_parsing:
+  llm_parsing_prompt: |
+    You are an intelligent insurance technical agent parser. Analyze this request and extract the intent.
+    
+    IMPORTANT: Customer identification is handled through session authentication. Focus only on determining what the user wants to do.
+    The request may contain multiple intents or be a comprehensive request asking for various types of information.
+    
+    Possible intents:
+    - get_customer_policies: User wants to retrieve/view/check policies (includes comprehensive policy info)
+    - get_coverage_information: User wants to know about coverage amounts, limits, totals
+    - get_payment_information: User wants payment schedules, due dates, billing info
+    - get_agent_information: User wants agent contact details
+    - health_check: User wants to check system/service health status
+    - general_inquiry: General questions or unclear intent
+    
+    Request: "{text}"
+    
+    Instructions:
+    1. Determine the most likely intent based on context
+    2. For comprehensive requests (e.g., "get comprehensive information covering: policy_inquiry, payment_inquiry"), use get_customer_policies
+    3. For multi-intent requests, choose the most comprehensive intent that covers all aspects
+    4. Provide high confidence only when very certain
+    5. Focus on the action/intent, not customer identification
+    
+    Respond ONLY with valid JSON:
+    {{
+        "intent": "get_customer_policies|get_coverage_information|get_payment_information|get_agent_information|health_check|general_inquiry",
+        "confidence": 0.0-1.0,
+        "reasoning": "brief explanation of your analysis"
+    }}
+
+intelligent_api_selection:
+  tool_selection_prompt: |
+    You are an insurance API assistant. Analyze this request and determine:
+    1. Which API tool to call
+    2. What parameters to extract
+    3. Provide reasoning for your choice
+
+    Request: "{request}"
+    Available customer_id from session: {customer_id}
+    Additional context: {context}
+
+    Available tools:
+    {tools_description}
+
+    TOOL SELECTION PREFERENCES:
+    - For policy inquiries: PREFER get_policy_list over get_policies (includes billing cycles, dates, deductibles)
+    - For comprehensive info: USE get_customer_policies (most complete data)
+    - For payment info: USE get_payment_information (includes billing cycles and due dates)
+    - For coverage details: USE get_coverage_information
+    - For agent info: USE get_agent
+    - For deductible info: USE get_deductibles
+
+    CRITICAL: Always prefer tools that provide complete information including billing cycles and detailed scheduling.
+
+    Respond with JSON in this exact format:
+    {{
+        "tool_name": "exact_tool_name_from_list_above",
+        "parameters": {{"param_name": "param_value"}},
+        "result_key": "appropriate_key_for_response_data",
+        "reasoning": "why you chose this tool and these parameters",
+        "confidence": 0.95
+    }}
+
+    Rules:
+    - Only use tool names from the list above
+    - customer_id is provided from authenticated session context
+    - policy_id is required for get_policy_details (extract from request)
+    - If you can't extract required parameters, set tool_name to null
+    - Be specific about which information the user is asking for
+    - ALWAYS prefer detailed tools (get_policy_list) over basic tools (get_policies)
+
+  multi_tool_planning_prompt: |
+    You are an intelligent insurance API planner. Analyze this complex request and create a comprehensive plan with multiple tool calls to gather all required information.
+
+    Request: "{request}"
+    Available customer_id from session: {customer_id}
+    Additional context: {context}
+
+    Available tools:
+    {tools_description}
+
+    For complex questions that require multiple pieces of information, create a plan with multiple tool calls.
+
+    Examples of complex requests:
+    - "Give me a complete overview" → needs policies, agent, payments, recommendations
+    - "What's the financial status of my insurance?" → needs policies, payments, deductibles
+    - "Help me understand my coverage and costs" → needs coverage_information, payment_information, deductibles
+
+    Respond with JSON in this exact format:
+    {{
+        "plan_type": "single_tool|multi_tool",
+        "reasoning": "why this approach was chosen",
+        "tool_calls": [
+            {{
+                "tool_name": "exact_tool_name_from_list_above",
+                "parameters": {{"param_name": "param_value"}},
+                "result_key": "appropriate_key_for_response_data",
+                "purpose": "what this tool call will provide"
+            }}
+        ],
+        "execution_order": "sequential|parallel",
+        "confidence": 0.95
+    }}
+
+    Rules:
+    - For simple, focused questions use "single_tool" with one tool call
+    - For comprehensive questions use "multi_tool" with multiple tool calls
+    - Use "parallel" execution when tools are independent
+    - Use "sequential" execution when one tool depends on another's result
+    - Only use tool names from the list above
+    - customer_id is provided from session context
+    - Ensure all required parameters are provided
+
+error_responses:
+  mcp_connection_error: |
+    Unable to connect to the policy system at this time. Please try again in a moment.
+  
+  policy_not_found: |
+    No policies found for the specified customer ID. Please verify the customer ID is correct.
+  
+  general_error: |
+    An error occurred while processing your request. Please try again. 

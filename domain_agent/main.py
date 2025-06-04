@@ -13,6 +13,8 @@ import time
 import threading
 from typing import Dict, Any, Optional, List
 from datetime import datetime
+import requests
+import uuid
 
 # Add current directory to Python path for imports
 sys.path.insert(0, os.path.dirname(__file__))
@@ -21,14 +23,14 @@ import structlog
 import openai
 import yaml
 from dotenv import load_dotenv
-from python_a2a import A2AServer, skill, agent, run_server, TaskStatus, TaskState, A2AClient
+from python_a2a import A2AServer, skill, agent, run_server, TaskStatus, TaskState, A2AClient, Task
 from openai import OpenAI
 
 from prompt_loader import PromptLoader
 from intent_analyzer import IntentAnalyzer
 from response_formatter import ResponseFormatter
 
-# Import monitoring
+# Import monitoring and session management
 try:
     sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
     from monitoring.setup.monitoring_setup import get_monitoring_manager
@@ -149,7 +151,7 @@ class DomainAgent(A2AServer):
             logger.error(f"🔥 DOMAIN AGENT: Failed to initialize components: {e}")
             raise RuntimeError(f"Failed to initialize LLM-based components: {e}")
         
-        # Technical Agent setup
+        # Technical Agent setup with direct A2A communication
         self.technical_agent_url = os.getenv("TECHNICAL_AGENT_URL", "http://insurance-ai-poc-technical-agent:8002")
         self.technical_client = None
         
@@ -180,7 +182,7 @@ class DomainAgent(A2AServer):
             if MONITORING_ENABLED and monitoring:
                 duration = time.time() - start_time
                 monitoring.record_intent_analysis(
-                    intent=result.get("primary_intent", "unknown"),
+                    intent=result.get("primary_intents", ["unknown"])[0],
                     confidence=result.get("confidence", 0.0),
                     method=result.get("method", "unknown"),
                     success=True,
@@ -237,7 +239,7 @@ class DomainAgent(A2AServer):
                 plan["technical_request"] = f"Get comprehensive information for customer {customer_id} covering: {', '.join(intents)}"
                 plan["response_template"] = "comprehensive_multi_intent"
             elif "policy_inquiry" in intents:
-                plan["technical_request"] = f"Get comprehensive policies for customer {customer_id}"
+                plan["technical_request"] = f"Get policies for customer {customer_id}"
                 plan["response_template"] = "policy_inquiry"
             elif "coverage_inquiry" in intents:
                 plan["technical_request"] = f"Get coverage information for customer {customer_id}"
@@ -345,29 +347,63 @@ class DomainAgent(A2AServer):
             # Step 3: Get information from Technical Agent if needed
             if response_plan["action"] == "ask_technical_agent":
                 try:
+                    logger.info(f"🔥 DOMAIN AGENT: Sending request to technical agent: {response_plan['technical_request']}")
+                    
+                    # Use A2A client with session data
                     client = self.get_technical_client()
                     if client:
-                        technical_response = client.ask(response_plan["technical_request"])
+                        # Create enhanced technical request with explicit customer ID for A2A transmission
+                        customer_id = session_data.get('customer_id', 'unknown')
+                        enhanced_request = f"{response_plan['technical_request']} (session_customer_id: {customer_id})"
+                        
+                        logger.info(f"🔥 DOMAIN AGENT: Sending A2A request with session data embedded in text: {enhanced_request}")
+                        
+                        # Send task via A2A client with customer ID embedded in text
+                        technical_response_data = client.ask(enhanced_request)
+                        
+                        # Extract response text from A2A response format
+                        if isinstance(technical_response_data, dict):
+                            artifacts = technical_response_data.get("artifacts", [])
+                            if artifacts and len(artifacts) > 0:
+                                parts = artifacts[0].get("parts", [])
+                                if parts and len(parts) > 0:
+                                    technical_response = parts[0].get("text", "No response")
+                                else:
+                                    technical_response = "No response parts found"
+                            else:
+                                technical_response = "No response artifacts found"
+                        else:
+                            technical_response = str(technical_response_data)
+                        
                         logger.info(f"🔥 DOMAIN AGENT: Technical response received")
                         logger.info(f"🔥 DOMAIN AGENT: Raw technical response: {technical_response}")
                         
-                        # Use LLM to format comprehensive response with templates
-                        try:
-                            final_response = self.format_comprehensive_response(
-                                intent_analysis["primary_intent"],
-                                response_plan["customer_id"], 
-                                technical_response,
-                                user_text
-                            )
-                        except ValueError as e:
-                            # Handle LLM formatting errors gracefully
-                            if "OpenAI API key" in str(e):
-                                final_response = "I need OpenAI configuration to provide formatted responses. Please contact support to enable AI formatting capabilities."
-                            else:
-                                final_response = f"I retrieved your policy information but encountered a formatting issue. Please contact support or try again. Raw data: {technical_response[:200]}..."
-                            logger.error(f"🔥 DOMAIN AGENT: Formatting error: {e}")
+                        # Check if technical response contains actual policy data or just help message
+                        if self._is_valid_policy_response(technical_response):
+                            # Use LLM to format comprehensive response with templates
+                            try:
+                                # Get the primary intent from the intents array
+                                primary_intent = intent_analysis.get("primary_intents", ["general_inquiry"])[0]
+                                final_response = self.format_comprehensive_response(
+                                    primary_intent,
+                                    response_plan["customer_id"], 
+                                    technical_response,
+                                    user_text
+                                )
+                            except ValueError as e:
+                                # Handle LLM formatting errors gracefully
+                                if "OpenAI API key" in str(e):
+                                    final_response = "I need OpenAI configuration to provide formatted responses. Please contact support to enable AI formatting capabilities."
+                                else:
+                                    final_response = f"I retrieved your policy information but encountered a formatting issue. Please contact support or try again. Raw data: {technical_response[:200]}..."
+                                logger.error(f"🔥 DOMAIN AGENT: Formatting error: {e}")
+                        else:
+                            # Technical response is just a help message or error - don't format with LLM
+                            logger.warning(f"🔥 DOMAIN AGENT: Technical response appears to be help message, not policy data: {technical_response[:100]}")
+                            final_response = "I'm having trouble retrieving your policy information. Please try again."
                     else:
                         final_response = "I'm having trouble connecting to our policy system. Please try again."
+                
                 except Exception as e:
                     logger.error(f"🔥 DOMAIN AGENT: Technical Agent error: {e}")
                     final_response = "I'm having trouble retrieving your policy information. Please try again."
@@ -394,7 +430,7 @@ class DomainAgent(A2AServer):
                     "domain_agent_requests_total",
                     labels={
                         "status": "success",
-                        "intent": intent_analysis.get("primary_intent", "unknown"),
+                        "intent": intent_analysis.get("primary_intents", ["unknown"])[0],
                         "action": response_plan.get("action", "unknown")
                     }
                 )
@@ -404,7 +440,7 @@ class DomainAgent(A2AServer):
                     "domain_agent_request_duration",
                     request_duration,
                     labels={
-                        "intent": intent_analysis.get("primary_intent", "unknown"),
+                        "intent": intent_analysis.get("primary_intents", ["unknown"])[0],
                         "action": response_plan.get("action", "unknown")
                     }
                 )
@@ -495,6 +531,76 @@ class DomainAgent(A2AServer):
         except Exception as e:
             logger.error(f"Failed to parse technical response: {e}")
             return []
+
+    def _is_valid_policy_response(self, response: str) -> bool:
+        """Check if the technical response contains actual policy data"""
+        if not response or not isinstance(response, str):
+            return False
+        
+        response_lower = response.lower()
+        
+        # Check for help/error indicators that suggest no real data
+        help_indicators = [
+            "i can help with",
+            "i'm here to help",
+            "how can i assist",
+            "please provide",
+            "customer id from session",
+            "error:",
+            "failed to",
+            "unable to",
+            "no data found",
+            "customer not found",
+            "not available",
+            "try again"
+        ]
+        
+        # If response contains help indicators, it's not policy data
+        for indicator in help_indicators:
+            if indicator in response_lower:
+                return False
+        
+        # Check for policy data indicators
+        policy_data_indicators = [
+            "policy_id",
+            "coverage_amount",
+            "premium",
+            "deductible",
+            "start_date",
+            "end_date",
+            "vehicle",
+            "beneficiary",
+            "agent_name",
+            '"policies"',
+            '"customer_policies"',
+            "POL-",  # Policy ID pattern
+            "$",     # Money amounts
+            "coverage",
+            "liability",
+            "collision"
+        ]
+        
+        # Check if response contains actual policy data indicators
+        policy_data_count = sum(1 for indicator in policy_data_indicators if indicator in response_lower)
+        
+        # Also check for JSON structure that might contain policy data
+        try:
+            import json
+            # Try to parse as JSON
+            if response.strip().startswith('[') or response.strip().startswith('{'):
+                parsed = json.loads(response)
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    # Check if it's a list of policies
+                    first_item = parsed[0]
+                    if isinstance(first_item, dict) and any(key in first_item for key in ['policy_id', 'id', 'type', 'premium']):
+                        return True
+                elif isinstance(parsed, dict) and any(key in parsed for key in ['policies', 'customer_policies', 'policy_data']):
+                    return True
+        except (json.JSONDecodeError, KeyError, IndexError):
+            pass
+        
+        # Return True if we found multiple policy data indicators
+        return policy_data_count >= 2
 
 if __name__ == "__main__":
     import logging

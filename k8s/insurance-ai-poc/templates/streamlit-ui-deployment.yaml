@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "insurance-ai-poc.fullname" . }}-streamlit-ui
-  namespace: insurance-ai-agentic
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "insurance-ai-poc.labels" . | nindent 4 }}
     component: streamlit-ui

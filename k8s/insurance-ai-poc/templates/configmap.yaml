@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "insurance-ai-poc.fullname" . }}-config
-  namespace: insurance-ai-agentic
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "insurance-ai-poc.labels" . | nindent 4 }}
 data:
@@ -15,6 +15,7 @@ data:
   # Technical Agent Configuration
   TECHNICAL_AGENT_HOST: {{ .Values.config.technicalAgent.host | quote }}
   TECHNICAL_AGENT_PORT: {{ .Values.config.technicalAgent.port | quote }}
+  POLICY_SERVICE_URL: {{ printf "%s/mcp/" .Values.config.technicalAgent.policyServerUrl | quote }}
   
   # Policy Server Configuration
   POLICY_SERVER_HOST: {{ .Values.config.policyServer.host | quote }}

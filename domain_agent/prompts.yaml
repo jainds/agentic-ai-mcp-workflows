@@ -55,18 +55,19 @@ llm_formatting:
     {response_template}
 
     CRITICAL INSTRUCTIONS:
-    1. Use the template structure above as your formatting guide
-    2. Extract relevant data EXACTLY from the comprehensive policy JSON - DO NOT modify, interpret, or change ANY details
-    3. Calculate totals, dates, and summaries as needed using the exact data provided
-    4. For payment_inquiry: Focus on payment dates, amounts, billing cycles
-    5. For coverage_inquiry: Calculate total coverage amounts across policies
-    6. For policy_types: List all policy types and their key details
-    7. For agent_contact: Extract agent information from the policy data
-    8. Format monetary amounts clearly (e.g., $325,000.00)
-    9. Format dates in readable format (e.g., September 1, 2024)
-    10. Be conversational, professional, and helpful
-    11. If data is missing for template sections, adapt gracefully, but don't make up data
-    12. Restrict response to only relevant to actual customer question based on template. End with offer to help further
+    1. **ONLY USE REAL DATA**: Extract relevant data EXACTLY from the comprehensive policy JSON - DO NOT modify, interpret, or change ANY details
+    2. **NO FAKE DATA**: If the technical response does not contain actual policy data (e.g., it's a help message, error, or empty), respond with: "I'm unable to retrieve your policy information at this time. Please try again or contact support."
+    3. **VALIDATE DATA FIRST**: Before formatting, verify the technical response contains actual policy information with fields like policy_id, coverage_amount, premium, etc.
+    4. Calculate totals, dates, and summaries as needed using ONLY the exact data provided
+    5. For payment_inquiry: Focus on payment dates, amounts, billing cycles FROM THE DATA
+    6. For coverage_inquiry: Calculate total coverage amounts across policies FROM THE DATA
+    7. For policy_types: List all policy types and their key details FROM THE DATA
+    8. For agent_contact: Extract agent information FROM THE DATA
+    9. Format monetary amounts clearly (e.g., $325,000.00) using EXACT amounts from data
+    10. Format dates in readable format (e.g., September 1, 2024) using EXACT dates from data
+    11. Be conversational, professional, and helpful
+    12. **NEVER MAKE UP DATA**: If data is missing for template sections, either omit those sections or state "Information not available"
+    13. Restrict response to only relevant to actual customer question based on template. End with offer to help further
 
     POLICY TYPE FILTERING RULES:
     - If customer asks about "auto policy" or "auto insurance" or "vehicle", show ONLY auto policy details prominently
@@ -83,8 +84,9 @@ llm_formatting:
     - DO NOT mention vehicles that are not in the customer's actual policy data
     - DO NOT create fictional scenarios about coverage gaps
     - Stick strictly to the facts provided in the comprehensive policy JSON data
+    - **IF NO REAL POLICY DATA IS PROVIDED, DO NOT GENERATE FAKE POLICY INFORMATION**
     
-    IMPORTANT: Extract and calculate actual values from the JSON data - don't use placeholder, mock, fake, or modified values. 
+    IMPORTANT: Extract and calculate actual values from the JSON data - don't use placeholder, mock, fake, or modified values. If the technical response is just a help message or error, respond with an appropriate error message instead of generating fake policy data.
 
 conversation_planning:
   technical_agent_request_prompt: |
@@ -210,6 +212,28 @@ response_formatting:
     {agent_info}
     
     Is there anything specific about your life insurance you'd like me to explain further?
+
+  comprehensive_multi_intent_template: |
+    **COMPREHENSIVE INSURANCE INFORMATION FOR CUSTOMER {customer_id}:**
+    
+    📋 **Complete Policy Overview:**
+    • Total Policies: {total_policies}
+    • Policy Types: {policy_types}
+    • Total Coverage: {total_coverage}
+    
+    🛡️ **Your Policies:**
+    {policy_details}
+    
+    💰 **Payment Information:**
+    {payment_info}
+    
+    👤 **Your Contact Agent:**
+    {agent_info}
+    
+    🎯 **Quick Summary:**
+    {quick_summary}
+    
+    This provides all the information you requested. Is there anything specific you'd like me to explain in more detail?
 
   general_help_template: |
     Thank you for contacting our insurance support team.

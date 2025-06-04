@@ -3,7 +3,7 @@ replicaCount: 1
 
 image:
   repository: insurance-ai-poc
-  tag: monitoring-1748869018
+  tag: session-fix
   pullPolicy: Never
 
 imagePullSecrets: []
@@ -24,7 +24,7 @@ securityContext: {}
 # Secrets Configuration
 secrets:
   # Use existing secret for API keys (recommended for production)
-  useExistingSecret: false
+  useExistingSecret: true
   secretName: "api-keys"
   # Fallback values for development (not recommended for production)
   apiKeys:
@@ -35,40 +35,40 @@ secrets:
 domainAgent:
   enabled: true
   port: 8003
-  replicas: 2
+  replicas: 1
   resources:
     limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 250m
+      cpu: 200m
       memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
 
 # Technical Agent Configuration  
 technicalAgent:
   enabled: true
   port: 8002
-  replicas: 2
+  replicas: 1
   resources:
     limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 250m
+      cpu: 200m
       memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
 
 # Policy Server Configuration
 policyServer:
   enabled: true
   port: 8001
-  replicas: 2
+  replicas: 1
   resources:
     limits:
-      cpu: 300m
-      memory: 256Mi
-    requests:
       cpu: 150m
       memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
 
 # Streamlit UI Configuration
 streamlitUI:
@@ -77,11 +77,11 @@ streamlitUI:
   replicas: 1
   resources:
     limits:
-      cpu: 300m
-      memory: 512Mi
-    requests:
       cpu: 150m
       memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
 
 service:
   type: ClusterIP

@@ -1,15 +1,15 @@
 {
   "summary": {
-    "total_tests": 15,
-    "passed": 2,
-    "failed": 13,
-    "success_rate": 0.13333333333333333,
-    "avg_response_time": 2.03,
+    "total_tests": 43,
+    "passed": 0,
+    "failed": 43,
+    "success_rate": 0.0,
+    "avg_response_time": 1.16,
     "category_breakdown": {
       "Core Requirements": {
         "total": 3,
-        "passed": 1,
-        "success_rate": 0.3333333333333333
+        "passed": 0,
+        "success_rate": 0.0
       },
       "Payment Information": {
         "total": 6,
@@ -18,8 +18,8 @@
       },
       "Policy Details": {
         "total": 3,
-        "passed": 1,
-        "success_rate": 0.3333333333333333
+        "passed": 0,
+        "success_rate": 0.0
       },
       "Coverage Information": {
         "total": 3,
@@ -32,172 +32,164 @@
     {
       "test_id": "total_coverage",
       "description": "Test total coverage calculation across all policies",
-      "query": "What's the total coverage amount for customer CUST-001?",
+      "query": "What's the total coverage amount?",
       "success": false,
-      "response": "Here's your coverage information for customer CUST-001:\n\nError retrieving policies for customer CUST-001: \n\nIf you need more details, please contact your agent.",
-      "keywords_found": [
-        "coverage"
-      ],
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "coverage",
         "325,000",
         "total",
         "75,000",
         "250,000"
       ],
-      "timestamp": "2025-05-31T14:57:06.090192",
-      "response_time": 3.22
+      "timestamp": "2025-06-02T23:18:10.714571",
+      "response_time": 1.24
     },
     {
       "test_id": "policy_types",
       "description": "Test policy types identification",
-      "query": "What types of policies do I have for customer CUST-001?",
-      "success": true,
-      "response": "Here's your policy information for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nLet me know if you need more specific details.",
+      "query": "What types of policies do I have?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
       "keywords_found": [
-        "auto",
-        "life",
         "policy"
       ],
       "keywords_missing": [
+        "auto",
+        "life",
         "types"
       ],
-      "timestamp": "2025-05-31T14:57:10.319208",
-      "response_time": 0.06
+      "timestamp": "2025-06-02T23:18:12.959204",
+      "response_time": 1.39
     },
     {
       "test_id": "payment_due_date",
       "description": "Test payment due date information",
-      "query": "When is my next payment due for customer CUST-001?",
+      "query": "When is my next payment due?",
       "success": false,
-      "response": "Here are your payment details for customer CUST-001:\n\nError retrieving policies for customer CUST-001: Client error '400 Bad Request' for url 'http://insurance-ai-poc-policy-server:8001/mcp/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400\n\nFor payment assistance, please contact your agent.",
-      "keywords_found": [
-        "payment"
-      ],
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "payment",
         "due",
         "september",
         "june",
         "2024-09-01",
         "2024-06-15"
       ],
-      "timestamp": "2025-05-31T14:57:11.385330",
-      "response_time": 3.21
+      "timestamp": "2025-06-02T23:18:15.356144",
+      "response_time": 1.34
     },
     {
       "test_id": "payment_due_auto",
       "description": "Test specific auto policy payment due date",
-      "query": "When is my auto insurance payment due for customer CUST-001?",
+      "query": "When is my auto insurance payment due?",
       "success": false,
-      "response": "Here are your payment details for customer CUST-001:\n\nError retrieving policies for customer CUST-001: \n\nFor payment assistance, please contact your agent.",
-      "keywords_found": [
-        "payment"
-      ],
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "payment",
         "due",
         "september",
         "2024-09-01",
         "auto",
         "quarterly"
       ],
-      "timestamp": "2025-05-31T14:57:15.600358",
-      "response_time": 3.21
+      "timestamp": "2025-06-02T23:18:17.699333",
+      "response_time": 1.13
     },
     {
       "test_id": "payment_due_life",
       "description": "Test specific life policy payment due date",
-      "query": "When is my life insurance payment due for customer CUST-001?",
+      "query": "When is my life insurance payment due?",
       "success": false,
-      "response": "Here are your payment details for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nFor payment assistance, please contact your agent.",
-      "keywords_found": [
-        "payment",
-        "life"
-      ],
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "payment",
         "due",
         "june",
         "2024-06-15",
+        "life",
         "monthly"
       ],
-      "timestamp": "2025-05-31T14:57:19.817467",
-      "response_time": 1.13
+      "timestamp": "2025-06-02T23:18:19.833789",
+      "response_time": 1.39
     },
     {
       "test_id": "payment_method_info",
       "description": "Test payment method information retrieval",
-      "query": "What payment method do I have set up for customer CUST-001?",
+      "query": "What payment method do I have set up?",
       "success": false,
-      "response": "Here are your payment details for customer CUST-001:\n\nError retrieving policies for customer CUST-001: \n\nFor payment assistance, please contact your agent.",
-      "keywords_found": [
-        "payment"
-      ],
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "payment",
         "method",
         "auto_pay",
         "auto",
         "autopay"
       ],
-      "timestamp": "2025-05-31T14:57:21.948267",
-      "response_time": 3.25
+      "timestamp": "2025-06-02T23:18:22.227967",
+      "response_time": 1.38
     },
     {
       "test_id": "billing_cycle_info",
       "description": "Test billing cycle information",
-      "query": "What are my billing cycles for customer CUST-001?",
+      "query": "What are my billing cycles?",
       "success": false,
-      "response": "Here are your payment details for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nFor payment assistance, please contact your agent.",
-      "keywords_found": [
-        "payment"
-      ],
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
       "keywords_missing": [
         "billing",
         "cycle",
         "quarterly",
-        "monthly"
+        "monthly",
+        "payment"
       ],
-      "timestamp": "2025-05-31T14:57:26.208137",
-      "response_time": 3.24
+      "timestamp": "2025-06-02T23:18:24.607952",
+      "response_time": 1.12
     },
     {
       "test_id": "next_payment_amount",
       "description": "Test next payment amount information",
-      "query": "How much is my next payment for customer CUST-001?",
+      "query": "How much is my next payment?",
       "success": false,
-      "response": "Here are your payment details for customer CUST-001:\n\nError retrieving policies for customer CUST-001: Client error '400 Bad Request' for url 'http://insurance-ai-poc-policy-server:8001/mcp/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400\n\nFor payment assistance, please contact your agent.",
-      "keywords_found": [
-        "payment"
-      ],
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
       "keywords_missing": [
+        "payment",
         "amount",
         "$95",
         "$45",
         "premium"
       ],
-      "timestamp": "2025-05-31T14:57:30.455757",
-      "response_time": 3.24
+      "timestamp": "2025-06-02T23:18:26.736898",
+      "response_time": 1.31
     },
     {
       "test_id": "contact_person",
       "description": "Test assigned agent contact information",
-      "query": "Who is my contact person for policies for customer CUST-001?",
+      "query": "Who is my contact person for policies?",
       "success": false,
-      "response": "Here's your agent information for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nYou can contact them for any policy questions.",
-      "keywords_found": [
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "michael",
+        "brown",
         "agent",
         "contact"
       ],
-      "keywords_missing": [
-        "michael",
-        "brown"
-      ],
-      "timestamp": "2025-05-31T14:57:34.702904",
-      "response_time": 0.07
+      "timestamp": "2025-06-02T23:18:29.053191",
+      "response_time": 1.56
     },
     {
       "test_id": "policy_details",
       "description": "Test detailed policy information retrieval",
-      "query": "Show me details of my auto policy for customer CUST-001",
+      "query": "Show me details of my auto policy.",
       "success": false,
-      "response": "Here's your policy information for customer CUST-001:\n\nError retrieving policies for customer CUST-001: Client error '400 Bad Request' for url 'http://insurance-ai-poc-policy-server:8001/mcp/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400\n\nLet me know if you need more specific details.",
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
       "keywords_found": [],
       "keywords_missing": [
         "honda",
@@ -206,15 +198,15 @@
         "liability",
         "collision"
       ],
-      "timestamp": "2025-05-31T14:57:35.774665",
-      "response_time": 3.25
+      "timestamp": "2025-06-02T23:18:31.622887",
+      "response_time": 1.14
     },
     {
       "test_id": "premium_amounts",
       "description": "Test premium amount and billing cycle information",
-      "query": "What are my premium amounts for customer CUST-001?",
+      "query": "What are my premium amounts?",
       "success": false,
-      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
       "keywords_found": [],
       "keywords_missing": [
         "premium",
@@ -223,30 +215,30 @@
         "monthly",
         "quarterly"
       ],
-      "timestamp": "2025-05-31T14:57:40.023481",
-      "response_time": 0.04
+      "timestamp": "2025-06-02T23:18:33.768604",
+      "response_time": 1.16
     },
     {
       "test_id": "policy_status",
       "description": "Test policy status reporting",
-      "query": "What's the status of my policies for customer CUST-001?",
-      "success": true,
-      "response": "Here's your policy information for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nLet me know if you need more specific details.",
-      "keywords_found": [
+      "query": "What's the status of my policies?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
         "active",
         "status",
         "POL-2024"
       ],
-      "keywords_missing": [],
-      "timestamp": "2025-05-31T14:57:41.061853",
-      "response_time": 0.07
+      "timestamp": "2025-06-02T23:18:35.937208",
+      "response_time": 2.19
     },
     {
       "test_id": "coverage_limits",
       "description": "Test detailed coverage limits information",
-      "query": "What are my coverage limits for customer CUST-001?",
+      "query": "What are my coverage limits?",
       "success": false,
-      "response": "Here's your policy information for customer CUST-001:\n\nError retrieving policies for customer CUST-001: Client error '400 Bad Request' for url 'http://insurance-ai-poc-policy-server:8001/mcp/'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400\n\nLet me know if you need more specific details.",
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
       "keywords_found": [],
       "keywords_missing": [
         "75,000",
@@ -255,15 +247,15 @@
         "injury",
         "benefit"
       ],
-      "timestamp": "2025-05-31T14:57:42.136639",
-      "response_time": 3.23
+      "timestamp": "2025-06-02T23:18:39.136221",
+      "response_time": 1.27
     },
     {
       "test_id": "deductibles",
       "description": "Test deductible information across policies",
-      "query": "What are my deductibles for customer CUST-001?",
+      "query": "What are my deductibles?",
       "success": false,
-      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please provide your customer ID and let me know what you need.",
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
       "keywords_found": [],
       "keywords_missing": [
         "deductible",
@@ -272,15 +264,15 @@
         "auto",
         "life"
       ],
-      "timestamp": "2025-05-31T14:57:46.370695",
-      "response_time": 0.02
+      "timestamp": "2025-06-02T23:18:41.407150",
+      "response_time": 1.08
     },
     {
       "test_id": "policy_dates",
       "description": "Test policy expiration date information",
-      "query": "When do my policies expire for customer CUST-001?",
+      "query": "When do my policies expire?",
       "success": false,
-      "response": "Here's your policy information for customer CUST-001:\n\nFound 2 policies for customer CUST-001:\n\n1. Policy POL-2024-AUTO-002 (auto policy)\n   Status: active\n   Premium: $95.0\n\n2. Policy POL-2024-LIFE-001 (life policy)\n   Status: active\n   Premium: $45.0\n\n\n\nLet me know if you need more specific details.",
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
       "keywords_found": [],
       "keywords_missing": [
         "expire",
@@ -289,9 +281,480 @@
         "end",
         "date"
       ],
-      "timestamp": "2025-05-31T14:57:47.399388",
-      "response_time": 3.23
+      "timestamp": "2025-06-02T23:18:43.486716",
+      "response_time": 1.19
+    },
+    {
+      "test_id": "general_policies_overview",
+      "description": "Test general policy overview without explicit customer ID",
+      "query": "Tell me about my policies.",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [
+        "policy"
+      ],
+      "keywords_missing": [
+        "auto",
+        "life",
+        "coverage",
+        "active"
+      ],
+      "timestamp": "2025-06-02T23:18:45.679466",
+      "response_time": 1.53
+    },
+    {
+      "test_id": "policy_expiring_next",
+      "description": "Test identifying next expiring policy",
+      "query": "Which policy is expiring next?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "expire",
+        "expiring",
+        "2025",
+        "auto",
+        "next"
+      ],
+      "timestamp": "2025-06-02T23:18:48.210105",
+      "response_time": 1.06
+    },
+    {
+      "test_id": "detailed_policy_info",
+      "description": "Test comprehensive policy details",
+      "query": "What are my policy details?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [
+        "policy"
+      ],
+      "keywords_missing": [
+        "details",
+        "auto",
+        "life",
+        "POL-2024",
+        "honda"
+      ],
+      "timestamp": "2025-06-02T23:18:50.276870",
+      "response_time": 1.57
+    },
+    {
+      "test_id": "auto_vehicle_details",
+      "description": "Test specific vehicle details from auto policy",
+      "query": "For my auto policy, can you give me vehicle details?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "auto",
+        "vehicle",
+        "honda",
+        "civic",
+        "2023",
+        "year"
+      ],
+      "timestamp": "2025-06-02T23:18:52.855531",
+      "response_time": 1.19
+    },
+    {
+      "test_id": "all_policy_limits",
+      "description": "Test comprehensive policy limits explanation",
+      "query": "Explain all my policy limits.",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "limits",
+        "coverage",
+        "75,000",
+        "250,000",
+        "bodily",
+        "benefit"
+      ],
+      "timestamp": "2025-06-02T23:18:55.049266",
+      "response_time": 1.33
+    },
+    {
+      "test_id": "user_003_format",
+      "description": "Test customer ID in user_### format",
+      "query": "What policies do I have?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [
+        "policy"
+      ],
+      "keywords_missing": [
+        "auto",
+        "life",
+        "user_003"
+      ],
+      "timestamp": "2025-06-02T23:18:57.380847",
+      "response_time": 0.01
+    },
+    {
+      "test_id": "customer_123_format",
+      "description": "Test customer ID in customer-### format",
+      "query": "Show me coverage for my policies",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "coverage",
+        "customer-123"
+      ],
+      "timestamp": "2025-06-02T23:18:58.395319",
+      "response_time": 0.01
+    },
+    {
+      "test_id": "mixed_case_customer",
+      "description": "Test mixed case customer ID",
+      "query": "What are the payment details for my policies?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "payment",
+        "Customer_001"
+      ],
+      "timestamp": "2025-06-02T23:18:59.414434",
+      "response_time": 0.01
+    },
+    {
+      "test_id": "casual_customer_mention",
+      "description": "Test casual customer name mention",
+      "query": "Tell me about my policies.",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [
+        "policy"
+      ],
+      "keywords_missing": [
+        "john"
+      ],
+      "timestamp": "2025-06-02T23:19:00.426285",
+      "response_time": 0.01
+    },
+    {
+      "test_id": "nonexistent_customer",
+      "description": "Test non-existent customer ID handling",
+      "query": "What policies do I have?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "no policies",
+        "not found",
+        "customer not found",
+        "no records"
+      ],
+      "timestamp": "2025-06-02T23:19:01.437994",
+      "response_time": 1.22
+    },
+    {
+      "test_id": "invalid_customer_format",
+      "description": "Test invalid customer ID format",
+      "query": "Show me policies for my account",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "invalid",
+        "error",
+        "not found",
+        "invalid customer"
+      ],
+      "timestamp": "2025-06-02T23:19:03.664268",
+      "response_time": 0.02
+    },
+    {
+      "test_id": "empty_customer",
+      "description": "Test empty customer ID",
+      "query": "What are my policies?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "invalid",
+        "error",
+        "customer id required"
+      ],
+      "timestamp": "2025-06-02T23:19:04.685551",
+      "response_time": 0.01
+    },
+    {
+      "test_id": "no_customer_specified",
+      "description": "Test query without customer identification",
+      "query": "What are my policies?",
+      "success": false,
+      "response": "I need you to be logged in with a valid session to access your policy information. Please log in and try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "customer",
+        "identify",
+        "specify",
+        "id required"
+      ],
+      "timestamp": "2025-06-02T23:19:05.697756",
+      "response_time": 0.0
+    },
+    {
+      "test_id": "policy_comparison",
+      "description": "Test policy comparison functionality",
+      "query": "Compare my auto and life policies",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "auto",
+        "life",
+        "compare",
+        "coverage",
+        "premium"
+      ],
+      "timestamp": "2025-06-02T23:19:06.706167",
+      "response_time": 1.69
+    },
+    {
+      "test_id": "premium_calculation",
+      "description": "Test premium calculation across policies",
+      "query": "Calculate my total annual premium",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "premium",
+        "annual",
+        "total",
+        "calculate",
+        "$95",
+        "$45"
+      ],
+      "timestamp": "2025-06-02T23:19:09.395632",
+      "response_time": 1.56
+    },
+    {
+      "test_id": "policy_renewal_info",
+      "description": "Test policy renewal information",
+      "query": "When do I need to renew my policies?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "renew",
+        "renewal",
+        "expire",
+        "2025",
+        "2034"
+      ],
+      "timestamp": "2025-06-02T23:19:11.956109",
+      "response_time": 1.19
+    },
+    {
+      "test_id": "claim_eligibility",
+      "description": "Test claim eligibility information",
+      "query": "What claims can I make on my policies?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "claim",
+        "coverage",
+        "eligible",
+        "bodily",
+        "injury"
+      ],
+      "timestamp": "2025-06-02T23:19:14.148077",
+      "response_time": 1.18
+    },
+    {
+      "test_id": "emergency_contact",
+      "description": "Test emergency contact information",
+      "query": "Who should I contact in an emergency?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "emergency",
+        "contact",
+        "agent",
+        "michael",
+        "brown"
+      ],
+      "timestamp": "2025-06-02T23:19:16.334845",
+      "response_time": 1.79
+    },
+    {
+      "test_id": "policy_modifications",
+      "description": "Test policy modification information",
+      "query": "Can I modify my coverage?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "modify",
+        "coverage",
+        "change",
+        "update"
+      ],
+      "timestamp": "2025-06-02T23:19:19.125470",
+      "response_time": 1.52
+    },
+    {
+      "test_id": "complex_multi_query",
+      "description": "Test complex multi-part query handling",
+      "query": "For customer CUST-001, tell me about all policies, payment dates, coverage limits, agent contact, and vehicle details",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [
+        "policy"
+      ],
+      "keywords_missing": [
+        "payment",
+        "coverage",
+        "agent",
+        "vehicle",
+        "honda",
+        "michael"
+      ],
+      "timestamp": "2025-06-02T23:19:21.651919",
+      "response_time": 2.1
+    },
+    {
+      "test_id": "specific_policy_id",
+      "description": "Test specific policy ID lookup",
+      "query": "Give me details for policy POL-2024-AUTO-002 for customer CUST-001",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "POL-2024-AUTO-002",
+        "auto",
+        "honda",
+        "civic",
+        "details"
+      ],
+      "timestamp": "2025-06-02T23:19:24.760251",
+      "response_time": 1.12
+    },
+    {
+      "test_id": "date_range_query",
+      "description": "Test date range payment queries",
+      "query": "What payments are due between now and December 2024 for CUST-001?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "payment",
+        "due",
+        "september",
+        "june",
+        "2024"
+      ],
+      "timestamp": "2025-06-02T23:19:26.889061",
+      "response_time": 0.93
+    },
+    {
+      "test_id": "formal_business_style",
+      "description": "Test formal business language style",
+      "query": "I would like to request a comprehensive review of all insurance policies and associated coverage details for customer identifier CUST-001",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [
+        "policy"
+      ],
+      "keywords_missing": [
+        "coverage",
+        "auto",
+        "life",
+        "review"
+      ],
+      "timestamp": "2025-06-02T23:19:28.827417",
+      "response_time": 1.16
+    },
+    {
+      "test_id": "casual_conversational",
+      "description": "Test casual conversational style",
+      "query": "Hey, can you just quickly tell me what kind of insurance I have? I'm customer CUST-001",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [
+        "policy"
+      ],
+      "keywords_missing": [
+        "insurance",
+        "auto",
+        "life"
+      ],
+      "timestamp": "2025-06-02T23:19:31.000151",
+      "response_time": 1.56
+    },
+    {
+      "test_id": "technical_jargon",
+      "description": "Test technical insurance jargon handling",
+      "query": "Provide actuarial data and risk assessment parameters for policyholder CUST-001",
+      "success": false,
+      "response": "I can help you with policy information, coverage details, payment schedules, and agent contact information. Please log in or provide your customer ID to get specific policy details.",
+      "keywords_found": [
+        "policy",
+        "coverage"
+      ],
+      "keywords_missing": [
+        "assessment",
+        "risk"
+      ],
+      "timestamp": "2025-06-02T23:19:33.565348",
+      "response_time": 1.41
+    },
+    {
+      "test_id": "special_characters_query",
+      "description": "Test special characters in queries",
+      "query": "What's my coverage amount ($) & payment due dates (?) for customer CUST-001???",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [],
+      "keywords_missing": [
+        "coverage",
+        "payment",
+        "due",
+        "$95",
+        "$45"
+      ],
+      "timestamp": "2025-06-02T23:19:35.971135",
+      "response_time": 1.76
+    },
+    {
+      "test_id": "very_long_query",
+      "description": "Test very long query handling",
+      "query": "I am writing a very long query to test the system's ability to handle extensive customer requests with lots of details and information and I want to know about my policies and coverage and payments and everything else related to my insurance for customer CUST-001 and I hope this works correctly",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [
+        "policy"
+      ],
+      "keywords_missing": [
+        "coverage",
+        "payment",
+        "insurance"
+      ],
+      "timestamp": "2025-06-02T23:19:38.728008",
+      "response_time": 1.95
+    },
+    {
+      "test_id": "minimal_query",
+      "description": "Test minimal query format",
+      "query": "CUST-001 policy?",
+      "success": false,
+      "response": "I'm having trouble retrieving your policy information. Please try again.",
+      "keywords_found": [
+        "policy"
+      ],
+      "keywords_missing": [
+        "auto",
+        "life"
+      ],
+      "timestamp": "2025-06-02T23:19:41.688285",
+      "response_time": 1.17
     }
   ],
-  "timestamp": "2025-05-31T14:57:51.634999"
+  "timestamp": "2025-06-02T23:19:43.857258"
 }

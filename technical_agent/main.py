@@ -448,17 +448,36 @@ class TechnicalAgent(A2AServer):
             logger.info(f"Session-based identification - Customer ID: {session_customer_id}, Authenticated: {authenticated}, UI Mode: {ui_mode}")
             
             if session_customer_id:
-                # Use session-based customer identification - no parsing needed!
-                parsed_request = {
-                    "intent": "get_customer_policies" if any(word in text.lower() for word in ["policy", "policies", "coverage"]) else 
-                             "health_check" if any(word in text.lower() for word in ["health", "status", "check"]) else 
-                             "general_inquiry",
-                    "customer_id": session_customer_id,
-                    "original_customer_mention": f"session:{session_customer_id}",
-                    "confidence": 1.0,  # 100% confidence since it's from authenticated session
-                    "reasoning": "Customer ID retrieved from authenticated session",
-                    "method": "session"
-                }
+                # Use session-based customer identification with LLM intent analysis
+                logger.info(f"Using LLM for intent identification with session customer ID: {session_customer_id}")
+                
+                # Get available tools from service discovery for LLM context
+                available_tools = {}
+                if self.services_initialized:
+                    available_tools = self.service_discovery.get_available_tools()
+                    logger.info(f"Available MCP tools for LLM context: {list(available_tools.keys())}")
+                
+                # Use LLM to determine intent and tool mapping
+                try:
+                    parsed_request = await self._parse_request_with_llm_and_tools(text, session_customer_id, available_tools)
+                    parsed_request["method"] = "session_llm"
+                    parsed_request["reasoning"] = f"Customer ID from session, intent from LLM: {parsed_request.get('reasoning', '')}"
+                    
+                except Exception as e:
+                    logger.error(f"LLM parsing failed for session request: {e}")
+                    logger.error(f"Exception type: {type(e).__name__}")
+                    logger.error(f"Exception args: {e.args}")
+                    # # Fallback to basic classification
+                    # parsed_request = {
+                    #     "intent": "get_customer_policies",  # Default for authenticated users
+                    #     "customer_id": session_customer_id,
+                    #     "original_customer_mention": f"session:{session_customer_id}",
+                    #     "confidence": 0.8,
+                    #     "reasoning": "Session-based customer ID, fallback intent classification",
+                    #     "method": "session_fallback"
+                    # }
+                    # Force failure to surface LLM issues
+                    raise e
                 
                 logger.info(f"Session-based parsing: {parsed_request}")
                 
@@ -470,16 +489,38 @@ class TechnicalAgent(A2AServer):
                     embedded_customer_id = session_customer_match.group(1).strip()
                     logger.info(f"🔥 TECHNICAL AGENT: Found embedded customer ID from domain agent: {embedded_customer_id}")
                     
-                    parsed_request = {
-                        "intent": "get_customer_policies" if any(word in text.lower() for word in ["policy", "policies", "coverage"]) else 
-                                 "health_check" if any(word in text.lower() for word in ["health", "status", "check"]) else 
-                                 "general_inquiry",
-                        "customer_id": embedded_customer_id,
-                        "original_customer_mention": f"embedded:{embedded_customer_id}",
-                        "confidence": 1.0,  # 100% confidence since it's from domain agent
-                        "reasoning": "Customer ID extracted from domain agent A2A request",
-                        "method": "embedded"
-                    }
+                    # Get available tools from service discovery for LLM context
+                    available_tools = {}
+                    if self.services_initialized:
+                        available_tools = self.service_discovery.get_available_tools()
+                        logger.info(f"Available MCP tools for LLM context: {list(available_tools.keys())}")
+                    
+                    # Use LLM to determine intent and tool mapping
+                    try:
+                        logger.info(f"Attempting LLM parsing for embedded customer ID: {embedded_customer_id}")
+                        logger.info(f"Available tools for LLM context: {list(available_tools.keys())}")
+                        
+                        parsed_request = await self._parse_request_with_llm_and_tools(text, embedded_customer_id, available_tools)
+                        parsed_request["method"] = "embedded_llm"
+                        parsed_request["reasoning"] = f"Customer ID from domain agent, intent from LLM: {parsed_request.get('reasoning', '')}"
+                        
+                        logger.info(f"LLM parsing successful: {parsed_request}")
+                        
+                    except Exception as e:
+                        logger.error(f"LLM parsing failed for embedded request: {e}")
+                        logger.error(f"Exception type: {type(e).__name__}")
+                        logger.error(f"Exception args: {e.args}")
+                        # # Fallback to basic classification
+                        # parsed_request = {
+                        #     "intent": "get_customer_policies",  # Default for domain agent requests
+                        #     "customer_id": embedded_customer_id,
+                        #     "original_customer_mention": f"embedded:{embedded_customer_id}",
+                        #     "confidence": 0.8,
+                        #     "reasoning": "Domain agent customer ID, fallback intent classification",
+                        #     "method": "embedded_fallback"
+                        # }
+                        # Force failure to surface LLM issues
+                        raise e
                     
                     logger.info(f"Embedded parsing: {parsed_request}")
                 
@@ -508,94 +549,60 @@ class TechnicalAgent(A2AServer):
             confidence = parsed_request.get("confidence", 0.5)
             method = parsed_request.get("method", "unknown")
             reasoning = parsed_request.get("reasoning", "No reasoning provided")
+            recommended_tool = parsed_request.get("recommended_tool")
             
             # Log the parsing details for better transparency
             logger.info(f"Intent: {intent}, Customer ID: {customer_id}, Confidence: {confidence:.1%}, Method: {method}")
             logger.info(f"Reasoning: {reasoning}")
+            if recommended_tool:
+                logger.info(f"LLM recommended tool: {recommended_tool}")
             
-            # Handle different intents with session context
-            if intent == "get_customer_policies" and customer_id:
-                # Try the new intelligent approach first
+            # Smart tool mapping based on LLM analysis and available tools
+            if customer_id and intent != "health_check":
+                # Determine which tool to use based on LLM recommendation
+                tool_to_use = recommended_tool if recommended_tool else intent
+                
+                # Validate that the tool exists in our available tools
+                available_tools = {}
+                if self.services_initialized:
+                    available_tools = self.service_discovery.get_available_tools()
+                
+                if tool_to_use not in available_tools and tool_to_use != "get_customer_policies":
+                    logger.warning(f"Recommended tool '{tool_to_use}' not available, falling back to get_customer_policies")
+                    tool_to_use = "get_customer_policies"
+                
+                logger.info(f"Using MCP tool: {tool_to_use} for customer {customer_id}")
+                
+                # Execute the appropriate MCP tool
                 try:
-                    # Use the intelligent policy assistant for better handling
-                    intelligent_result = await self.intelligent_policy_assistant(
-                        request=text,
-                        customer_id=customer_id,
-                        session=session_data,
-                        metadata=metadata,
-                        authenticated=authenticated
-                    )
+                    result = await self._generic_mcp_skill(tool_to_use, {"customer_id": customer_id}, self._get_result_key_for_tool(tool_to_use))
                     
-                    if intelligent_result.get("success"):
-                        # Process the intelligent result
-                        customer_name = customer_data.get('name', customer_id) if customer_data else customer_id
-                        
-                        if authenticated and customer_name != customer_id:
-                            response_prefix = f"Hello {customer_name}! "
+                    # Process result with proper customer validation
+                    if result["success"]:
+                        response_text = await self._format_tool_response(result, customer_id, customer_data, authenticated, method, confidence, original_mention, tool_to_use, reasoning)
+                    else:
+                        # If the specific tool fails, try get_customer_policies as fallback
+                        if tool_to_use != "get_customer_policies":
+                            logger.warning(f"Tool {tool_to_use} failed, trying get_customer_policies as fallback")
+                            fallback_result = await self._generic_mcp_skill("get_customer_policies", {"customer_id": customer_id}, "policies")
+                            if fallback_result["success"]:
+                                response_text = await self._format_tool_response(fallback_result, customer_id, customer_data, authenticated, method, confidence, original_mention, "get_customer_policies", f"Fallback after {tool_to_use} failed: {reasoning}")
+                            else:
+                                response_text = f"Customer {customer_id} not found in our system. Please verify the customer ID and try again."
                         else:
-                            response_prefix = ""
-                        
-                        # Add LLM reasoning if available
-                        reasoning = intelligent_result.get("llm_reasoning", "")
-                        if reasoning and not reasoning.startswith("Request asks"):
-                            response_prefix += f"(AI Analysis: {reasoning}) "
-                        
-                        # Build response from intelligent result
-                        data = intelligent_result.get(list(intelligent_result.keys())[-1])  # Get the data key
-                        if isinstance(data, list) and len(data) > 0:
-                            response_text = f"{response_prefix}Found information for customer {customer_id}:\n"
-                            response_text += json.dumps(intelligent_result, indent=2)
-                        else:
-                            response_text = f"{response_prefix}No data found for customer {customer_id}"
-                        
-                        task.artifacts = [{
-                            "parts": [{"type": "text", "text": response_text}]
-                        }]
-                        task.status = TaskStatus(state=TaskState.COMPLETED)
-                        return task
+                            response_text = f"Customer {customer_id} not found in our system. Please verify the customer ID and try again."
+                    
+                    task.artifacts = [{
+                        "parts": [{"type": "text", "text": response_text}]
+                    }]
+                    task.status = TaskStatus(state=TaskState.COMPLETED)
                     
                 except Exception as e:
-                    logger.warning(f"Intelligent assistant failed, falling back to legacy: {e}")
-                
-                # Fallback to legacy comprehensive API
-                result = await self._generic_mcp_skill("get_customer_policies", {"customer_id": customer_id}, "policies")
-                
-                # Process legacy result with proper customer validation
-                if result["success"]:
-                    customer_name = customer_data.get('name', customer_id) if customer_data else customer_id
-                    
-                    if authenticated and customer_name != customer_id:
-                        response_prefix = f"Hello {customer_name}! "
-                    else:
-                        response_prefix = ""
-                    
-                    if original_mention and original_mention != customer_id and not original_mention.startswith("session:"):
-                        response_prefix += f"(identified from: '{original_mention}') "
-                    
-                    policies = result.get("policies", [])
-                    
-                    # If we successfully called get_customer_policies, the customer exists
-                    # The presence of policies data (even if empty) means the customer is valid
-                    if len(policies) == 0:
-                        response_text = f"{response_prefix}Customer {customer_id} exists but has no active policies."
-                    else:
-                        comprehensive_data = {
-                            "customer_id": customer_id,
-                            "total_policies": len(policies),
-                            "policies": policies,
-                            "response_prefix": response_prefix,
-                            "method": method,
-                            "confidence": confidence if method != "session" else 1.0
-                        }
-                        response_text = json.dumps(comprehensive_data, indent=2)
-                else:
-                    # If get_customer_policies fails, then the customer doesn't exist
-                    response_text = f"Customer {customer_id} not found in our system. Please verify the customer ID and try again."
-                
-                task.artifacts = [{
-                    "parts": [{"type": "text", "text": response_text}]
-                }]
-                task.status = TaskStatus(state=TaskState.COMPLETED)
+                    logger.error(f"Error executing tool {tool_to_use}: {e}")
+                    task.artifacts = [{
+                        "parts": [{"type": "text", "text": f"Error processing request: {str(e)}"}]
+                    }]
+                    task.status = TaskStatus(state=TaskState.FAILED)
             
             elif intent == "health_check":
                 # Health check request
@@ -1016,6 +1023,190 @@ class TechnicalAgent(A2AServer):
             logger.error(f"Failed to validate customer existence: {e}")
             # If validation fails, assume customer doesn't exist to be safe
             return False
+
+    async def _parse_request_with_llm_and_tools(self, text: str, customer_id: str, available_tools: Dict) -> Dict[str, Any]:
+        """Parse a request using LLM with context of available MCP tools"""
+        try:
+            # Create enhanced prompt with available tools context
+            tools_description = ""
+            if available_tools:
+                tools_description = "Available MCP tools:\n"
+                for tool_name, tool_desc in available_tools.items():
+                    tools_description += f"- {tool_name}: {tool_desc}\n"
+            
+            # Get prompt that includes tools context
+            enhanced_prompt = f"""
+            You are analyzing an insurance customer request to determine the intent and appropriate tool mapping.
+            
+            Request: "{text}"
+            Customer ID: {customer_id}
+            
+            {tools_description}
+            
+            Based on the request and available tools, respond with JSON:
+            {{
+                "intent": "specific_tool_name_from_available_tools_or_general_category",
+                "confidence": 0.0-1.0,
+                "reasoning": "why this intent was chosen and which tool should be used",
+                "recommended_tool": "exact_tool_name_if_specific_tool_identified"
+            }}
+            
+            Examples:
+            - "What is my deductible?" -> intent: "get_deductibles"
+            - "When is payment due?" -> intent: "get_payment_information" 
+            - "What policies do I have?" -> intent: "get_customer_policies"
+            - "Who is my agent?" -> intent: "get_agent"
+            """
+            
+            if not self.openai_client:
+                raise ValueError("OpenAI client not available for LLM parsing")
+            
+            response = self.openai_client.chat.completions.create(
+                model="anthropic/claude-3-haiku",
+                messages=[{"role": "user", "content": enhanced_prompt}],
+                temperature=0.1,
+                max_tokens=300
+            )
+            
+            result_text = response.choices[0].message.content.strip()
+            logger.info(f"LLM tool-aware parsing response: {result_text}")
+            
+            # Parse JSON response
+            import json
+            import re
+            json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+            if json_match:
+                parsed_data = json.loads(json_match.group())
+                
+                return {
+                    "intent": parsed_data.get("intent", "get_customer_policies"),
+                    "customer_id": customer_id,
+                    "original_customer_mention": f"llm_analyzed:{customer_id}",
+                    "confidence": parsed_data.get("confidence", 0.8),
+                    "reasoning": parsed_data.get("reasoning", "LLM analysis with available tools"),
+                    "recommended_tool": parsed_data.get("recommended_tool"),
+                    "available_tools": list(available_tools.keys()) if available_tools else []
+                }
+            else:
+                raise ValueError("Could not parse LLM JSON response")
+                
+        except Exception as e:
+            logger.error(f"LLM tool-aware parsing failed: {e}")
+            raise
+
+    def _get_result_key_for_tool(self, tool_name: str) -> str:
+        """Get the appropriate result key for a given MCP tool"""
+        # Map tools to their expected result keys
+        tool_result_mapping = {
+            "get_customer_policies": "policies",
+            "get_policies": "policies", 
+            "get_agent": "agent",
+            "get_policy_types": "policy_types",
+            "get_policy_list": "policies",
+            "get_payment_information": "payment_info",
+            "get_coverage_information": "coverage_info",
+            "get_deductibles": "deductibles",
+            "get_recommendations": "recommendations",
+            "get_policy_details": "policy_details"
+        }
+        return tool_result_mapping.get(tool_name, "data")
+
+    async def _format_tool_response(self, result: Dict[str, Any], customer_id: str, customer_data: Dict[str, Any], authenticated: bool, method: str, confidence: float, original_mention: str, tool_name: str, reasoning: str) -> str:
+        """Format a tool response based on the result and customer data"""
+        try:
+            # Build customer greeting prefix
+            customer_name = customer_data.get('name', customer_id) if customer_data else customer_id
+            
+            if authenticated and customer_name != customer_id:
+                response_prefix = f"Hello {customer_name}! "
+            else:
+                response_prefix = ""
+            
+            if original_mention and original_mention != customer_id and not original_mention.startswith("session:"):
+                response_prefix += f"(identified from: '{original_mention}') "
+            
+            # Get the data from the result
+            result_key = self._get_result_key_for_tool(tool_name)
+            data = result.get(result_key, [])
+            
+            # Format based on tool type
+            if tool_name == "get_customer_policies":
+                if len(data) == 0:
+                    return f"{response_prefix}Customer {customer_id} exists but has no active policies."
+                else:
+                    comprehensive_data = {
+                        "customer_id": customer_id,
+                        "total_policies": len(data),
+                        "policies": data,
+                        "response_prefix": response_prefix,
+                        "method": method,
+                        "confidence": confidence,
+                        "tool_used": tool_name,
+                        "llm_reasoning": reasoning
+                    }
+                    return json.dumps(comprehensive_data, indent=2)
+            
+            elif tool_name == "get_deductibles":
+                if isinstance(data, list) and len(data) > 0:
+                    deductible_text = f"{response_prefix}Your deductible information:\n"
+                    for item in data:
+                        if isinstance(item, dict):
+                            policy_id = item.get('policy_id', 'Unknown')
+                            deductible = item.get('deductible', 'N/A')
+                            policy_type = item.get('policy_type', 'Unknown')
+                            deductible_text += f"- {policy_type} ({policy_id}): ${deductible}\n"
+                    return deductible_text
+                else:
+                    return f"{response_prefix}No deductible information found for customer {customer_id}."
+            
+            elif tool_name == "get_payment_information":
+                if isinstance(data, list) and len(data) > 0:
+                    payment_text = f"{response_prefix}Your payment information:\n"
+                    for item in data:
+                        if isinstance(item, dict):
+                            policy_id = item.get('policy_id', 'Unknown')
+                            next_due = item.get('next_payment_due', 'N/A')
+                            amount = item.get('premium', 'N/A')
+                            payment_text += f"- Policy {policy_id}: ${amount} due on {next_due}\n"
+                    return payment_text
+                else:
+                    return f"{response_prefix}No payment information found for customer {customer_id}."
+            
+            elif tool_name == "get_agent":
+                if isinstance(data, dict) and data:
+                    agent_text = f"{response_prefix}Your agent information:\n"
+                    agent_text += f"Name: {data.get('name', 'N/A')}\n"
+                    agent_text += f"Email: {data.get('email', 'N/A')}\n" 
+                    agent_text += f"Phone: {data.get('phone', 'N/A')}\n"
+                    return agent_text
+                else:
+                    return f"{response_prefix}No agent information found for customer {customer_id}."
+            
+            elif tool_name == "get_coverage_information":
+                if isinstance(data, list) and len(data) > 0:
+                    coverage_text = f"{response_prefix}Your coverage information:\n"
+                    for item in data:
+                        if isinstance(item, dict):
+                            policy_id = item.get('policy_id', 'Unknown')
+                            coverage = item.get('coverage_amount', 'N/A')
+                            policy_type = item.get('policy_type', 'Unknown')
+                            coverage_text += f"- {policy_type} ({policy_id}): ${coverage} coverage\n"
+                    return coverage_text
+                else:
+                    return f"{response_prefix}No coverage information found for customer {customer_id}."
+            
+            else:
+                # Generic formatting for other tools
+                if isinstance(data, list) and len(data) > 0:
+                    return f"{response_prefix}Found {len(data)} result(s) for {tool_name}:\n" + json.dumps(data, indent=2)
+                elif isinstance(data, dict) and data:
+                    return f"{response_prefix}Result from {tool_name}:\n" + json.dumps(data, indent=2)
+                else:
+                    return f"{response_prefix}No data found using {tool_name} for customer {customer_id}."
+            
+        except Exception as e:
+            logger.error(f"Error formatting response for tool {tool_name}: {e}")
+            return f"Successfully retrieved data using {tool_name}, but encountered formatting error: {str(e)}"
 
 if __name__ == "__main__":
     # Check command line arguments for port

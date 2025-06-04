@@ -231,7 +231,7 @@ class DomainAgent(A2AServer):
         }
         
         # Plan what to ask Technical Agent - only if we have customer ID from session
-        if customer_id and any(intent in ["policy_inquiry", "coverage_inquiry", "payment_inquiry", "agent_contact"] for intent in intents):
+        if customer_id and any(intent in ["policy_inquiry", "coverage_inquiry", "payment_inquiry", "deductible_inquiry", "agent_contact"] for intent in intents):
             plan["action"] = "ask_technical_agent"
             
             # Create comprehensive request based on all intents
@@ -247,6 +247,9 @@ class DomainAgent(A2AServer):
             elif "payment_inquiry" in intents:
                 plan["technical_request"] = f"Get payment information for customer {customer_id}"
                 plan["response_template"] = "payment_inquiry"
+            elif "deductible_inquiry" in intents:
+                plan["technical_request"] = f"Get deductible information for customer {customer_id}"
+                plan["response_template"] = "deductible_inquiry"
             elif "agent_contact" in intents:
                 plan["technical_request"] = f"Get agent contact information for customer {customer_id}"
                 plan["response_template"] = "agent_contact"
@@ -537,7 +540,15 @@ class DomainAgent(A2AServer):
         if not response or not isinstance(response, str):
             return False
         
-        response_lower = response.lower()
+        # Remove any identification prefix from the response for analysis
+        cleaned_response = response
+        if response.startswith("(identified from:"):
+            # Find the end of the identification prefix and extract the actual response
+            closing_paren_idx = response.find(")")
+            if closing_paren_idx != -1:
+                cleaned_response = response[closing_paren_idx + 1:].strip()
+        
+        response_lower = cleaned_response.lower()
         
         # Check for help/error indicators that suggest no real data
         help_indicators = [
@@ -577,7 +588,10 @@ class DomainAgent(A2AServer):
             "$",     # Money amounts
             "coverage",
             "liability",
-            "collision"
+            "collision",
+            "your payment information:",
+            "your deductible",
+            "due on"
         ]
         
         # Check if response contains actual policy data indicators
@@ -587,8 +601,8 @@ class DomainAgent(A2AServer):
         try:
             import json
             # Try to parse as JSON
-            if response.strip().startswith('[') or response.strip().startswith('{'):
-                parsed = json.loads(response)
+            if cleaned_response.strip().startswith('[') or cleaned_response.strip().startswith('{'):
+                parsed = json.loads(cleaned_response)
                 if isinstance(parsed, list) and len(parsed) > 0:
                     # Check if it's a list of policies
                     first_item = parsed[0]

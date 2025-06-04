@@ -9,7 +9,8 @@ intent_analysis:
     IMPORTANT: Customers may ask multiple questions in one request. Extract ALL relevant intents.
     
     Intent Classification Rules:
-    - payment_inquiry: User asks about payments, premiums, billing, due dates, amounts, deductibles
+    - payment_inquiry: User asks about payments, premiums, billing, due dates, amounts
+    - deductible_inquiry: User asks specifically about deductibles, out-of-pocket costs
     - coverage_inquiry: User asks about coverage amounts, limits, totals, how much coverage
     - policy_inquiry: User asks about policies, policy details, policy types, what policies they have
     - agent_contact: User asks about their agent, contact information, who to call
@@ -21,7 +22,7 @@ intent_analysis:
     CRITICAL JSON FORMAT REQUIREMENTS:
     1. You MUST respond with ONLY valid JSON - no markdown, no explanations, no extra text
     2. Use exactly these field names: "primary_intents", "confidence"
-    3. primary_intents must be an array of intents: ["payment_inquiry", "coverage_inquiry", etc.]
+    3. primary_intents must be an array of intents: ["payment_inquiry", "deductible_inquiry", "coverage_inquiry", etc.]
     4. Include ALL relevant intents, even if there are multiple
     5. confidence must be a number between 0.0 and 1.0
     6. Do not include any other fields or comments
@@ -34,6 +35,7 @@ intent_analysis:
     
     Examples:
     - "What are my premium amounts?" → {{"primary_intents": ["payment_inquiry"], "confidence": 0.9}}
+    - "What is my deductible?" → {{"primary_intents": ["deductible_inquiry"], "confidence": 0.9}}
     - "Tell me about my policies and when my next payment is due" → {{"primary_intents": ["policy_inquiry", "payment_inquiry"], "confidence": 0.9}}
     - "Who is my agent and what coverage do I have?" → {{"primary_intents": ["agent_contact", "coverage_inquiry"], "confidence": 0.9}}
     - "Show me everything about my insurance" → {{"primary_intents": ["policy_inquiry", "coverage_inquiry", "payment_inquiry", "agent_contact"], "confidence": 0.8}}

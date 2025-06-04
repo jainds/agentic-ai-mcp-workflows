@@ -1,11 +1,24 @@
 """
 Response formatting module for Domain Agent
-Handles LLM-based response formatting
+Handles LLM-based response formatting using examples instead of rigid templates
 """
 
+import sys
+import os
 import logging
+import time
 from typing import Dict, Any
 from prompt_loader import PromptLoader
+
+# Import monitoring
+try:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    from monitoring.setup.monitoring_setup import get_monitoring_manager
+    monitoring = get_monitoring_manager()
+    MONITORING_ENABLED = monitoring.is_monitoring_enabled()
+except Exception:
+    monitoring = None
+    MONITORING_ENABLED = False
 
 logger = logging.getLogger(__name__)
 
@@ -19,35 +32,73 @@ class ResponseFormatter:
         self.prompts = PromptLoader()
     
     def format_comprehensive_response(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
-        """Format comprehensive response using LLM and templates"""
-        return self._format_with_llm(intent, customer_id, technical_response, user_question)
-    
-    def _format_with_llm(self, intent: str, customer_id: str, technical_response: str, user_question: str) -> str:
-        """Use LLM to format response with template structure"""
+        """Format comprehensive response using LLM with examples instead of rigid templates"""
+        start_time = time.time()
+        
         try:
-            # Select appropriate template based on intent
-            template_key = self._get_template_key_for_intent(intent)
-            response_template = self.prompts.prompts.get("response_formatting", {}).get(template_key, "")
-            
-            # Get enhanced prompt from YAML
-            enhanced_prompt = self.prompts.get_llm_formatting_prompt(
-                user_question, customer_id, intent, technical_response, response_template
+            # Get the LLM formatting prompt (no longer needs response_template parameter)
+            prompt = self.prompts.get_llm_formatting_prompt(
+                user_question=user_question,
+                customer_id=customer_id,
+                intent=intent,
+                technical_response=technical_response
             )
-
+            
+            # Call LLM to format the response intelligently based on examples
             response = self.openai_client.chat.completions.create(
                 model="openai/gpt-4o-mini",
-                messages=[{"role": "user", "content": enhanced_prompt}],
-                temperature=0.3,
-                max_tokens=1500
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,  # Slightly higher for more natural language
+                max_tokens=800    # Allow for longer, more natural responses
             )
             
+            duration = time.time() - start_time
+            
+            # Record LLM call metrics
+            if MONITORING_ENABLED and monitoring:
+                monitoring.record_llm_call(
+                    model="gpt-4o-mini",
+                    prompt_tokens=response.usage.prompt_tokens if response.usage else 0,
+                    completion_tokens=response.usage.completion_tokens if response.usage else 0,
+                    total_tokens=response.usage.total_tokens if response.usage else 0,
+                    duration_seconds=duration,
+                    success=True,
+                    metadata={
+                        "function": "response_formatting",
+                        "intent": intent,
+                        "customer_id": customer_id
+                    }
+                )
+            
             formatted_response = response.choices[0].message.content.strip()
-            logger.info(f"🔥 DOMAIN AGENT: LLM formatted response using template: {template_key}")
+            logger.info(f"🔥 DOMAIN AGENT: LLM formatted response successfully (intent: {intent})")
+            
             return formatted_response
             
         except Exception as e:
+            duration = time.time() - start_time
+            
+            # Record failed LLM call
+            if MONITORING_ENABLED and monitoring:
+                monitoring.record_llm_call(
+                    model="gpt-4o-mini",
+                    prompt_tokens=0,
+                    completion_tokens=0,
+                    total_tokens=0,
+                    duration_seconds=duration,
+                    success=False,
+                    error=str(e),
+                    metadata={
+                        "function": "response_formatting",
+                        "intent": intent,
+                        "customer_id": customer_id
+                    }
+                )
+            
             logger.error(f"🔥 DOMAIN AGENT: LLM formatting failed: {e}")
-            raise ValueError(f"Failed to format response with LLM: {e}")
+            
+            # Fallback to basic formatting if LLM fails
+            return f"I found your policy information:\n\n{technical_response}\n\nLet me know if you need help with anything else!"
 
     def _get_template_key_for_intent(self, intent: str) -> str:
         """Map intent to appropriate response template key"""

@@ -751,16 +751,16 @@ class TechnicalAgent(A2AServer):
             else:
                 # Fallback to hardcoded tools if discovery failed
                 available_tools = {
-                    "get_policies": "Get basic list of customer policies (requires customer_id)",
-                    "get_agent": "Get agent contact information for customer (requires customer_id)",
-                    "get_policy_types": "Get policy types for customer (requires customer_id)",
-                    "get_policy_list": "Get detailed policy list with dates and coverage (requires customer_id)",
-                    "get_payment_information": "Get payment details and due dates (requires customer_id)",
-                    "get_coverage_information": "Get coverage details and limits (requires customer_id)",
-                    "get_deductibles": "Get deductible amounts (requires customer_id)",
-                    "get_recommendations": "Get product recommendations (requires customer_id)",
+                    "get_policies": "Get basic list of customer policies (limited info - use get_policy_list for complete data)",
+                    "get_policy_list": "Get detailed policy list with billing cycles, dates, and deductibles (preferred for policy inquiries)",
+                    "get_customer_policies": "Get comprehensive customer policies with all details",
+                    "get_agent": "Get agent contact information for customer",
+                    "get_policy_types": "Get list of policy types for customer", 
+                    "get_payment_information": "Get payment schedules, due dates, and billing information",
+                    "get_coverage_information": "Get coverage amounts, limits, and types",
                     "get_policy_details": "Get complete details for specific policy (requires policy_id)",
-                    "get_customer_policies": "Legacy comprehensive API (requires customer_id)"
+                    "get_deductibles": "Get deductible amounts for customer policies",
+                    "get_recommendations": "Get policy recommendations for customer"
                 }
                 tools_description = "\n".join([f"- {name}: {desc}" for name, desc in available_tools.items()])
             
@@ -1129,6 +1129,14 @@ class TechnicalAgent(A2AServer):
             result_key = self._get_result_key_for_tool(tool_name)
             data = result.get(result_key, [])
             
+            # Helper function to format premium with billing cycle
+            def format_premium_with_cycle(premium, billing_cycle):
+                """Format premium amount with billing cycle if available"""
+                if billing_cycle:
+                    return f"${premium} ({billing_cycle})"
+                else:
+                    return f"${premium}"
+            
             # Format based on tool type
             if tool_name == "get_customer_policies":
                 if len(data) == 0:
@@ -1145,6 +1153,31 @@ class TechnicalAgent(A2AServer):
                         "llm_reasoning": reasoning
                     }
                     return json.dumps(comprehensive_data, indent=2)
+            
+            elif tool_name in ["get_policies", "get_policy_list"]:
+                if len(data) == 0:
+                    return f"{response_prefix}Customer {customer_id} exists but has no active policies."
+                else:
+                    policies_text = f"{response_prefix}Your insurance policies:\n\n"
+                    for policy in data:
+                        if isinstance(policy, dict):
+                            policy_id = policy.get('id', 'Unknown')
+                            policy_type = policy.get('type', 'Unknown').title()
+                            premium = policy.get('premium', 'N/A')
+                            billing_cycle = policy.get('billing_cycle', '')
+                            coverage = policy.get('coverage_amount', 'N/A')
+                            status = policy.get('status', 'Unknown')
+                            
+                            # Format premium with billing cycle
+                            premium_display = format_premium_with_cycle(premium, billing_cycle)
+                            
+                            policies_text += f"🛡️ **{policy_type} Insurance ({policy_id})**\n"
+                            policies_text += f"- Coverage: ${coverage:,}\n"
+                            policies_text += f"- Premium: {premium_display}\n"
+                            policies_text += f"- Status: {status}\n\n"
+                    
+                    policies_text += "If you need more details about any specific policy, just let me know!"
+                    return policies_text
             
             elif tool_name == "get_deductibles":
                 if isinstance(data, list) and len(data) > 0:
@@ -1166,8 +1199,13 @@ class TechnicalAgent(A2AServer):
                         if isinstance(item, dict):
                             policy_id = item.get('policy_id', 'Unknown')
                             next_due = item.get('next_payment_due', 'N/A')
-                            amount = item.get('premium', 'N/A')
-                            payment_text += f"- Policy {policy_id}: ${amount} due on {next_due}\n"
+                            premium = item.get('premium', 'N/A')
+                            billing_cycle = item.get('billing_cycle', '')
+                            
+                            # Format premium with billing cycle
+                            premium_display = format_premium_with_cycle(premium, billing_cycle)
+                            
+                            payment_text += f"- Policy {policy_id}: {premium_display} due on {next_due}\n"
                     return payment_text
                 else:
                     return f"{response_prefix}No payment information found for customer {customer_id}."

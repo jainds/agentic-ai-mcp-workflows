@@ -71,13 +71,13 @@ def get_customer_policies_internal(customer_id: str) -> List[Dict[str, Any]]:
 @mcp.tool()
 def get_policies(customer_id: str) -> List[Dict[str, Any]]:
     """
-    Get basic list of customer policies
+    Get basic list of customer policies with essential billing information
     
     Args:
         customer_id: The customer's ID
         
     Returns:
-        Simple list of policies with basic information
+        List of policies with premium and billing cycle information
     """
     logger.info(f"Getting policies for customer: {customer_id}")
     
@@ -86,7 +86,7 @@ def get_policies(customer_id: str) -> List[Dict[str, Any]]:
     if not customer_policies:
         return []
     
-    # Return simplified policy list
+    # Return policy list with billing cycle information always included
     policies = []
     for policy in customer_policies:
         policies.append({
@@ -94,10 +94,11 @@ def get_policies(customer_id: str) -> List[Dict[str, Any]]:
             "type": policy.get("type"),
             "status": policy.get("status"),
             "premium": policy.get("premium"),
+            "billing_cycle": policy.get("billing_cycle"),  # Always include billing cycle
             "coverage_amount": policy.get("coverage_amount")
         })
     
-    logger.info(f"Returning {len(policies)} policies")
+    logger.info(f"Returning {len(policies)} policies with billing cycle information")
     return policies
 
 @mcp.tool()

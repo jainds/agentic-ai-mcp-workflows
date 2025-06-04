@@ -125,6 +125,9 @@ llm_formatting:
     - Always extract exact amounts, dates, and details from the data
     - Never include sections for unavailable information
     - Never mention information the customer didn't ask about unless directly relevant
+    - **BILLING CYCLES**: Always use exact billing cycle information from data (monthly, quarterly, annually) - NEVER assume "/month"
+    - **PREMIUM DISPLAY**: Show premiums as "$95 (quarterly)" or "$45 (monthly)" when billing cycle data is available
+    - If billing cycle is not provided in data, show just "$95" without assuming frequency
 
     CRITICAL RULES:
     - If the customer asked about "policies", show policy overview

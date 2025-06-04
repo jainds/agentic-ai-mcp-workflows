@@ -46,6 +46,16 @@ intelligent_api_selection:
     Available tools:
     {tools_description}
 
+    TOOL SELECTION PREFERENCES:
+    - For policy inquiries: PREFER get_policy_list over get_policies (includes billing cycles, dates, deductibles)
+    - For comprehensive info: USE get_customer_policies (most complete data)
+    - For payment info: USE get_payment_information (includes billing cycles and due dates)
+    - For coverage details: USE get_coverage_information
+    - For agent info: USE get_agent
+    - For deductible info: USE get_deductibles
+
+    CRITICAL: Always prefer tools that provide complete information including billing cycles and detailed scheduling.
+
     Respond with JSON in this exact format:
     {{
         "tool_name": "exact_tool_name_from_list_above",
@@ -61,6 +71,7 @@ intelligent_api_selection:
     - policy_id is required for get_policy_details (extract from request)
     - If you can't extract required parameters, set tool_name to null
     - Be specific about which information the user is asking for
+    - ALWAYS prefer detailed tools (get_policy_list) over basic tools (get_policies)
 
   multi_tool_planning_prompt: |
     You are an intelligent insurance API planner. Analyze this complex request and create a comprehensive plan with multiple tool calls to gather all required information.

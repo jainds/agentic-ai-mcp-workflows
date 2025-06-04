@@ -392,9 +392,14 @@ class PolicyQueriesE2ETester:
         try:
             start_time = time.time()
             
-            # Create A2A client and send query
+            # Create A2A client and send query with customer ID embedded
             domain_client = A2AClient(self.domain_agent_url)
-            response = domain_client.ask(test_case["query"])
+            
+            # Append customer ID to query so it can be extracted
+            customer_id = test_case.get("customer_id", "CUST-001")
+            query_with_customer = f"{test_case['query']} Customer ID: {customer_id}"
+            
+            response = domain_client.ask(query_with_customer)
             
             end_time = time.time()
             result["response_time"] = round(end_time - start_time, 2)

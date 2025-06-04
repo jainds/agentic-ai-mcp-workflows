@@ -6,9 +6,13 @@ request_parsing:
     You are an intelligent insurance technical agent parser. Analyze this request and extract the intent.
     
     IMPORTANT: Customer identification is handled through session authentication. Focus only on determining what the user wants to do.
+    The request may contain multiple intents or be a comprehensive request asking for various types of information.
     
     Possible intents:
-    - get_customer_policies: User wants to retrieve/view/check policies 
+    - get_customer_policies: User wants to retrieve/view/check policies (includes comprehensive policy info)
+    - get_coverage_information: User wants to know about coverage amounts, limits, totals
+    - get_payment_information: User wants payment schedules, due dates, billing info
+    - get_agent_information: User wants agent contact details
     - health_check: User wants to check system/service health status
     - general_inquiry: General questions or unclear intent
     
@@ -16,12 +20,14 @@ request_parsing:
     
     Instructions:
     1. Determine the most likely intent based on context
-    2. Provide high confidence only when very certain
-    3. Focus on the action/intent, not customer identification
+    2. For comprehensive requests (e.g., "get comprehensive information covering: policy_inquiry, payment_inquiry"), use get_customer_policies
+    3. For multi-intent requests, choose the most comprehensive intent that covers all aspects
+    4. Provide high confidence only when very certain
+    5. Focus on the action/intent, not customer identification
     
     Respond ONLY with valid JSON:
     {{
-        "intent": "get_customer_policies|health_check|general_inquiry",
+        "intent": "get_customer_policies|get_coverage_information|get_payment_information|get_agent_information|health_check|general_inquiry",
         "confidence": 0.0-1.0,
         "reasoning": "brief explanation of your analysis"
     }}

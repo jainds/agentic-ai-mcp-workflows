@@ -1,0 +1,59 @@
+technical_data_workflow:
+  name: "technical_data_processing"
+  description: "A2A technical data processing workflow"
+  timeout: 45.0
+  retry_count: 3
+  
+  steps:
+    - name: "request_parsing"
+      agent: "technical_agent"
+      instruction: "Parse A2A request into structured format"
+      input_mapping:
+        request: "a2a_request"
+        customer_id: "customer_id"
+      output_mapping:
+        parsed: "parsed_request"
+        intent: "request_intent"
+        mcp_calls: "required_mcp_calls"
+        
+    - name: "mcp_data_retrieval"
+      agent: "technical_agent"
+      instruction: "Retrieve data using MCP tools"
+      tool: "mcp_policy_tool"
+      input_mapping:
+        request: "parsed_request"
+        customer_id: "customer_id"
+        mcp_calls: "required_mcp_calls"
+      output_mapping:
+        data: "mcp_data"
+        success: "mcp_success"
+        error: "mcp_error"
+        
+    - name: "response_formatting"
+      agent: "technical_agent"
+      instruction: "Format response for A2A protocol"
+      input_mapping:
+        request: "parsed_request"
+        data: "mcp_data"
+        customer_id: "customer_id"
+      output_mapping:
+        response: "formatted_response"
+        metadata: "response_metadata"
+
+  error_handling:
+    mcp_connection_failed:
+      message: "Unable to connect to policy system"
+      action: "retry_with_backoff"
+      retry_count: 3
+      
+    policy_not_found:
+      message: "No policies found for customer"
+      action: "return_empty_result"
+      
+    parsing_failed:
+      message: "Unable to parse request"
+      action: "return_error_response"
+      
+    general_error:
+      message: "Technical processing error"
+      action: "log_and_escalate" 

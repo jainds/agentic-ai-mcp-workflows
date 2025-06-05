@@ -1,0 +1,248 @@
+name: 🔍 PR Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: 📋 Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.changes.outputs.code }}
+      docker: ${{ steps.changes.outputs.docker }}
+      k8s: ${{ steps.changes.outputs.k8s }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            code:
+              - '**/*.py'
+              - 'requirements.txt'
+              - 'pyproject.toml'
+              - 'policy_server/**'
+              - 'technical_agent/**'
+              - 'domain_agent/**'
+              - 'agents/**'
+              - 'ui/**'
+            docker:
+              - 'Dockerfile'
+              - 'docker-compose.yml'
+            k8s:
+              - 'k8s/**'
+              - 'helm/**'
+
+  lint-and-format:
+    name: 🧹 Code Quality
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install black flake8 mypy
+          pip install -r requirements.txt
+      
+      - name: Black formatting check
+        run: black --check --diff .
+        continue-on-error: true
+      
+      - name: Flake8 linting
+        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        continue-on-error: true
+      
+      - name: MyPy type checking
+        run: mypy . --ignore-missing-imports --show-error-codes
+        continue-on-error: true
+
+  unit-tests:
+    name: 🧪 Unit Tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-json-report
+      
+      - name: Run unit tests
+        run: |
+          python -m pytest tests/unit/ -v \
+            --cov=. --cov-report=xml --cov-report=term \
+            --json-report --json-report-file=test-results.json
+      
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+        continue-on-error: true
+
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Bandit security scan
+        run: |
+          pip install bandit[toml]
+          bandit -r . -f json -o bandit-report.json || true
+        continue-on-error: true
+      
+      - name: Run Safety dependency check
+        run: |
+          pip install safety
+          safety check --json --output safety-report.json || true
+        continue-on-error: true
+      
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+
+  docker-build-test:
+    name: 🐳 Docker Build Test
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.docker == 'true' || needs.changes.outputs.code == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image (test)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: insurance-ai-poc:pr-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  integration-tests:
+    name: 🔗 Integration Tests
+    runs-on: ubuntu-latest
+    needs: [changes, unit-tests]
+    if: needs.changes.outputs.code == 'true' && needs.unit-tests.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-json-report
+      
+      - name: Run integration tests
+        run: |
+          python -m pytest tests/integration/ -v \
+            --json-report --json-report-file=integration-results.json
+        continue-on-error: true
+
+  pr-summary:
+    name: 💬 PR Summary
+    runs-on: ubuntu-latest
+    needs: [changes, lint-and-format, unit-tests, security-scan, docker-build-test, integration-tests]
+    if: always()
+    steps:
+      - name: Create PR Summary Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              'Code Quality': '${{ needs.lint-and-format.result || 'skipped' }}',
+              'Unit Tests': '${{ needs.unit-tests.result || 'skipped' }}',
+              'Security Scan': '${{ needs.security-scan.result || 'skipped' }}',
+              'Docker Build': '${{ needs.docker-build-test.result || 'skipped' }}',
+              'Integration Tests': '${{ needs.integration-tests.result || 'skipped' }}'
+            };
+            
+            const statusEmoji = {
+              'success': '✅',
+              'failure': '❌',
+              'cancelled': '⚠️',
+              'skipped': '⏭️'
+            };
+            
+            const passed = Object.values(results).filter(r => r === 'success').length;
+            const total = Object.values(results).filter(r => r !== 'skipped').length;
+            
+            let body = `## 🔍 PR Validation Results\n\n`;
+            body += `**${passed}/${total} checks passed**\n\n`;
+            
+            for (const [check, result] of Object.entries(results)) {
+              body += `${statusEmoji[result] || '❓'} **${check}**: ${result}\n`;
+            }
+            
+            if (passed === total && total > 0) {
+              body += `\n🎉 **All checks passed! Ready for review.**`;
+            } else if (total === 0) {
+              body += `\n📝 **No code changes detected - only documentation updates.**`;
+            } else {
+              body += `\n⚠️ **Please address failing checks before review.**`;
+            }
+            
+            // Get previous comments
+            const comments = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            const botComment = comments.data.find(comment => 
+              comment.user.login === 'github-actions[bot]' && 
+              comment.body.includes('PR Validation Results')
+            );
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                comment_id: botComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } 

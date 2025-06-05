@@ -1,0 +1,116 @@
+name: 'Setup Kubernetes'
+description: 'Setup kubectl and Helm for Kubernetes operations'
+
+inputs:
+  kubeconfig:
+    description: 'Base64 encoded kubeconfig content'
+    required: true
+  namespace:
+    description: 'Kubernetes namespace to create/use'
+    required: true
+  kubectl-version:
+    description: 'kubectl version to install'
+    required: false
+    default: 'v1.28.0'
+  helm-version:
+    description: 'Helm version to install'
+    required: false
+    default: '3.13.0'
+  create-namespace:
+    description: 'Create namespace if it does not exist'
+    required: false
+    default: 'true'
+
+outputs:
+  kubeconfig-path:
+    description: 'Path to the kubeconfig file'
+    value: ${{ steps.setup.outputs.kubeconfig_path }}
+  cluster-info:
+    description: 'Cluster information'
+    value: ${{ steps.setup.outputs.cluster_info }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: ${{ inputs.kubectl-version }}
+    
+    - name: Setup Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: ${{ inputs.helm-version }}
+    
+    - name: Configure kubectl and create namespace
+      id: setup
+      shell: bash
+      run: |
+        # Create kubeconfig file
+        KUBECONFIG_PATH="$HOME/.kube/config"
+        mkdir -p "$(dirname "$KUBECONFIG_PATH")"
+        echo "${{ inputs.kubeconfig }}" | base64 -d > "$KUBECONFIG_PATH"
+        chmod 600 "$KUBECONFIG_PATH"
+        
+        # Set kubeconfig environment variable
+        echo "KUBECONFIG=$KUBECONFIG_PATH" >> $GITHUB_ENV
+        echo "kubeconfig_path=$KUBECONFIG_PATH" >> $GITHUB_OUTPUT
+        
+        # Try to get cluster info
+        CLUSTER_INFO="unknown"
+        if kubectl cluster-info --request-timeout=10s > /dev/null 2>&1; then
+          CLUSTER_INFO=$(kubectl cluster-info | head -1 | grep -oE 'https://[^[:space:]]+' || echo "connected")
+        fi
+        echo "cluster_info=$CLUSTER_INFO" >> $GITHUB_OUTPUT
+        
+        # Create namespace if requested
+        if [[ "${{ inputs.create-namespace }}" == "true" ]]; then
+          echo "📦 Creating namespace: ${{ inputs.namespace }}"
+          kubectl create namespace "${{ inputs.namespace }}" --dry-run=client -o yaml | kubectl apply -f -
+        fi
+        
+        # Verify setup
+        echo "✅ Kubernetes setup completed"
+        echo "🔧 kubectl version: $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
+        echo "⚙️ Helm version: $(helm version --short 2>/dev/null || helm version)"
+        echo "🌐 Cluster: $CLUSTER_INFO"
+        echo "📦 Namespace: ${{ inputs.namespace }}"
+    
+    - name: Verify cluster connectivity
+      shell: bash
+      run: |
+        echo "🔍 Verifying cluster connectivity..."
+        
+        # Test basic connectivity
+        if ! kubectl get nodes --request-timeout=30s > /dev/null 2>&1; then
+          echo "⚠️ Warning: Unable to list cluster nodes (may be RBAC restricted)"
+        else
+          echo "✅ Cluster nodes accessible"
+        fi
+        
+        # Check namespace access
+        if kubectl get namespace "${{ inputs.namespace }}" > /dev/null 2>&1; then
+          echo "✅ Namespace '${{ inputs.namespace }}' accessible"
+        else
+          echo "❌ Unable to access namespace '${{ inputs.namespace }}'"
+          exit 1
+        fi
+        
+        # Test Helm
+        if helm list --namespace "${{ inputs.namespace }}" > /dev/null 2>&1; then
+          echo "✅ Helm can access namespace"
+        else
+          echo "⚠️ Warning: Helm access to namespace may be limited"
+        fi
+    
+    - name: Generate setup summary
+      shell: bash
+      run: |
+        echo "### ⚙️ Kubernetes Setup Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Component | Version | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|-----------|---------|--------|" >> $GITHUB_STEP_SUMMARY
+        echo "| kubectl | ${{ inputs.kubectl-version }} | ✅ Installed |" >> $GITHUB_STEP_SUMMARY
+        echo "| Helm | ${{ inputs.helm-version }} | ✅ Installed |" >> $GITHUB_STEP_SUMMARY
+        echo "| Cluster | ${{ steps.setup.outputs.cluster_info }} | ✅ Connected |" >> $GITHUB_STEP_SUMMARY
+        echo "| Namespace | ${{ inputs.namespace }} | ✅ Ready |" >> $GITHUB_STEP_SUMMARY 

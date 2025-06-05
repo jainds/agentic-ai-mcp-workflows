@@ -1,0 +1,317 @@
+name: 🔒 Security Scan
+
+on:
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: [ main ]
+    paths:
+      - 'requirements.txt'
+      - 'requirements.lock'
+      - 'pyproject.toml'
+      - 'Dockerfile'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'requirements.txt'
+      - 'requirements.lock'
+      - 'pyproject.toml'
+      - 'Dockerfile'
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of security scan'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - quick
+          - full
+          - dependencies-only
+          - code-only
+
+env:
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  dependency-scan:
+    name: 🔍 Dependency Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type != 'code-only'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies for scanning
+        run: |
+          pip install --upgrade pip
+          pip install safety pip-audit bandit[toml]
+      
+      - name: Run Safety check
+        run: |
+          echo "🔒 Running Safety vulnerability check..."
+          safety check --json --output safety-report.json || true
+          safety check --short-report || true
+        continue-on-error: true
+      
+      - name: Run pip-audit
+        run: |
+          echo "🔍 Running pip-audit..."
+          pip-audit --desc --output=pip-audit-report.json --format=json || true
+          pip-audit --desc || true
+        continue-on-error: true
+      
+      - name: Upload dependency scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: dependency-scan-results
+          path: |
+            safety-report.json
+            pip-audit-report.json
+          retention-days: 30
+
+  code-security-scan:
+    name: 🛡️ Code Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type != 'dependencies-only'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install Bandit
+        run: pip install bandit[toml]
+      
+      - name: Run Bandit security scan
+        run: |
+          echo "🔒 Running Bandit code security scan..."
+          bandit -r . \
+            -f json -o bandit-report.json \
+            --exclude tests/,test_*,.venv/,build/,dist/ \
+            --skip B101,B601 || true
+          
+          echo "📊 Bandit Summary:"
+          bandit -r . \
+            --exclude tests/,test_*,.venv/,build/,dist/ \
+            --skip B101,B601 \
+            --format txt || true
+        continue-on-error: true
+      
+      - name: Run Semgrep security scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >- 
+            p/security-audit
+            p/secrets
+            p/python
+        continue-on-error: true
+      
+      - name: Upload code scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: code-scan-results
+          path: |
+            bandit-report.json
+          retention-days: 30
+
+  docker-security-scan:
+    name: 🐳 Docker Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == ''
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: insurance-ai-poc:security-scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'insurance-ai-poc:security-scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+        continue-on-error: true
+      
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+        continue-on-error: true
+      
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: |
+            trivy-results.sarif
+            trivy-fs-results.sarif
+        continue-on-error: true
+      
+      - name: Upload Docker scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: docker-scan-results
+          path: |
+            trivy-results.sarif
+            trivy-fs-results.sarif
+          retention-days: 30
+
+  license-scan:
+    name: 📜 License Compliance Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == ''
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install pip-licenses
+        run: pip install pip-licenses
+      
+      - name: Install project dependencies
+        run: pip install -r requirements.txt
+      
+      - name: Generate license report
+        run: |
+          echo "📜 Generating license compliance report..."
+          pip-licenses --format=json --output-file=licenses-report.json
+          pip-licenses --format=markdown --output-file=licenses-report.md
+          
+          echo "📊 License Summary:"
+          pip-licenses --summary
+      
+      - name: Upload license scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: license-scan-results
+          path: |
+            licenses-report.json
+            licenses-report.md
+          retention-days: 30
+
+  security-summary:
+    name: 📊 Security Summary
+    needs: [dependency-scan, code-security-scan, docker-security-scan, license-scan]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download all scan results
+        uses: actions/download-artifact@v3
+        continue-on-error: true
+      
+      - name: Generate security summary
+        run: |
+          echo "# 🔒 Security Scan Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "**Scan Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> security-summary.md
+          echo "**Triggered by:** ${{ github.actor }}" >> security-summary.md
+          echo "**Repository:** ${{ github.repository }}" >> security-summary.md
+          echo "**Commit:** ${{ github.sha }}" >> security-summary.md
+          echo "" >> security-summary.md
+          
+          echo "## Scan Results" >> security-summary.md
+          echo "| Scan Type | Status |" >> security-summary.md
+          echo "|-----------|--------|" >> security-summary.md
+          echo "| Dependency Scan | ${{ needs.dependency-scan.result || 'skipped' }} |" >> security-summary.md
+          echo "| Code Security Scan | ${{ needs.code-security-scan.result || 'skipped' }} |" >> security-summary.md
+          echo "| Docker Security Scan | ${{ needs.docker-security-scan.result || 'skipped' }} |" >> security-summary.md
+          echo "| License Compliance | ${{ needs.license-scan.result || 'skipped' }} |" >> security-summary.md
+          
+          # Check for high-severity issues
+          HIGH_SEVERITY_FOUND=false
+          
+          if [[ -f "dependency-scan-results/safety-report.json" ]]; then
+            if jq -e '.vulnerabilities | length > 0' dependency-scan-results/safety-report.json > /dev/null 2>&1; then
+              HIGH_SEVERITY_FOUND=true
+              echo "" >> security-summary.md
+              echo "⚠️ **High-severity dependency vulnerabilities found!**" >> security-summary.md
+            fi
+          fi
+          
+          if [[ -f "code-scan-results/bandit-report.json" ]]; then
+            if jq -e '.results | length > 0' code-scan-results/bandit-report.json > /dev/null 2>&1; then
+              echo "" >> security-summary.md
+              echo "⚠️ **Code security issues found!**" >> security-summary.md
+            fi
+          fi
+          
+          if [[ "$HIGH_SEVERITY_FOUND" == "true" ]]; then
+            echo "" >> security-summary.md
+            echo "🚨 **Action Required:** Please review and address high-severity security issues." >> security-summary.md
+          else
+            echo "" >> security-summary.md
+            echo "✅ **No critical security issues found.**" >> security-summary.md
+          fi
+          
+          cat security-summary.md
+      
+      - name: Create Issue for High-Severity Findings
+        if: github.event_name == 'schedule' && contains(needs.*.result, 'failure')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🔒 Security Scan Alert - ${new Date().toISOString().split('T')[0]}`;
+            const body = `## Security Scan Alert
+            
+            A scheduled security scan has detected potential issues that require attention.
+            
+            **Scan Results:**
+            - Dependency Scan: ${{ needs.dependency-scan.result || 'skipped' }}
+            - Code Security Scan: ${{ needs.code-security-scan.result || 'skipped' }}
+            - Docker Security Scan: ${{ needs.docker-security-scan.result || 'skipped' }}
+            - License Compliance: ${{ needs.license-scan.result || 'skipped' }}
+            
+            **Action Required:**
+            1. Review the scan results in the [Actions tab](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            2. Download and analyze the security reports
+            3. Address any high-severity vulnerabilities
+            4. Update dependencies if necessary
+            
+            **Workflow:** [Security Scan #${{ github.run_number }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['security', 'priority-high', 'automated']
+            });
+
+      - name: Upload security summary
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-summary
+          path: security-summary.md
+          retention-days: 90 

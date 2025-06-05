@@ -1,0 +1,14 @@
+openrouter:
+  api_key: "${OPENROUTER_API_KEY}"
+  base_url: "https://openrouter.ai/api/v1"
+  headers:
+    HTTP-Referer: "https://insurance-ai-poc.com"
+    X-Title: "Insurance AI Agent System"
+  
+  # Cost tracking
+  budget_limit: 50.0  # Monthly budget in USD
+  cost_alerts: true
+  
+  # Performance monitoring
+  track_latency: true
+  track_tokens: true 

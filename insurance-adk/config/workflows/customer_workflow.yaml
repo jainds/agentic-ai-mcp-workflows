@@ -1,0 +1,66 @@
+customer_inquiry_workflow:
+  name: "customer_inquiry_processing"
+  description: "Process customer inquiries through domain and technical agents"
+  timeout: 60.0
+  retry_count: 2
+  
+  steps:
+    - name: "intent_analysis"
+      agent: "domain_agent"
+      instruction: "Analyze customer intent and determine required actions"
+      input_mapping:
+        message: "customer_message"
+        context: "session_data"
+      output_mapping:
+        intent: "intent_result"
+        confidence: "intent_confidence"
+        requires_auth: "needs_authentication"
+        requires_technical: "needs_data_retrieval"
+      
+    - name: "authentication_check"
+      condition: "needs_authentication == true"
+      agent: "domain_agent"
+      instruction: "Verify customer authentication status"
+      input_mapping:
+        session: "session_data"
+        customer_id: "customer_id"
+      output_mapping:
+        authenticated: "auth_status"
+        
+    - name: "data_retrieval"
+      condition: "needs_data_retrieval == true AND auth_status == true"
+      agent: "technical_agent"
+      instruction: "Retrieve policy data using MCP tools"
+      input_mapping:
+        request: "technical_request"
+        customer_id: "customer_id"
+        intent: "intent_result"
+      output_mapping:
+        data: "policy_data"
+        success: "retrieval_success"
+        
+    - name: "response_synthesis"
+      agent: "domain_agent"
+      instruction: "Create final customer response"
+      input_mapping:
+        intent: "intent_result"
+        data: "policy_data"
+        context: "session_data"
+        message: "customer_message"
+        customer_id: "customer_id"
+      output_mapping:
+        response: "final_response"
+        requires_followup: "followup_needed"
+
+  error_handling:
+    authentication_failed:
+      message: "Please authenticate to access your policy information"
+      action: "redirect_to_auth"
+      
+    data_retrieval_failed:
+      message: "Unable to retrieve policy data at this time"
+      action: "retry_or_escalate"
+      
+    general_error:
+      message: "An error occurred processing your request"
+      action: "log_and_retry" 

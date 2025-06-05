@@ -1,0 +1,24 @@
+models:
+  domain_agent:
+    primary: "openrouter/anthropic/claude-3.5-sonnet"
+    fallback: "openrouter/openai/gpt-4o-mini"
+    max_tokens: 4096
+    temperature: 0.3
+    
+  technical_agent:
+    primary: "openrouter/meta-llama/llama-3.1-70b-instruct"
+    fallback: "openrouter/openai/gpt-4o-mini"
+    max_tokens: 4096
+    temperature: 0.1
+    
+  orchestrator:
+    primary: "openrouter/anthropic/claude-3.5-sonnet"
+    fallback: "openrouter/openai/gpt-4o-mini"
+    max_tokens: 4096
+    temperature: 0.2
+
+# Model fallback configuration
+fallback_strategy:
+  max_retries: 3
+  retry_delay: 1.0
+  timeout: 30.0 

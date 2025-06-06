@@ -19,11 +19,11 @@ class UIConfig:
     # UI Mode: "simple" or "advanced"
     UI_MODE = os.getenv("UI_MODE", "advanced")  # Default to advanced mode
     
-    # Agent endpoints - Updated for current Kubernetes deployment
+    # Agent endpoints - Updated for Google ADK + A2A architecture
     DOMAIN_AGENT_ENDPOINTS = [
-        os.getenv("DOMAIN_AGENT_URL", "http://insurance-ai-poc-domain-agent:8003"),  # Current Kubernetes service
-        "http://localhost:8003",             # Port forwarded current agent
-        "http://127.0.0.1:8003"              # Fallback
+        "http://insurance-ai-poc-domain-agent:8003",    # Domain Agent (Kubernetes service)
+        "http://localhost:8003",                        # Port forwarded domain agent  
+        "http://127.0.0.1:8003"                        # Local domain agent
     ]
     
     # Demo customer data
@@ -31,17 +31,16 @@ class UIConfig:
         "CUST-001": {"name": "John Smith", "status": "Active", "type": "Premium"},
         "CUST-002": {"name": "Jane Doe", "status": "Active", "type": "Standard"},
         "CUST-003": {"name": "Bob Johnson", "status": "Active", "type": "Basic"},
-        "user_001": {"name": "Test User 1", "status": "Active", "type": "Demo"},
-        "user_002": {"name": "Test User 2", "status": "Active", "type": "Demo"},
-        "user_003": {"name": "Test User 3", "status": "Active", "type": "Demo"}
+        "TEST-CUSTOMER": {"name": "Test User", "status": "Active", "type": "Demo"}
     }
     
-    # Service endpoints for monitoring - Updated for current deployment
+    # Service endpoints for monitoring - Updated for current architecture
     MONITORED_SERVICES = {
-        "Domain Agent": os.getenv("DOMAIN_AGENT_URL", "http://insurance-ai-poc-domain-agent:8003") + "/agent.json",
-        "Technical Agent": os.getenv("TECHNICAL_AGENT_URL", "http://insurance-ai-poc-technical-agent:8002") + "/agent.json",
-        "Policy Server": os.getenv("POLICY_SERVER_URL", "http://insurance-ai-poc-policy-server:8001") + "/mcp",
-        "Streamlit UI": "http://insurance-ai-poc-streamlit-ui:80/healthz"
+        "Domain Agent (Google ADK)": "http://localhost:8003/health",
+        "Technical Agent (A2A)": "http://localhost:8002/health", 
+        "Policy Server (MCP)": "http://localhost:8001/mcp",
+        "A2A Communication": "http://localhost:8002/a2a/agent.json",
+        "ADK Orchestrator": "http://localhost:8000/health"
     }
     
     @classmethod

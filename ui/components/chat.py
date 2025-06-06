@@ -10,7 +10,7 @@ from ui.components.config import UIConfig
 from ui.components.agent_client import DomainAgentClient, send_chat_message_simple
 
 def initialize_chat_state():
-    """Initialize chat-related session state with session ID"""
+    """Initialize chat-related session state"""
     if 'conversation_history' not in st.session_state:
         st.session_state.conversation_history = []
     if 'api_calls' not in st.session_state:
@@ -19,13 +19,6 @@ def initialize_chat_state():
         st.session_state.thinking_steps = []
     if 'orchestration_data' not in st.session_state:
         st.session_state.orchestration_data = []
-    
-    # Initialize session ID if not present
-    if 'session_id' not in st.session_state:
-        import uuid
-        st.session_state.session_id = str(uuid.uuid4())
-        # Use print for now since logger might not be configured yet
-        print(f"Initialized new session ID: {st.session_state.session_id}")
 
 def render_chat_interface():
     """Render the main chat interface"""

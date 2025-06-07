@@ -3,7 +3,7 @@ google-adk>=1.0.0
 
 # FastAPI Server
 fastapi==0.115.12
-uvicorn==0.34.2
+uvicorn==0.34.3
 
 # LLM Integration
 litellm>=1.55.0

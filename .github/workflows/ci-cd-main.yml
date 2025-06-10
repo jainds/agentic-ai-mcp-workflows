@@ -39,6 +39,7 @@ jobs:
       previous-version: ${{ steps.version.outputs.previous-version }}
       tag: ${{ steps.version.outputs.tag }}
       changelog: ${{ steps.version.outputs.changelog }}
+      docker-tag: ${{ steps.version.outputs.docker-tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -118,23 +119,31 @@ jobs:
               ;;
           esac
           
-          NEW_VERSION="$NEW_MAJOR.$NEW_MINOR.$NEW_PATCH"
+          BASE_VERSION="$NEW_MAJOR.$NEW_MINOR.$NEW_PATCH"
           
-          # Add branch suffix for non-main branches  
+          # Create Docker-safe tag - only for non-main branches add suffix
           if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9]/-/g' | head -c 20)
-            NEW_VERSION="$NEW_VERSION-$BRANCH_NAME"
+            # Sanitize branch name for Docker tags (only alphanumeric, dots, dashes, underscores)
+            BRANCH_CLEAN=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/--*/-/g' | head -c 20)
+            DOCKER_TAG="$BASE_VERSION-$BRANCH_CLEAN"
+            VERSION_TAG="$BASE_VERSION-$BRANCH_CLEAN"
+          else
+            DOCKER_TAG="$BASE_VERSION"
+            VERSION_TAG="$BASE_VERSION"
           fi
           
-          echo "Final version: $NEW_VERSION"
+          echo "Base version: $BASE_VERSION"
+          echo "Docker tag: $DOCKER_TAG"
+          echo "Version tag: $VERSION_TAG"
           
           # Set outputs
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION_TAG" >> $GITHUB_OUTPUT
+          echo "docker-tag=$DOCKER_TAG" >> $GITHUB_OUTPUT
           echo "previous-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION_TAG" >> $GITHUB_OUTPUT
           
           # Generate simple changelog
-          CHANGELOG=$(git log --oneline --since="1 day ago" | head -5 | sed 's/^/- /' || echo "- Updated version to $NEW_VERSION")
+          CHANGELOG=$(git log --oneline --since="1 day ago" | head -5 | sed 's/^/- /' || echo "- Updated version to $VERSION_TAG")
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -238,25 +247,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🏷️ Extract metadata for Docker
+      - name: 🏷️ Generate simplified Docker tags
         id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}
-          tags: |
-            type=raw,value=${{ needs.version.outputs.version }}
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value={{date 'YYYYMMDD-HHmmss'}},suffix=-${{ matrix.image.name }}
-          labels: |
-            org.opencontainers.image.title=Insurance AI PoC (${{ matrix.image.name }})
-            org.opencontainers.image.description=Google ADK + LiteLLM + OpenRouter Integration (${{ matrix.image.name }})
-            org.opencontainers.image.version=${{ needs.version.outputs.version }}
-            org.opencontainers.image.vendor=Insurance AI Team
-            insurance.ai.component=${{ matrix.image.name }}
-            insurance.ai.version=${{ needs.version.outputs.version }}
+        run: |
+          # Generate simple, valid Docker tags
+          IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}"
+          DOCKER_TAG="${{ needs.version.outputs.docker-tag }}"
+          
+          # Primary tag with version
+          TAGS="$IMAGE_NAME:$DOCKER_TAG"
+          
+          # Add latest tag for main branch
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            TAGS="$TAGS,$IMAGE_NAME:latest"
+          fi
+          
+          # Add branch tag for non-main branches
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+            BRANCH_TAG=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
+            TAGS="$TAGS,$IMAGE_NAME:$BRANCH_TAG"
+          fi
+          
+          echo "Generated tags: $TAGS"
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "images=$IMAGE_NAME" >> $GITHUB_OUTPUT
 
       - name: 🐳 Build and push Docker image
         id: build
@@ -266,7 +280,13 @@ jobs:
           file: ${{ matrix.image.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: |
+            org.opencontainers.image.title=Insurance AI PoC (${{ matrix.image.name }})
+            org.opencontainers.image.description=Google ADK + LiteLLM + OpenRouter Integration (${{ matrix.image.name }})
+            org.opencontainers.image.version=${{ needs.version.outputs.version }}
+            org.opencontainers.image.vendor=Insurance AI Team
+            insurance.ai.component=${{ matrix.image.name }}
+            insurance.ai.version=${{ needs.version.outputs.version }}
           cache-from: type=gha,scope=${{ matrix.image.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
           platforms: linux/amd64,linux/arm64
@@ -278,9 +298,10 @@ jobs:
       - name: 🔍 Test image
         run: |
           # Test that the image can be pulled and runs
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}:${{ needs.version.outputs.version }}
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}:${{ needs.version.outputs.version }} \
-            python --version
+          PRIMARY_TAG=$(echo "${{ steps.meta.outputs.tags }}" | cut -d',' -f1)
+          echo "Testing image: $PRIMARY_TAG"
+          docker pull "$PRIMARY_TAG"
+          docker run --rm "$PRIMARY_TAG" python --version
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4
@@ -309,12 +330,12 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.31.0
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image-name }}:${{ needs.version.outputs.version }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image-name }}:${{ needs.version.outputs.docker-tag }}
           format: 'sarif'
           output: 'trivy-results-${{ matrix.image-name }}.sarif'
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: 'trivy-results-${{ matrix.image-name }}.sarif'
@@ -340,8 +361,8 @@ jobs:
             ## 🚀 Release ${{ needs.version.outputs.tag }}
             
             ### 📦 Docker Images Published
-            - `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}`
-            - `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.docker-tag }}`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.docker-tag }}`
             
             ### 📝 Changes
             ${{ needs.version.outputs.changelog }}
@@ -349,12 +370,12 @@ jobs:
             ### 🔧 Usage Commands
             ```bash
             # Pull latest images
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.docker-tag }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.docker-tag }}
             
             # Run locally
-            docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}
-            docker run -p 8001:8001 ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}
+            docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.docker-tag }}
+            docker run -p 8001:8001 ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.docker-tag }}
             ```
           draft: false
           prerelease: false
@@ -376,8 +397,8 @@ jobs:
           echo "Scan Date: $(date)" >> vulnerability-report.md
           echo "" >> vulnerability-report.md
           echo "### Images Scanned:" >> vulnerability-report.md
-          echo "- insurance-ai-poc-main:${{ needs.version.outputs.version }}" >> vulnerability-report.md
-          echo "- insurance-ai-poc-adk:${{ needs.version.outputs.version }}" >> vulnerability-report.md
+          echo "- insurance-ai-poc-main:${{ needs.version.outputs.docker-tag }}" >> vulnerability-report.md
+          echo "- insurance-ai-poc-adk:${{ needs.version.outputs.docker-tag }}" >> vulnerability-report.md
 
       - name: Upload vulnerability report
         uses: actions/upload-artifact@v4
@@ -400,13 +421,14 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Release Information" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag:** ${{ needs.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Tag:** ${{ needs.version.outputs.docker-tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Git Tag:** ${{ needs.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📦 Published Docker Images" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.docker-tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.docker-tag }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔍 Pipeline Results" >> $GITHUB_STEP_SUMMARY
           echo "- **Version Management:** ${{ needs.version.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY

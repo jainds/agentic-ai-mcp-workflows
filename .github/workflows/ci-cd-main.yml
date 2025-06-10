@@ -67,8 +67,23 @@ jobs:
       - name: 🔍 Determine version bump
         id: version
         run: |
+          # Default fallback version
+          DEFAULT_VERSION="1.0.0"
+          
           # Get current version from pyproject.toml
-          CURRENT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          if [ -f "pyproject.toml" ]; then
+            CURRENT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/' | head -1)
+          else
+            echo "pyproject.toml not found, using default version"
+            CURRENT_VERSION=""
+          fi
+          
+          # If no version found, use default
+          if [ -z "$CURRENT_VERSION" ]; then
+            echo "No version found in pyproject.toml, using default: $DEFAULT_VERSION"
+            CURRENT_VERSION="$DEFAULT_VERSION"
+          fi
+          
           echo "Current version: $CURRENT_VERSION"
           
           # Determine version bump type
@@ -90,11 +105,16 @@ jobs:
           
           echo "Version bump type: $BUMP_TYPE"
           
-          # Calculate new version
+          # Calculate new version - ensure we have valid numbers
           IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-          MAJOR=${VERSION_PARTS[0]}
-          MINOR=${VERSION_PARTS[1]}
-          PATCH=${VERSION_PARTS[2]}
+          MAJOR=${VERSION_PARTS[0]:-1}
+          MINOR=${VERSION_PARTS[1]:-0}
+          PATCH=${VERSION_PARTS[2]:-0}
+          
+          # Ensure all parts are numeric
+          if ! [[ "$MAJOR" =~ ^[0-9]+$ ]]; then MAJOR=1; fi
+          if ! [[ "$MINOR" =~ ^[0-9]+$ ]]; then MINOR=0; fi
+          if ! [[ "$PATCH" =~ ^[0-9]+$ ]]; then PATCH=0; fi
           
           case $BUMP_TYPE in
             major)
@@ -119,12 +139,18 @@ jobs:
             NEW_VERSION="$NEW_VERSION-$BRANCH_NAME.$(date +%Y%m%d%H%M%S)"
           fi
           
+          # Ensure we have a valid version
+          if [ -z "$NEW_VERSION" ]; then
+            NEW_VERSION="$DEFAULT_VERSION"
+          fi
+          
+          echo "New version: $NEW_VERSION"
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "previous-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
           
           # Generate changelog
-          CHANGELOG=$(git log --oneline --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '1 day ago')" | head -10 | sed 's/^/- /')
+          CHANGELOG=$(git log --oneline --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '1 day ago')" | head -10 | sed 's/^/- /' || echo "- Initial release")
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -132,7 +158,29 @@ jobs:
       - name: 📝 Update version in pyproject.toml
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
-          sed -i 's/^version = .*/version = "${{ steps.version.outputs.version }}"/' pyproject.toml
+          # Create pyproject.toml if it doesn't exist
+          if [ ! -f "pyproject.toml" ]; then
+            cat > pyproject.toml << EOF
+          [build-system]
+          requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+          build-backend = "setuptools.build_meta"
+          
+          [project]
+          name = "insurance-ai-poc"
+          version = "${{ steps.version.outputs.version }}"
+          description = "Google ADK + LiteLLM + OpenRouter Integration"
+          authors = [{name = "Insurance AI Team"}]
+          license = {text = "MIT"}
+          readme = "README.md"
+          requires-python = ">=3.11"
+          dependencies = []
+          
+          [tool.setuptools]
+          packages = ["insurance_adk", "policy_server"]
+          EOF
+          else
+            sed -i 's/^version = .*/version = "${{ steps.version.outputs.version }}"/' pyproject.toml
+          fi
           git add pyproject.toml
           git commit -m "🔖 Bump version to ${{ steps.version.outputs.version }}" || echo "No changes to commit"
 
@@ -294,8 +342,7 @@ jobs:
     name: 🚀 Deploy to Staging
     needs: [version, build-and-test, security-scan]
     runs-on: ubuntu-latest
-    environment: 
-      name: staging
+    environment: staging
     if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
     steps:
       - name: Checkout code
@@ -413,6 +460,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
+      url: https://insurance-ai-poc.example.com
     if: |
       (needs.e2e-tests.result == 'success' || github.event.inputs.force_deploy == 'true') &&
       (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production')

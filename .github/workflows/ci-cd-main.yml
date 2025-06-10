@@ -8,14 +8,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Deployment environment'
-        required: true
-        default: 'staging'
-        type: choice
-        options:
-        - staging
-        - production
       version_bump:
         description: 'Version bump type'
         required: false
@@ -25,11 +17,6 @@ on:
         - patch
         - minor
         - major
-      force_deploy:
-        description: 'Force deployment even if tests fail'
-        required: false
-        default: false
-        type: boolean
       skip_tests:
         description: 'Skip test execution'
         required: false
@@ -67,34 +54,41 @@ jobs:
       - name: 🔍 Determine version bump
         id: version
         run: |
-          # Default fallback version
+          # Set a simple default version
           DEFAULT_VERSION="1.0.0"
           
-          # Get current version from pyproject.toml
-          if [ -f "pyproject.toml" ]; then
-            CURRENT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/' | head -1)
+          # Get the latest tag or use default
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LATEST_TAG" ]; then
+            CURRENT_VERSION="$DEFAULT_VERSION"
           else
-            echo "pyproject.toml not found, using default version"
-            CURRENT_VERSION=""
+            # Remove 'v' prefix if present
+            CURRENT_VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
           fi
           
-          # If no version found, use default
-          if [ -z "$CURRENT_VERSION" ]; then
-            echo "No version found in pyproject.toml, using default: $DEFAULT_VERSION"
+          # Ensure we have a valid semver format
+          if ! echo "$CURRENT_VERSION" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Invalid version format, using default: $DEFAULT_VERSION"
             CURRENT_VERSION="$DEFAULT_VERSION"
           fi
           
           echo "Current version: $CURRENT_VERSION"
           
+          # Parse version components
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]:-1}
+          MINOR=${VERSION_PARTS[1]:-0}
+          PATCH=${VERSION_PARTS[2]:-0}
+          
           # Determine version bump type
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             BUMP_TYPE="${{ github.event.inputs.version_bump }}"
           elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            # Check commit messages for version hints
-            COMMITS=$(git log --oneline --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '1 day ago')" | head -20)
-            if echo "$COMMITS" | grep -iE "\b(break|breaking|major)\b"; then
+            # Check recent commits for version hints
+            RECENT_COMMITS=$(git log --oneline -10 | head -10)
+            if echo "$RECENT_COMMITS" | grep -iE "\b(break|breaking|major)\b"; then
               BUMP_TYPE="major"
-            elif echo "$COMMITS" | grep -iE "\b(feat|feature|minor)\b"; then
+            elif echo "$RECENT_COMMITS" | grep -iE "\b(feat|feature|minor)\b"; then
               BUMP_TYPE="minor"
             else
               BUMP_TYPE="patch"
@@ -105,52 +99,42 @@ jobs:
           
           echo "Version bump type: $BUMP_TYPE"
           
-          # Calculate new version - ensure we have valid numbers
-          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-          MAJOR=${VERSION_PARTS[0]:-1}
-          MINOR=${VERSION_PARTS[1]:-0}
-          PATCH=${VERSION_PARTS[2]:-0}
-          
-          # Ensure all parts are numeric
-          if ! [[ "$MAJOR" =~ ^[0-9]+$ ]]; then MAJOR=1; fi
-          if ! [[ "$MINOR" =~ ^[0-9]+$ ]]; then MINOR=0; fi
-          if ! [[ "$PATCH" =~ ^[0-9]+$ ]]; then PATCH=0; fi
-          
+          # Calculate new version
           case $BUMP_TYPE in
             major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
+              NEW_MAJOR=$((MAJOR + 1))
+              NEW_MINOR=0
+              NEW_PATCH=0
               ;;
             minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
+              NEW_MAJOR=$MAJOR
+              NEW_MINOR=$((MINOR + 1))
+              NEW_PATCH=0
               ;;
             patch)
-              PATCH=$((PATCH + 1))
+              NEW_MAJOR=$MAJOR
+              NEW_MINOR=$MINOR
+              NEW_PATCH=$((PATCH + 1))
               ;;
           esac
           
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          NEW_VERSION="$NEW_MAJOR.$NEW_MINOR.$NEW_PATCH"
           
-          # Add pre-release suffix for non-main branches
+          # Add branch suffix for non-main branches  
           if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9]/-/g')
-            NEW_VERSION="$NEW_VERSION-$BRANCH_NAME.$(date +%Y%m%d%H%M%S)"
+            BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9]/-/g' | head -c 20)
+            NEW_VERSION="$NEW_VERSION-$BRANCH_NAME"
           fi
           
-          # Ensure we have a valid version
-          if [ -z "$NEW_VERSION" ]; then
-            NEW_VERSION="$DEFAULT_VERSION"
-          fi
+          echo "Final version: $NEW_VERSION"
           
-          echo "New version: $NEW_VERSION"
+          # Set outputs
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "previous-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
           
-          # Generate changelog
-          CHANGELOG=$(git log --oneline --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '1 day ago')" | head -10 | sed 's/^/- /' || echo "- Initial release")
+          # Generate simple changelog
+          CHANGELOG=$(git log --oneline --since="1 day ago" | head -5 | sed 's/^/- /' || echo "- Updated version to $NEW_VERSION")
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -336,199 +320,11 @@ jobs:
           sarif_file: 'trivy-results-${{ matrix.image-name }}.sarif'
 
   # ==========================================
-  # Deploy to Staging
-  # ==========================================
-  deploy-staging:
-    name: 🚀 Deploy to Staging
-    needs: [version, build-and-test, security-scan]
-    runs-on: ubuntu-latest
-    environment: staging
-    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: 'v1.30.0'
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: '3.15.0'
-
-      - name: 🔧 Configure kubectl for staging
-        run: |
-          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
-          kubectl config use-context default || true
-          kubectl create namespace insurance-ai-staging --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: 📊 Deploy to staging with Helm
-        run: |
-          helm upgrade --install insurance-ai-poc ./k8s/insurance-ai-poc \
-            --namespace insurance-ai-staging \
-            --create-namespace \
-            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }} \
-            --set image.tag=${{ needs.version.outputs.version }} \
-            --set image.mainImage=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }} \
-            --set image.adkImage=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }} \
-            --set environment=staging \
-            --set version="${{ needs.version.outputs.version }}" \
-            --set replicaCount=1 \
-            --set resources.requests.cpu=200m \
-            --set resources.requests.memory=512Mi \
-            --set resources.limits.cpu=1000m \
-            --set resources.limits.memory=2Gi \
-            --set secrets.openrouterApiKey="${{ secrets.OPENROUTER_API_KEY }}" \
-            --set secrets.openaiApiKey="${{ secrets.OPENAI_API_KEY }}" \
-            --set secrets.langfuseSecretKey="${{ secrets.LANGFUSE_SECRET_KEY }}" \
-            --set secrets.langfusePublicKey="${{ secrets.LANGFUSE_PUBLIC_KEY }}" \
-            --wait --timeout=10m
-
-      - name: ⏳ Wait for deployment to be ready
-        run: |
-          kubectl wait --for=condition=available deployment \
-            -l app.kubernetes.io/instance=insurance-ai-poc \
-            --timeout=300s \
-            -n insurance-ai-staging
-
-      - name: 🔍 Get deployment status
-        run: |
-          kubectl get pods -n insurance-ai-staging
-          kubectl get services -n insurance-ai-staging
-
-  # ==========================================
-  # E2E Tests
-  # ==========================================
-  e2e-tests:
-    name: 🎯 E2E Tests
-    needs: [version, build-and-test, deploy-staging]
-    runs-on: ubuntu-latest
-    if: needs.deploy-staging.result == 'success'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-          cache: 'pip'
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: 'v1.30.0'
-
-      - name: 🔧 Configure kubectl
-        run: |
-          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
-
-      - name: 🌐 Set up port forwarding for E2E tests
-        run: |
-          # Start port forwarding in background
-          kubectl port-forward -n insurance-ai-staging service/insurance-adk-customer-service 8000:8000 &
-          kubectl port-forward -n insurance-ai-staging service/insurance-adk-technical 8001:8001 &
-          kubectl port-forward -n insurance-ai-staging service/insurance-adk-orchestrator 8002:8002 &
-          kubectl port-forward -n insurance-ai-staging service/policy-server 8003:8001 &
-          kubectl port-forward -n insurance-ai-staging service/streamlit-ui 8501:8501 &
-          
-          # Wait for port forwards to be ready
-          sleep 30
-
-      - name: 🧪 Run E2E tests
-        run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-json-report
-          
-          # Run E2E tests with staging endpoints
-          python tests/verify_monitoring_integration.py || true
-        env:
-          ADK_CUSTOMER_SERVICE_URL: http://localhost:8000
-          ADK_TECHNICAL_AGENT_URL: http://localhost:8001
-          ADK_ORCHESTRATOR_URL: http://localhost:8002
-          POLICY_SERVER_URL: http://localhost:8003
-          STREAMLIT_URL: http://localhost:8501
-
-  # ==========================================
-  # Production Deployment
-  # ==========================================
-  deploy-production:
-    name: 🚀 Production Deployment
-    needs: [version, build-and-test, e2e-tests]
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: https://insurance-ai-poc.example.com
-    if: |
-      (needs.e2e-tests.result == 'success' || github.event.inputs.force_deploy == 'true') &&
-      (github.ref == 'refs/heads/main' || github.event.inputs.environment == 'production')
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: 'v1.30.0'
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: '3.15.0'
-
-      - name: 🔧 Configure kubectl for production
-        run: |
-          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
-          kubectl config use-context default || true
-          kubectl create namespace insurance-ai-production --dry-run=client -o yaml | kubectl apply -f -
-
-      - name: 📊 Deploy to production with Helm
-        run: |
-          helm upgrade --install insurance-ai-poc ./k8s/insurance-ai-poc \
-            --namespace insurance-ai-production \
-            --create-namespace \
-            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }} \
-            --set image.tag=${{ needs.version.outputs.version }} \
-            --set image.mainImage=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }} \
-            --set image.adkImage=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }} \
-            --set environment=production \
-            --set version="${{ needs.version.outputs.version }}" \
-            --set replicaCount=2 \
-            --set resources.requests.cpu=500m \
-            --set resources.requests.memory=1Gi \
-            --set resources.limits.cpu=2000m \
-            --set resources.limits.memory=4Gi \
-            --set autoscaling.enabled=true \
-            --set autoscaling.minReplicas=2 \
-            --set autoscaling.maxReplicas=10 \
-            --set autoscaling.targetCPUUtilizationPercentage=70 \
-            --set secrets.openrouterApiKey="${{ secrets.OPENROUTER_API_KEY }}" \
-            --set secrets.openaiApiKey="${{ secrets.OPENAI_API_KEY }}" \
-            --set secrets.langfuseSecretKey="${{ secrets.LANGFUSE_SECRET_KEY }}" \
-            --set secrets.langfusePublicKey="${{ secrets.LANGFUSE_PUBLIC_KEY }}" \
-            --wait --timeout=15m
-
-      - name: ⏳ Wait for production deployment
-        run: |
-          kubectl wait --for=condition=available deployment \
-            -l app.kubernetes.io/instance=insurance-ai-poc \
-            --timeout=600s \
-            -n insurance-ai-production
-
-      - name: 🔍 Verify production deployment
-        run: |
-          kubectl get pods -n insurance-ai-production
-          kubectl get services -n insurance-ai-production
-          kubectl get hpa -n insurance-ai-production
-
-  # ==========================================
   # Create GitHub Release
   # ==========================================
   create-release:
     name: 📦 Create GitHub Release
-    needs: [version, build-and-test, deploy-staging]
+    needs: [version, build-and-test, security-scan]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     steps:
@@ -550,15 +346,15 @@ jobs:
             ### 📝 Changes
             ${{ needs.version.outputs.changelog }}
             
-            ### 🔧 Deployment Commands
+            ### 🔧 Usage Commands
             ```bash
             # Pull latest images
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}
             
-            # Deploy with Helm
-            helm upgrade --install insurance-ai-poc ./k8s/insurance-ai-poc \
-              --set image.tag=${{ needs.version.outputs.version }}
+            # Run locally
+            docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}
+            docker run -p 8001:8001 ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}
             ```
           draft: false
           prerelease: false
@@ -590,45 +386,36 @@ jobs:
           path: vulnerability-report.md
 
   # ==========================================
-  # Notifications
+  # Pipeline Summary
   # ==========================================
-  notify:
-    name: 📢 Notify Team
-    needs: [version, build-and-test, deploy-staging, e2e-tests, deploy-production, create-release]
+  pipeline-summary:
+    name: 📋 Pipeline Summary
+    needs: [version, build-and-test, security-scan, create-release, vulnerability-report]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Create deployment summary
-        id: summary
+      - name: 📊 Generate Pipeline Summary
         run: |
-          if [[ "${{ needs.deploy-production.result }}" == "success" ]]; then
-            STATUS="🎉 Production deployment successful!"
-            COLOR="good"
-          elif [[ "${{ needs.deploy-staging.result }}" == "success" ]]; then
-            STATUS="✅ Staging deployment successful"
-            COLOR="warning"
-          else
-            STATUS="❌ Deployment failed"
-            COLOR="danger"
-          fi
-          
-          echo "status=$STATUS" >> $GITHUB_OUTPUT
-          echo "color=$COLOR" >> $GITHUB_OUTPUT
-
-      - name: 📋 Pipeline Summary
-        run: |
-          echo "## 🚀 Pipeline Execution Summary"
-          echo "**Version:** ${{ needs.version.outputs.version }}"
-          echo "**Images Published:**"
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}\`"
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}\`"
-          echo ""
-          echo "**Pipeline Results:**"
-          echo "- **Build:** ${{ needs.build-and-test.result }}"
-          echo "- **Tests:** ${{ needs.build-and-test.outputs.test-results }}"
-          echo "- **Staging:** ${{ needs.deploy-staging.result }}"
-          echo "- **E2E Tests:** ${{ needs.e2e-tests.result }}"
-          echo "- **Production:** ${{ needs.deploy-production.result }}"
-          echo "- **Release:** ${{ needs.create-release.result }}"
-          echo ""
-          echo "${{ steps.summary.outputs.status }}" 
+          echo "## 🚀 CI/CD Pipeline Execution Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Release Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** ${{ needs.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Published Docker Images" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Pipeline Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version Management:** ${{ needs.version.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build & Test:** ${{ needs.build-and-test.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Scan:** ${{ needs.security-scan.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **GitHub Release:** ${{ needs.create-release.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Vulnerability Report:** ${{ needs.vulnerability-report.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎯 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review the [vulnerability report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) if security issues were found" >> $GITHUB_STEP_SUMMARY
+          echo "2. Use the published Docker images for your deployments" >> $GITHUB_STEP_SUMMARY
+          echo "3. Check the [release notes](https://github.com/${{ github.repository }}/releases/tag/${{ needs.version.outputs.tag }}) for detailed changes" >> $GITHUB_STEP_SUMMARY 

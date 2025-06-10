@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Configuration and Feature Toggles for Insurance AI UI
+Updated for Google ADK + LiteLLM + OpenRouter Integration
 """
 
 import os
@@ -19,11 +20,30 @@ class UIConfig:
     # UI Mode: "simple" or "advanced"
     UI_MODE = os.getenv("UI_MODE", "advanced")  # Default to advanced mode
     
-    # Agent endpoints - Updated for Google ADK + A2A architecture
+    # Google ADK Agent endpoints - Updated for LiteLLM + OpenRouter integration
+    ADK_CUSTOMER_SERVICE_ENDPOINTS = [
+        "http://insurance-adk-customer-service:8000",   # Kubernetes service
+        "http://localhost:8000",                        # Port forwarded ADK web
+        "http://127.0.0.1:8000"                        # Local ADK web
+    ]
+    
+    ADK_TECHNICAL_AGENT_ENDPOINTS = [
+        "http://insurance-adk-technical:8001",          # Kubernetes service  
+        "http://localhost:8001",                        # Port forwarded ADK API
+        "http://127.0.0.1:8001"                        # Local ADK API
+    ]
+    
+    ADK_ORCHESTRATOR_ENDPOINTS = [
+        "http://insurance-adk-orchestrator:8002",       # Kubernetes service
+        "http://localhost:8002",                        # Port forwarded orchestrator
+        "http://127.0.0.1:8002"                        # Local orchestrator
+    ]
+    
+    # Legacy endpoints (for backwards compatibility)
     DOMAIN_AGENT_ENDPOINTS = [
-        "http://insurance-ai-poc-domain-agent:8003",    # Domain Agent (Kubernetes service)
-        "http://localhost:8003",                        # Port forwarded domain agent  
-        "http://127.0.0.1:8003"                        # Local domain agent
+        "http://insurance-ai-poc-domain-agent:8003",    # Legacy Kubernetes service
+        "http://localhost:8003",                        # Legacy port forwarded  
+        "http://127.0.0.1:8003"                        # Legacy local
     ]
     
     # Demo customer data
@@ -34,15 +54,45 @@ class UIConfig:
         "TEST-CUSTOMER": {"name": "Test User", "status": "Active", "type": "Demo"}
     }
     
-    # Service endpoints for monitoring - Updated for current architecture
+    # Service endpoints for monitoring - Updated for Google ADK architecture
     MONITORED_SERVICES = {
-        "Domain Agent (Google ADK)": "http://localhost:8003/health",
-        "Technical Agent (A2A)": "http://localhost:8002/health", 
-        "Policy Server (MCP)": "http://localhost:8001/mcp",
-        "A2A Communication": "http://localhost:8002/a2a/agent.json",
-        "ADK Orchestrator": "http://localhost:8000/health"
+        "ADK Customer Service": "http://localhost:8000/health",
+        "ADK Technical Agent": "http://localhost:8001/health", 
+        "ADK Orchestrator": "http://localhost:8002/health",
+        "Policy Server (MCP)": "http://localhost:8003/health",
+        "Google ADK Web UI": "http://localhost:8000/dev-ui/",
+        "Streamlit UI": "http://localhost:8501"
     }
     
+    # Google ADK specific configuration
+    ADK_CONFIG = {
+        "framework": "Google ADK v1.2.1",
+        "model_provider": "OpenRouter",
+        "integration": "LiteLLM",
+        "default_model": "openai/gpt-4o-mini",
+        "orchestrator_model": "anthropic/claude-3-5-sonnet",
+        "technical_model": "openai/gpt-4o-mini"
+    }
+    
+    # Agent communication patterns
+    AGENT_PATTERNS = {
+        "customer_service": {
+            "type": "LlmAgent",
+            "capabilities": ["chat", "inquiry_handling", "customer_support"],
+            "endpoints": ADK_CUSTOMER_SERVICE_ENDPOINTS
+        },
+        "technical_agent": {
+            "type": "LlmAgent", 
+            "capabilities": ["policy_analysis", "mcp_integration", "data_processing"],
+            "endpoints": ADK_TECHNICAL_AGENT_ENDPOINTS
+        },
+        "orchestrator": {
+            "type": "LlmAgent",
+            "capabilities": ["workflow_coordination", "multi_agent_communication", "response_synthesis"],
+            "endpoints": ADK_ORCHESTRATOR_ENDPOINTS
+        }
+    }
+
     @classmethod
     def is_simple_mode(cls) -> bool:
         """Check if UI is in simple mode"""
@@ -65,3 +115,8 @@ class UIConfig:
             "simple_mode": cls.is_simple_mode(),
             "advanced_mode": cls.is_advanced_mode()
         } 
+
+# Backwards compatibility
+class Config(UIConfig):
+    """Legacy config class for backwards compatibility"""
+    pass 

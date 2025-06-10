@@ -1,260 +1,166 @@
-# Insurance AI POC - Google ADK v1.0.0
+# Insurance AI POC - Google ADK v1.2.1
 
 **Production-ready insurance AI agent system built with Google's official Agent Development Kit**
 
-[![Google ADK](https://img.shields.io/badge/Google%20ADK-v1.0.0-blue)](https://google.github.io/adk-docs/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green)](https://fastapi.tiangolo.com/)
-[![LiteLLM](https://img.shields.io/badge/LiteLLM-1.55+-purple)](https://litellm.ai/)
+[![Google ADK](https://img.shields.io/badge/Google%20ADK-v1.2.1-blue)](https://google.github.io/adk-docs/)
+[![A2A Protocol](https://img.shields.io/badge/A2A%20Protocol-python--a2a%20v0.5.6-green)](https://github.com/google/adk-python)
 [![Monitoring](https://img.shields.io/badge/Monitoring-Langfuse%20%2B%20Prometheus-purple)](https://langfuse.com/)
 
 ## 🚀 Overview
 
-This is a **complete production implementation** of an insurance AI agent system using **Google's official Agent Development Kit (ADK) v1.0.0**. The system provides intelligent insurance customer service through coordinated multi-agent workflows with enterprise-grade monitoring and deployment.
+This is a **complete production implementation** of an insurance AI agent system using **Google's official Agent Development Kit (ADK) v1.2.1**. The system follows patterns from [google/adk-samples](https://github.com/google/adk-samples) and eliminates the need for custom FastAPI servers.
 
 ### ✨ Key Features
 
-- **🤖 Google ADK v1.0.0**: Official framework with sequential workflows and orchestration
-- **🔄 Multi-Agent System**: Specialized domain and technical agents
-- **🌐 OpenRouter Integration**: LiteLLM abstraction for all major model providers
-- **📡 MCP Integration**: Policy server connectivity for real-time data
-- **🔒 Enterprise Security**: Session management and authentication
-- **📊 Production Monitoring**: Langfuse observability + Prometheus metrics
-- **🚀 Cloud Deployment**: Kubernetes manifests with GitHub Actions CI/CD
-- **🔌 API Compatibility**: FastAPI with legacy A2A endpoint support
+- 🤖 **Multiple Agent Types**: Customer service (LlmAgent) + Technical operations (BaseAgent)
+- 🛠️ **Native Google ADK**: Uses built-in `adk web`, `adk run`, and `adk api_server` commands
+- 🎛️ **No Custom FastAPI**: Leverages Google ADK's built-in runtime and web UI
+- 📊 **Built-in Evaluation**: Google ADK evaluation framework included
+- 🚀 **Production Ready**: Deployment tools and monitoring integrated
+- 📝 **Automatic Logging**: Built-in tracing and observability
 
-## 🏗️ System Architecture
+## 🏗️ Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                       FastAPI Server (8000)                      │
-│                     ┌─────────────────────┐                      │
-│                     │   ADK Orchestrator  │                      │
-│                     │  (Sequential Flows) │                      │
-│                     └─────────────────────┘                      │
-├──────────────────────────────────────────────────────────────────┤
-│   ┌─────────────────┐              ┌──────────────────────────┐   │
-│   │  Domain Agent   │◄────────────►│    Technical Agent       │   │
-│   │ (Claude 3.5     │              │   (Llama 3.1 70B +      │   │
-│   │  Sonnet)        │              │    MCP Integration)      │   │
-│   └─────────────────┘              └──────────────────────────┘   │
-├──────────────────────────────────────────────────────────────────┤
-│                    Google ADK v1.0.0 Framework                  │
-│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────┐  │
-│  │ Sequential      │ │ Function        │ │ LiteLLM Model       │  │
-│  │ Workflows       │ │ Tools           │ │ Management          │  │
-│  └─────────────────┘ └─────────────────┘ └─────────────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
-                                 │
-                                 ▼
-                      ┌─────────────────────┐
-                      │   Policy Server     │
-                      │   (MCP on 8001)     │
-                      └─────────────────────┘
+insurance-adk/
+├── insurance_customer_service/    # LlmAgent for customer interactions
+│   ├── __init__.py
+│   └── agent.py                  # root_agent = LlmAgent(...)
+├── insurance_technical_agent/     # BaseAgent for backend operations  
+│   ├── __init__.py
+│   └── agent.py                  # root_agent = BaseAgent(...)
+├── agent.py                      # Simple agent example
+└── .env                          # Google API configuration
 ```
 
-## 📁 Repository Structure
+## 🛠️ Google ADK Commands
 
-```
-insurance-ai-poc/
-├── insurance-adk/          # Main Google ADK implementation
-│   ├── agents/            # ADK agents (domain, technical)
-│   ├── server/            # FastAPI server with ADK integration
-│   ├── config/            # Model and workflow configurations
-│   ├── tools/             # ADK-compatible tools
-│   ├── workflows/         # ADK workflow definitions
-│   └── tests/             # Comprehensive test suite
-├── policy_server/         # MCP server for policy data
-├── monitoring/            # Langfuse + Prometheus integration
-├── k8s/                   # Kubernetes deployment manifests
-├── .github/              # GitHub Actions CI/CD workflows
-└── tests/                # System integration tests
-```
-
-## 🚀 Quick Start
-
-### 1. Installation
+### Available Commands
 
 ```bash
-# Clone and setup
-git clone <repository-url>
-cd insurance-ai-poc
+# Interactive CLI mode
+adk run insurance_customer_service
+adk run insurance_technical_agent
 
-# Install Google ADK and dependencies
-cd insurance-adk
-pip install google-adk>=1.0.0
+# Web UI for testing (recommended)
+adk web
+
+# REST API server  
+adk api_server
+
+# Evaluation framework
+adk eval <agent> <eval_set>
+
+# Create new agents
+adk create <app_name>
+```
+
+## 🚦 Quick Start
+
+### Prerequisites
+
+```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Set up Google API key
+export GOOGLE_API_KEY=your_google_ai_studio_api_key
+# OR configure Vertex AI in .env file
 ```
 
-### 2. Configuration
+### Run Agents
 
 ```bash
-# Configure environment
-cp insurance-adk/config.env.example .env
-# Edit .env with your API keys:
-# - OPENROUTER_API_KEY
-# - LANGFUSE_SECRET_KEY
-# - LANGFUSE_PUBLIC_KEY
+cd insurance-adk
+
+# Option 1: Web UI (recommended)
+adk web
+
+# Option 2: CLI mode
+adk run insurance_customer_service
+
+# Option 3: API server
+adk api_server
 ```
 
-### 3. Run the System
+## 🎯 Agent Capabilities
 
-```bash
-# Terminal 1: Start policy server
-cd policy_server && python main.py
+### Insurance Customer Service Agent (LlmAgent)
+- 💬 Customer support and inquiries
+- 📋 Policy information assistance  
+- 🤝 Claims guidance and support
+- 📞 Professional customer interactions
 
-# Terminal 2: Start ADK system
-cd insurance-adk && python server/main.py
-```
+### Insurance Technical Agent (BaseAgent)  
+- ⚙️ Complex backend operations
+- 📊 Policy analysis and validation
+- 🔧 Technical system integrations
+- 📈 Data processing workflows
 
-### 4. Test the API
+## 📊 Benefits Over FastAPI
 
-```bash
-# Test customer inquiry
-curl -X POST "http://localhost:8000/customer/inquiry" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "What are my policy details?",
-    "customer_id": "CUST123"
-  }'
-```
-
-## 🌐 API Reference
-
-### Customer Service Endpoints
-
-- `POST /customer/inquiry` - Process customer inquiries
-- `POST /sessions` - Create/manage customer sessions
-- `GET /sessions/{session_id}` - Get session details
-
-### Technical Endpoints
-
-- `POST /technical/data` - Policy data retrieval
-- `GET /workflows` - Available workflow information
-- `GET /health` - System health check
-
-### Legacy Compatibility
-
-- `POST /a2a/handle_task` - A2A compatibility endpoint
+| **Google ADK** | **Custom FastAPI** |
+|----------------|-------------------|
+| ✅ Built-in web UI | ❌ Manual UI development |
+| ✅ Automatic evaluation | ❌ Custom testing framework |
+| ✅ Production deployment | ❌ Manual deployment setup |
+| ✅ Integrated logging | ❌ Custom logging configuration |
+| ✅ CLI tools included | ❌ Manual CLI development |
+| ✅ Official Google support | ❌ Community maintenance |
 
 ## 🔧 Configuration
 
-### Model Configuration (`config/models.yaml`)
+### Environment Variables (.env)
 
-```yaml
-models:
-  domain_agent:
-    primary: "openrouter/anthropic/claude-3.5-sonnet"
-    fallback: "openrouter/openai/gpt-4o-mini"
-    max_tokens: 4096
-    temperature: 0.3
-  
-  technical_agent:
-    primary: "openrouter/meta-llama/llama-3.1-70b-instruct"
-    fallback: "openrouter/openai/gpt-4o-mini"
-    max_tokens: 4096
-    temperature: 0.1
+```env
+# Google AI Configuration
+GOOGLE_API_KEY=your_google_ai_studio_api_key
+
+# OR Vertex AI (production)
+GOOGLE_GENAI_USE_VERTEXAI=TRUE
+GOOGLE_CLOUD_PROJECT=your-project-id
+GOOGLE_CLOUD_LOCATION=us-central1
+
+# Model Configuration  
+MODEL_NAME=gemini-2.0-flash
 ```
-
-### Workflow Configuration (`config/workflows.yaml`)
-
-```yaml
-workflows:
-  customer_inquiry:
-    steps:
-      - intent_analysis
-      - authentication_check
-      - data_retrieval
-      - response_synthesis
-    
-  technical_processing:
-    steps:
-      - request_parsing
-      - mcp_operations
-      - response_formatting
-```
-
-## 🚀 Deployment
-
-### Local Development
-
-```bash
-# Use port forwarding script
-./start_port_forwards.sh
-```
-
-### Kubernetes Deployment
-
-```bash
-# Deploy to Kubernetes
-cd k8s
-kubectl apply -f manifests/
-```
-
-### Production Deployment
-
-```bash
-# Use deployment script
-./deploy.sh production
-```
-
-## 📊 Monitoring
-
-- **Langfuse**: LLM observability and tracing at `https://cloud.langfuse.com`
-- **Prometheus**: Metrics collection
-- **Health Endpoints**: System status monitoring
-
-### Monitoring URLs
-
-- Langfuse Dashboard: Configure in `.env`
-- Prometheus: `http://localhost:8080` (when port-forwarded)
-- Health Check: `http://localhost:8000/health`
 
 ## 🧪 Testing
 
 ```bash
-# Run ADK migration validation tests
-cd insurance-adk
-python -m pytest tests/test_adk_migration.py -v
+# Run Google ADK tests
+python tests/google-adk-tests/test_google_adk_agents.py
 
-# Run comprehensive system tests
-cd tests
-python -m pytest README.md -v
+# Demo commands
+python tests/google-adk-tests/demo_adk_commands.py
+
+# A2A communication tests  
+python tests/google-adk-tests/test_a2a_communication.py
 ```
 
-## 🔒 Security
+## 📈 Monitoring & Observability
 
-- Session-based authentication
-- API key management via environment variables
-- Secure MCP server communication
-- Input validation and sanitization
+- **Langfuse**: LLM observability and tracing
+- **Google ADK Logs**: Built-in agent logging
+- **Evaluation Framework**: Automated testing suite
 
-## 📚 Documentation
+## 🌟 Production Features
 
-- **Google ADK**: [https://google.github.io/adk-docs/](https://google.github.io/adk-docs/)
-- **API Documentation**: Available at `http://localhost:8000/docs` when running
-- **Architecture Guide**: See `insurance-adk/README.md`
-- **Migration Summary**: See `insurance-adk/GOOGLE_ADK_MIGRATION_SUMMARY.md`
+- 🔄 **Hot Reloading**: Automatic agent updates
+- 📊 **Built-in Metrics**: Performance monitoring
+- 🚀 **Easy Deployment**: `adk deploy` commands
+- 🔒 **Security**: Google Cloud integration
+- 📝 **Documentation**: Auto-generated API docs
 
-## 🤝 Contributing
+## 🎉 Migration Complete
 
-1. Fork the repository
-2. Create a feature branch
-3. Make changes following ADK patterns
-4. Add tests for new functionality
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🆘 Support
-
-For issues and questions:
-- Check the [Google ADK documentation](https://google.github.io/adk-docs/)
-- Review the comprehensive README in `insurance-adk/`
-- Test the system using the validation suite
-- Check monitoring dashboards for operational issues
+✅ **FastAPI Server Removed**: No longer needed - Google ADK provides all runtime capabilities  
+✅ **Agent Structure**: Following [google/adk-samples](https://github.com/google/adk-samples) patterns  
+✅ **Built-in Tools**: Using native `adk` commands instead of custom scripts  
+✅ **Clean Architecture**: Simplified and production-ready  
 
 ---
 
-**Ready for production deployment with Google ADK v1.0.0** 🚀 
+**Ready to use Google ADK v1.2.1!** 🚀
+
+Start with: `cd insurance-adk && adk web` 

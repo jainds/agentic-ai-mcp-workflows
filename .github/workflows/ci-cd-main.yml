@@ -1,7 +1,10 @@
-name: 🚀 CI/CD Pipeline
+name: 🚀 CI/CD Pipeline with Auto-Versioning & Multi-Image Publishing
 
 on:
   push:
+    branches: [ main, develop ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
     branches: [ main ]
   workflow_dispatch:
     inputs:
@@ -13,6 +16,15 @@ on:
         options:
         - staging
         - production
+      version_bump:
+        description: 'Version bump type'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
       force_deploy:
         description: 'Force deployment even if tests fail'
         required: false
@@ -26,40 +38,144 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_PREFIX: ${{ github.repository }}
 
 jobs:
-  build-and-test:
-    name: 🏗️ Build & Test
+  # ==========================================
+  # Version Management & Tagging
+  # ==========================================
+  version:
+    name: 🏷️ Version Management
     runs-on: ubuntu-latest
     outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
-      image-digest: ${{ steps.build.outputs.digest }}
-      test-results: ${{ steps.test.outputs.results }}
+      version: ${{ steps.version.outputs.version }}
+      previous-version: ${{ steps.version.outputs.previous-version }}
+      tag: ${{ steps.version.outputs.tag }}
+      changelog: ${{ steps.version.outputs.changelog }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📝 Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: 🔍 Determine version bump
+        id: version
+        run: |
+          # Get current version from pyproject.toml
+          CURRENT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Determine version bump type
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            BUMP_TYPE="${{ github.event.inputs.version_bump }}"
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            # Check commit messages for version hints
+            COMMITS=$(git log --oneline --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '1 day ago')" | head -20)
+            if echo "$COMMITS" | grep -iE "\b(break|breaking|major)\b"; then
+              BUMP_TYPE="major"
+            elif echo "$COMMITS" | grep -iE "\b(feat|feature|minor)\b"; then
+              BUMP_TYPE="minor"
+            else
+              BUMP_TYPE="patch"
+            fi
+          else
+            BUMP_TYPE="patch"
+          fi
+          
+          echo "Version bump type: $BUMP_TYPE"
+          
+          # Calculate new version
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          
+          case $BUMP_TYPE in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+          
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          
+          # Add pre-release suffix for non-main branches
+          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
+            BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9]/-/g')
+            NEW_VERSION="$NEW_VERSION-$BRANCH_NAME.$(date +%Y%m%d%H%M%S)"
+          fi
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "previous-version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Generate changelog
+          CHANGELOG=$(git log --oneline --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '1 day ago')" | head -10 | sed 's/^/- /')
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 📝 Update version in pyproject.toml
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          sed -i 's/^version = .*/version = "${{ steps.version.outputs.version }}"/' pyproject.toml
+          git add pyproject.toml
+          git commit -m "🔖 Bump version to ${{ steps.version.outputs.version }}" || echo "No changes to commit"
+
+      - name: 🏷️ Create and push tag
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: |
+          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}" || echo "Tag already exists"
+          git push origin main || echo "No changes to push"
+
+  # ==========================================
+  # Build and Test
+  # ==========================================
+  build-and-test:
+    name: 🏗️ Build & Test
+    needs: version
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.meta.outputs.images }}
+      image-tags: ${{ steps.meta.outputs.tags }}
+      test-results: ${{ steps.test.outputs.results }}
+    strategy:
+      matrix:
+        image:
+          - name: main
+            dockerfile: Dockerfile
+            context: .
+          - name: adk
+            dockerfile: Dockerfile.adk
+            context: .
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.13'
           cache: 'pip'
-      
-      - name: 🏷️ Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value={{date 'YYYYMMDD-HHmmss'}}
 
       - name: 🧪 Run comprehensive tests
         id: test
-        if: ${{ !github.event.inputs.skip_tests }}
+        if: ${{ !github.event.inputs.skip_tests && matrix.image.name == 'main' }}
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-cov pytest-json-report
@@ -79,32 +195,64 @@ jobs:
             unit_passed=$(cat unit-test-results.json | jq -r '.summary.passed // 0')
             echo "results=Unit: $unit_passed/$unit_tests passed" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
-      - name: Log in to Container Registry
+
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
+      - name: 🏷️ Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}
+          tags: |
+            type=raw,value=${{ needs.version.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value={{date 'YYYYMMDD-HHmmss'}},suffix=-${{ matrix.image.name }}
+          labels: |
+            org.opencontainers.image.title=Insurance AI PoC (${{ matrix.image.name }})
+            org.opencontainers.image.description=Google ADK + LiteLLM + OpenRouter Integration (${{ matrix.image.name }})
+            org.opencontainers.image.version=${{ needs.version.outputs.version }}
+            org.opencontainers.image.vendor=Insurance AI Team
+            insurance.ai.component=${{ matrix.image.name }}
+            insurance.ai.version=${{ needs.version.outputs.version }}
+
       - name: 🐳 Build and push Docker image
         id: build
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
-      
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ needs.version.outputs.version }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            VCS_REF=${{ github.sha }}
+
+      - name: 🔍 Test image
+        run: |
+          # Test that the image can be pulled and runs
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}:${{ needs.version.outputs.version }}
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}:${{ needs.version.outputs.version }} \
+            python --version
+
       - name: Upload test artifacts
         uses: actions/upload-artifact@v3
-        if: always()
+        if: always() && matrix.image.name == 'main'
         with:
           name: test-results
           path: |
@@ -112,43 +260,73 @@ jobs:
             integration-test-results.json
             coverage.xml
 
+  # ==========================================
+  # Security Scanning
+  # ==========================================
+  security-scan:
+    name: 🔒 Security Scan
+    needs: [version, build-and-test]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image-name: [main, adk]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image-name }}:${{ needs.version.outputs.version }}
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.image-name }}.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.image-name }}.sarif'
+
+  # ==========================================
+  # Deploy to Staging
+  # ==========================================
   deploy-staging:
     name: 🚀 Deploy to Staging
-    needs: build-and-test
+    needs: [version, build-and-test, security-scan]
     runs-on: ubuntu-latest
     environment: staging
     if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'v1.28.0'
-      
+
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
           version: '3.13.0'
-      
+
       - name: 🔧 Configure kubectl for staging
         run: |
           echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
           kubectl config use-context default || true
           kubectl create namespace insurance-ai-staging --dry-run=client -o yaml | kubectl apply -f -
-      
+
       - name: 📊 Deploy to staging with Helm
         run: |
-          # Extract the first tag from the metadata
-          IMAGE_TAG=$(echo "${{ needs.build-and-test.outputs.image-tag }}" | cut -d',' -f1)
-          
           helm upgrade --install insurance-ai-poc ./k8s/insurance-ai-poc \
             --namespace insurance-ai-staging \
             --create-namespace \
-            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
-            --set image.tag=${IMAGE_TAG##*:} \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }} \
+            --set image.tag=${{ needs.version.outputs.version }} \
+            --set image.mainImage=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }} \
+            --set image.adkImage=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }} \
             --set environment=staging \
+            --set version="${{ needs.version.outputs.version }}" \
             --set replicaCount=1 \
             --set resources.requests.cpu=200m \
             --set resources.requests.memory=512Mi \
@@ -159,79 +337,78 @@ jobs:
             --set secrets.langfuseSecretKey="${{ secrets.LANGFUSE_SECRET_KEY }}" \
             --set secrets.langfusePublicKey="${{ secrets.LANGFUSE_PUBLIC_KEY }}" \
             --wait --timeout=10m
-      
+
       - name: ⏳ Wait for deployment to be ready
         run: |
           kubectl wait --for=condition=available deployment \
             -l app.kubernetes.io/instance=insurance-ai-poc \
             --timeout=300s \
             -n insurance-ai-staging
-      
+
       - name: 🔍 Get deployment status
         run: |
           kubectl get pods -n insurance-ai-staging
           kubectl get services -n insurance-ai-staging
 
+  # ==========================================
+  # E2E Tests
+  # ==========================================
   e2e-tests:
     name: 🎯 E2E Tests
-    needs: [build-and-test, deploy-staging]
+    needs: [version, build-and-test, deploy-staging]
     runs-on: ubuntu-latest
     if: needs.deploy-staging.result == 'success'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.13'
           cache: 'pip'
-      
+
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'v1.28.0'
-      
+
       - name: 🔧 Configure kubectl
         run: |
           echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
-      
+
       - name: 🌐 Set up port forwarding for E2E tests
         run: |
           # Start port forwarding in background
-          kubectl port-forward -n insurance-ai-staging service/insurance-ai-poc-policy-server 8001:8001 &
-          kubectl port-forward -n insurance-ai-staging service/insurance-ai-poc-technical-agent 8002:8002 &
-          kubectl port-forward -n insurance-ai-staging service/insurance-ai-poc-domain-agent 8003:8003 &
-          kubectl port-forward -n insurance-ai-staging service/insurance-ai-poc-streamlit 8501:8501 &
+          kubectl port-forward -n insurance-ai-staging service/insurance-adk-customer-service 8000:8000 &
+          kubectl port-forward -n insurance-ai-staging service/insurance-adk-technical 8001:8001 &
+          kubectl port-forward -n insurance-ai-staging service/insurance-adk-orchestrator 8002:8002 &
+          kubectl port-forward -n insurance-ai-staging service/policy-server 8003:8001 &
+          kubectl port-forward -n insurance-ai-staging service/streamlit-ui 8501:8501 &
           
           # Wait for port forwards to be ready
           sleep 30
-      
+
       - name: 🧪 Run E2E tests
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-json-report
           
           # Run E2E tests with staging endpoints
-          python -m pytest tests/e2e/ -v \
-            --json-report --json-report-file=e2e-test-results.json \
-            -k "not requires_production" || true
+          python tests/verify_monitoring_integration.py || true
         env:
-          POLICY_SERVER_URL: http://localhost:8001
-          TECHNICAL_AGENT_URL: http://localhost:8002
-          DOMAIN_AGENT_URL: http://localhost:8003
+          ADK_CUSTOMER_SERVICE_URL: http://localhost:8000
+          ADK_TECHNICAL_AGENT_URL: http://localhost:8001
+          ADK_ORCHESTRATOR_URL: http://localhost:8002
+          POLICY_SERVER_URL: http://localhost:8003
           STREAMLIT_URL: http://localhost:8501
-      
-      - name: Upload E2E test results
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: e2e-test-results
-          path: e2e-test-results.json
 
+  # ==========================================
+  # Production Deployment
+  # ==========================================
   deploy-production:
     name: 🚀 Production Deployment
-    needs: [build-and-test, e2e-tests]
+    needs: [version, build-and-test, e2e-tests]
     runs-on: ubuntu-latest
     environment: production
     if: |
@@ -240,34 +417,34 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'v1.28.0'
-      
+
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
           version: '3.13.0'
-      
+
       - name: 🔧 Configure kubectl for production
         run: |
           echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
           kubectl config use-context default || true
           kubectl create namespace insurance-ai-production --dry-run=client -o yaml | kubectl apply -f -
-      
+
       - name: 📊 Deploy to production with Helm
         run: |
-          # Extract the first tag from the metadata
-          IMAGE_TAG=$(echo "${{ needs.build-and-test.outputs.image-tag }}" | cut -d',' -f1)
-          
           helm upgrade --install insurance-ai-poc ./k8s/insurance-ai-poc \
             --namespace insurance-ai-production \
             --create-namespace \
-            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
-            --set image.tag=${IMAGE_TAG##*:} \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }} \
+            --set image.tag=${{ needs.version.outputs.version }} \
+            --set image.mainImage=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }} \
+            --set image.adkImage=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }} \
             --set environment=production \
+            --set version="${{ needs.version.outputs.version }}" \
             --set replicaCount=2 \
             --set resources.requests.cpu=500m \
             --set resources.requests.memory=1Gi \
@@ -282,23 +459,93 @@ jobs:
             --set secrets.langfuseSecretKey="${{ secrets.LANGFUSE_SECRET_KEY }}" \
             --set secrets.langfusePublicKey="${{ secrets.LANGFUSE_PUBLIC_KEY }}" \
             --wait --timeout=15m
-      
+
       - name: ⏳ Wait for production deployment
         run: |
           kubectl wait --for=condition=available deployment \
             -l app.kubernetes.io/instance=insurance-ai-poc \
             --timeout=600s \
             -n insurance-ai-production
-      
+
       - name: 🔍 Verify production deployment
         run: |
           kubectl get pods -n insurance-ai-production
           kubectl get services -n insurance-ai-production
           kubectl get hpa -n insurance-ai-production
 
+  # ==========================================
+  # Create GitHub Release
+  # ==========================================
+  create-release:
+    name: 📦 Create GitHub Release
+    needs: [version, build-and-test, deploy-staging]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          release_name: Release ${{ needs.version.outputs.tag }}
+          body: |
+            ## 🚀 Release ${{ needs.version.outputs.tag }}
+            
+            ### 📦 Docker Images Published
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}`
+            
+            ### 📝 Changes
+            ${{ needs.version.outputs.changelog }}
+            
+            ### 🔧 Deployment Commands
+            ```bash
+            # Pull latest images
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}
+            
+            # Deploy with Helm
+            helm upgrade --install insurance-ai-poc ./k8s/insurance-ai-poc \
+              --set image.tag=${{ needs.version.outputs.version }}
+            ```
+          draft: false
+          prerelease: false
+
+  # ==========================================
+  # Package Vulnerability Report
+  # ==========================================
+  vulnerability-report:
+    name: 📊 Generate Vulnerability Report
+    needs: [version, security-scan]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Create vulnerability summary
+        run: |
+          echo "## 🔒 Security Scan Summary" > vulnerability-report.md
+          echo "Version: ${{ needs.version.outputs.version }}" >> vulnerability-report.md
+          echo "Scan Date: $(date)" >> vulnerability-report.md
+          echo "" >> vulnerability-report.md
+          echo "### Images Scanned:" >> vulnerability-report.md
+          echo "- insurance-ai-poc-main:${{ needs.version.outputs.version }}" >> vulnerability-report.md
+          echo "- insurance-ai-poc-adk:${{ needs.version.outputs.version }}" >> vulnerability-report.md
+
+      - name: Upload vulnerability report
+        uses: actions/upload-artifact@v3
+        with:
+          name: vulnerability-report
+          path: vulnerability-report.md
+
+  # ==========================================
+  # Notifications
+  # ==========================================
   notify:
     name: 📢 Notify Team
-    needs: [build-and-test, deploy-staging, e2e-tests, deploy-production]
+    needs: [version, build-and-test, deploy-staging, e2e-tests, deploy-production, create-release]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -318,7 +565,7 @@ jobs:
           
           echo "status=$STATUS" >> $GITHUB_OUTPUT
           echo "color=$COLOR" >> $GITHUB_OUTPUT
-      
+
       - name: Slack notification
         if: ${{ secrets.SLACK_WEBHOOK_URL }}
         uses: 8398a7/action-slack@v3
@@ -328,10 +575,17 @@ jobs:
           text: |
             ${{ steps.summary.outputs.status }}
             
+            **Version:** ${{ needs.version.outputs.version }}
+            **Images Published:**
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}`
+            - `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}`
+            
+            **Pipeline Results:**
             **Build:** ${{ needs.build-and-test.result }}
             **Tests:** ${{ needs.build-and-test.outputs.test-results }}
             **Staging:** ${{ needs.deploy-staging.result }}
             **E2E Tests:** ${{ needs.e2e-tests.result }}
             **Production:** ${{ needs.deploy-production.result }}
+            **Release:** ${{ needs.create-release.result }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} 

@@ -1,7 +1,7 @@
-# Multi-stage Docker build for Insurance AI PoC - Main Image
-# Supports automatic versioning and GitHub Actions integration
+# Google ADK Insurance Agents - Production Dockerfile with Auto-Versioning
+# Multi-stage build for Google ADK + LiteLLM + OpenRouter Integration
 
-ARG PYTHON_VERSION=3.12
+ARG PYTHON_VERSION=3.11
 FROM python:${PYTHON_VERSION}-slim as base
 
 # Build arguments for versioning and metadata
@@ -12,14 +12,14 @@ ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 
 # Set build-time metadata
-LABEL org.opencontainers.image.title="Insurance AI PoC - Main"
+LABEL org.opencontainers.image.title="Insurance AI PoC - Google ADK"
 LABEL org.opencontainers.image.description="Google ADK + LiteLLM + OpenRouter Integration"
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.created="${BUILD_DATE}"
 LABEL org.opencontainers.image.revision="${VCS_REF}"
 LABEL org.opencontainers.image.vendor="Insurance AI Team"
 LABEL org.opencontainers.image.source="https://github.com/piyushkumarjain/insurance-ai-poc"
-LABEL insurance.ai.component="main"
+LABEL insurance.ai.component="adk"
 LABEL insurance.ai.version="${VERSION}"
 
 # Set working directory
@@ -45,6 +45,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements.txt
 
+# Install Google ADK with specific version
+RUN pip install --no-cache-dir google-adk>=1.2.1
+
 # ========================================
 # Production Stage
 # ========================================
@@ -55,10 +58,10 @@ COPY --from=dependencies /usr/local/lib/python*/site-packages/ /usr/local/lib/py
 COPY --from=dependencies /usr/local/bin/ /usr/local/bin/
 
 # Copy application code
-COPY . .
-
-# Create data directory for policy server
-RUN mkdir -p /app/data
+COPY insurance-adk/ ./insurance-adk/
+COPY policy_server/ ./policy_server/
+COPY main_ui.py .
+COPY .env.example .env
 
 # Create non-root user for security
 RUN adduser --disabled-password --gecos '' --uid 10001 appuser && \
@@ -72,16 +75,18 @@ RUN echo "{\
   \"version\": \"${VERSION}\", \
   \"build_date\": \"${BUILD_DATE}\", \
   \"git_commit\": \"${VCS_REF}\", \
-  \"component\": \"main\", \
-  \"platform\": \"${TARGETPLATFORM}\" \
+  \"component\": \"adk\", \
+  \"platform\": \"${TARGETPLATFORM}\", \
+  \"adk_version\": \"1.2.1+\", \
+  \"features\": [\"google-adk\", \"litellm\", \"openrouter\", \"monitoring\"] \
 }" > /app/version.json
 
-# Expose ports for all services
-EXPOSE 8001 8002 8003 8501
+# Expose ports
+EXPOSE 8000 8001 8501
 
-# Health check
+# Health check for Google ADK web interface
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)" || exit 1
+    CMD curl -f http://localhost:8000/dev-ui/ || exit 1
 
-# Default command (can be overridden in Kubernetes)
-CMD ["python", "-c", "print('Insurance AI PoC Main Container v${VERSION} ready'); import json; print(json.dumps(json.load(open('/app/version.json')), indent=2))"] 
+# Default command runs Google ADK web with versioning info
+CMD ["sh", "-c", "echo 'Starting Google ADK v${VERSION}' && cat /app/version.json && cd insurance-adk && adk web --host 0.0.0.0 --port 8000"] 

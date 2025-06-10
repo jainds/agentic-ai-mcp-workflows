@@ -566,26 +566,20 @@ jobs:
           echo "status=$STATUS" >> $GITHUB_OUTPUT
           echo "color=$COLOR" >> $GITHUB_OUTPUT
 
-      - name: Slack notification
-        if: ${{ secrets.SLACK_WEBHOOK_URL }}
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ steps.summary.outputs.color }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow
-          text: |
-            ${{ steps.summary.outputs.status }}
-            
-            **Version:** ${{ needs.version.outputs.version }}
-            **Images Published:**
-            - `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}`
-            - `${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}`
-            
-            **Pipeline Results:**
-            **Build:** ${{ needs.build-and-test.result }}
-            **Tests:** ${{ needs.build-and-test.outputs.test-results }}
-            **Staging:** ${{ needs.deploy-staging.result }}
-            **E2E Tests:** ${{ needs.e2e-tests.result }}
-            **Production:** ${{ needs.deploy-production.result }}
-            **Release:** ${{ needs.create-release.result }}
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} 
+      - name: 📋 Pipeline Summary
+        run: |
+          echo "## 🚀 Pipeline Execution Summary"
+          echo "**Version:** ${{ needs.version.outputs.version }}"
+          echo "**Images Published:**"
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.version }}\`"
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.version }}\`"
+          echo ""
+          echo "**Pipeline Results:**"
+          echo "- **Build:** ${{ needs.build-and-test.result }}"
+          echo "- **Tests:** ${{ needs.build-and-test.outputs.test-results }}"
+          echo "- **Staging:** ${{ needs.deploy-staging.result }}"
+          echo "- **E2E Tests:** ${{ needs.e2e-tests.result }}"
+          echo "- **Production:** ${{ needs.deploy-production.result }}"
+          echo "- **Release:** ${{ needs.create-release.result }}"
+          echo ""
+          echo "${{ steps.summary.outputs.status }}" 

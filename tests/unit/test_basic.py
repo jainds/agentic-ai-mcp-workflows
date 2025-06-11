@@ -39,6 +39,23 @@ def test_env_file_exists():
     assert env_example.exists(), ".env.example file missing"
 
 
+def test_insurance_adk_imports():
+    """Test that cleaned-up insurance-adk imports work"""
+    sys.path.insert(0, str(project_root / "insurance-adk"))
+    
+    try:
+        from agents.orchestrator import create_adk_orchestrator, ADKOrchestrator
+        
+        # Test that we can create an orchestrator
+        orchestrator = create_adk_orchestrator("Test Orchestrator")
+        assert isinstance(orchestrator, ADKOrchestrator)
+        assert orchestrator.name == "Test Orchestrator"
+        assert orchestrator.version == "1.2.1"
+        
+    except ImportError as e:
+        pytest.fail(f"Failed to import insurance-adk components: {e}")
+
+
 class TestBasicFunctionality:
     """Test basic functionality"""
     
@@ -52,4 +69,21 @@ class TestBasicFunctionality:
         """Test that we can write files"""
         test_file = tmp_path / "test.txt"
         test_file.write_text("test content")
-        assert test_file.read_text() == "test content" 
+        assert test_file.read_text() == "test content"
+    
+    def test_mock_data_exists(self):
+        """Test that mock data file exists"""
+        mock_data_file = project_root / "data" / "mock_data.json"
+        assert mock_data_file.exists(), "Mock data file missing"
+        
+        # Test that it's valid JSON
+        import json
+        with open(mock_data_file) as f:
+            data = json.load(f)
+        
+        # Basic structure validation
+        assert "policies" in data
+        assert "customers" in data
+        assert "claims" in data
+        assert isinstance(data["policies"], list)
+        assert len(data["policies"]) > 0 

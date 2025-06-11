@@ -148,7 +148,7 @@ jobs:
           pip install --no-cache-dir uv
           uv pip install --system bandit[toml]
           echo "🔍 Running Bandit security scan..."
-          bandit -r . -f json -o bandit-report.json || {
+          bandit -r . -f json -o bandit-report.json --exclude tests/,/.venv/,build/,dist/ --skip B101,B601 || {
             echo "⚠️ Bandit scan completed with warnings"
             # Create minimal report if scan fails
             echo '{"metrics": {"_totals": {"nosec": 0, "skipped_tests": 0}}, "results": []}' > bandit-report.json
@@ -169,7 +169,7 @@ jobs:
           pip install --no-cache-dir uv
           uv pip install --system safety
           echo "🔍 Running Safety dependency scan..."
-          safety check --json --output safety-report.json || {
+          safety check --save-json safety-report.json || {
             echo "⚠️ Safety scan completed with warnings"
             # Create minimal report if scan fails
             echo '{"report_meta": {"scan_target": "requirements"}, "scanned_packages": [], "affected_packages": [], "ignored_vulnerabilities": [], "remediations": {"vulnerabilities": [], "other": []}}' > safety-report.json

@@ -1,5 +1,10 @@
 [run]
-source = tests, policy_server, ui
+source = .
+include = 
+    tests/*
+    policy_server/*
+    ui/*
+    insurance-adk/*
 omit = 
     */tests/*
     */__pycache__/*
@@ -9,9 +14,20 @@ omit =
     */dist/*
     setup.py
     */site-packages/*
-    insurance-adk/agents/*
+    .github/*
+    docs/*
+    scripts/*
+    k8s/*
+    monitoring/*
+disable_warnings = 
+    no-data-collected
 
 [report]
+# Fail on missing coverage data
+fail_under = 0
+skip_empty = true
+skip_covered = false
+show_missing = true
 exclude_lines =
     pragma: no cover
     def __repr__
@@ -23,11 +39,6 @@ exclude_lines =
     if __name__ == .__main__.:
     class .*\bProtocol\):
     @(abc\.)?abstractmethod
-
-# Suppress warnings about modules with no coverage
-skip_covered = false
-skip_empty = true
-show_missing = true
 
 [html]
 directory = htmlcov

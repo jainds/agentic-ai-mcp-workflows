@@ -1,8 +1,8 @@
 {
   "policies": [
     {
-      "policy_id": "POL-001",
-      "customer_id": "CUST-001", 
+      "policy_id": "POL001",
+      "customer_id": "CUST001", 
       "policy_type": "Auto",
       "premium": 1200.00,
       "deductible": 500,
@@ -16,8 +16,8 @@
       "expiry_date": "2025-01-01"
     },
     {
-      "policy_id": "POL-002", 
-      "customer_id": "CUST-002",
+      "policy_id": "POL002", 
+      "customer_id": "CUST002",
       "policy_type": "Home",
       "premium": 2400.00,
       "deductible": 1000,
@@ -31,8 +31,8 @@
       "expiry_date": "2025-02-01"
     },
     {
-      "policy_id": "POL-003",
-      "customer_id": "CUST-003", 
+      "policy_id": "POL003",
+      "customer_id": "CUST003", 
       "policy_type": "Life",
       "premium": 600.00,
       "deductible": 0,
@@ -43,11 +43,41 @@
       "status": "active",
       "effective_date": "2024-03-01",
       "expiry_date": "2034-03-01"
+    },
+    {
+      "policy_id": "POL004",
+      "customer_id": "CUST001", 
+      "policy_type": "Home",
+      "premium": 1800.00,
+      "deductible": 750,
+      "coverage_limits": {
+        "dwelling": 250000,
+        "personal_property": 100000,
+        "liability": 300000
+      },
+      "status": "active",
+      "effective_date": "2024-01-15",
+      "expiry_date": "2025-01-15"
+    },
+    {
+      "policy_id": "POL005",
+      "customer_id": "CUST004", 
+      "policy_type": "Auto",
+      "premium": 900.00,
+      "deductible": 250,
+      "coverage_limits": {
+        "liability": 75000,
+        "collision": 30000,
+        "comprehensive": 15000
+      },
+      "status": "active",
+      "effective_date": "2024-04-01",
+      "expiry_date": "2025-04-01"
     }
   ],
   "customers": [
     {
-      "customer_id": "CUST-001",
+      "customer_id": "CUST001",
       "name": "John Smith",
       "email": "john.smith@email.com",
       "phone": "+1-555-0123",
@@ -58,10 +88,10 @@
         "zip": "12345"
       },
       "date_of_birth": "1985-06-15",
-      "policies": ["POL-001"]
+      "policies": ["POL001", "POL004"]
     },
     {
-      "customer_id": "CUST-002",
+      "customer_id": "CUST002",
       "name": "Jane Doe",
       "email": "jane.doe@email.com", 
       "phone": "+1-555-0456",
@@ -72,10 +102,10 @@
         "zip": "90210"
       },
       "date_of_birth": "1990-03-22",
-      "policies": ["POL-002"]
+      "policies": ["POL002"]
     },
     {
-      "customer_id": "CUST-003",
+      "customer_id": "CUST003",
       "name": "Bob Johnson",
       "email": "bob.johnson@email.com",
       "phone": "+1-555-0789", 
@@ -86,14 +116,28 @@
         "zip": "75201"
       },
       "date_of_birth": "1975-11-08",
-      "policies": ["POL-003"]
+      "policies": ["POL003"]
+    },
+    {
+      "customer_id": "CUST004",
+      "name": "Alice Williams",
+      "email": "alice.williams@email.com",
+      "phone": "+1-555-0321", 
+      "address": {
+        "street": "321 Elm St",
+        "city": "Newtown",
+        "state": "FL",
+        "zip": "33101"
+      },
+      "date_of_birth": "1988-09-12",
+      "policies": ["POL005"]
     }
   ],
   "claims": [
     {
-      "claim_id": "CLM-001",
-      "policy_id": "POL-001",
-      "customer_id": "CUST-001",
+      "claim_id": "CLM001",
+      "policy_id": "POL001",
+      "customer_id": "CUST001",
       "claim_type": "collision",
       "incident_date": "2024-05-15",
       "reported_date": "2024-05-16", 
@@ -103,9 +147,9 @@
       "description": "Rear-end collision at intersection"
     },
     {
-      "claim_id": "CLM-002",
-      "policy_id": "POL-002", 
-      "customer_id": "CUST-002",
+      "claim_id": "CLM002",
+      "policy_id": "POL002", 
+      "customer_id": "CUST002",
       "claim_type": "water_damage",
       "incident_date": "2024-04-20",
       "reported_date": "2024-04-21",
@@ -113,32 +157,52 @@
       "amount_claimed": 15000.00,
       "amount_approved": 12000.00,
       "description": "Burst pipe caused water damage to living room"
+    },
+    {
+      "claim_id": "CLM003",
+      "policy_id": "POL004", 
+      "customer_id": "CUST001",
+      "claim_type": "theft",
+      "incident_date": "2024-06-01",
+      "reported_date": "2024-06-01",
+      "status": "approved",
+      "amount_claimed": 5000.00,
+      "amount_approved": 4500.00,
+      "description": "Stolen personal property from home"
     }
   ],
   "agents": [
     {
-      "agent_id": "AGT-001",
+      "agent_id": "AGT001",
       "name": "Sarah Wilson",
       "email": "sarah.wilson@insurance.com",
       "phone": "+1-555-1001", 
       "territory": "Northeast",
-      "customers": ["CUST-001", "CUST-003"]
+      "customers": ["CUST001", "CUST003"]
     },
     {
-      "agent_id": "AGT-002",
+      "agent_id": "AGT002",
       "name": "Mike Chen", 
       "email": "mike.chen@insurance.com",
       "phone": "+1-555-1002",
       "territory": "West Coast",
-      "customers": ["CUST-002"]
+      "customers": ["CUST002"]
+    },
+    {
+      "agent_id": "AGT003",
+      "name": "Lisa Rodriguez", 
+      "email": "lisa.rodriguez@insurance.com",
+      "phone": "+1-555-1003",
+      "territory": "Southeast",
+      "customers": ["CUST004"]
     }
   ],
   "metadata": {
-    "version": "1.0.0",
-    "last_updated": "2024-06-01T00:00:00Z",
-    "total_policies": 3,
-    "total_customers": 3,
-    "total_claims": 2,
-    "total_agents": 2
+    "version": "1.1.0",
+    "last_updated": "2024-06-11T00:00:00Z",
+    "total_policies": 5,
+    "total_customers": 4,
+    "total_claims": 3,
+    "total_agents": 3
   }
 } 

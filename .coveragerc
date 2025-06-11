@@ -24,6 +24,11 @@ exclude_lines =
     class .*\bProtocol\):
     @(abc\.)?abstractmethod
 
+# Suppress warnings about modules with no coverage
+skip_covered = false
+skip_empty = true
+show_missing = true
+
 [html]
 directory = htmlcov
 

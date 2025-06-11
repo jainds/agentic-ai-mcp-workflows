@@ -106,17 +106,19 @@ jobs:
         run: |
           python -m pytest tests/unit/ -v \
             --cov=tests --cov=policy_server --cov=ui \
-            --cov-report=xml --cov-report=term \
+            --cov-report=xml --cov-report=term --cov-report=html \
             --json-report --json-report-file=test-results.json
       
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+      - name: Upload coverage and test results
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-        continue-on-error: true
+          name: test-and-coverage-results
+          path: |
+            test-results.json
+            coverage.xml
+            htmlcov/
+          retention-days: 7
 
   security-scan:
     name: 🔒 Security Scan

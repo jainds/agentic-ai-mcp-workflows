@@ -116,7 +116,6 @@ filterwarnings = [
     "error",
     "ignore::UserWarning",
     "ignore::DeprecationWarning",
-    "ignore::coverage.exceptions.CoverageWarning:coverage.control",
 ]
 markers = [
     "unit: Unit tests",

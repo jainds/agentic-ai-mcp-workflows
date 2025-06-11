@@ -7,6 +7,14 @@ on:
       - '**.md'
       - 'docs/**'
 
+# Add permissions for GitHub Actions to write comments and issues
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  checks: write
+  statuses: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

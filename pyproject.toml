@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "insurance-ai-poc"
-version = "1.0.0"
+version = "1.1.0"
 description = "Kubernetes-Native AI Agent PoC using A2A and MCP protocols"
 authors = [
     {name = "Insurance AI Team", email = "team@insurance.com"},

@@ -47,20 +47,20 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
-      - name: Cache pip dependencies
+      - name: Cache uv and dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-security-${{ hashFiles('**/requirements.txt') }}
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-security-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-security-
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-uv-security-
+            ${{ runner.os }}-uv-
         continue-on-error: true
       
       - name: Install dependencies for scanning
         run: |
-          pip install --upgrade pip
-          pip install safety pip-audit bandit[toml]
+          pip install --no-cache-dir uv
+          uv pip install --system safety pip-audit bandit[toml]
       
       - name: Run Safety check
         id: safety-scan
@@ -156,18 +156,20 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
-      - name: Cache pip dependencies
+      - name: Cache uv and dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-security-${{ hashFiles('**/requirements.txt') }}
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-security-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-security-
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-uv-security-
+            ${{ runner.os }}-uv-
         continue-on-error: true
       
       - name: Install Bandit
-        run: pip install bandit[toml]
+        run: |
+          pip install --no-cache-dir uv
+          uv pip install --system bandit[toml]
       
       - name: Run Bandit security scan
         id: bandit-scan
@@ -565,21 +567,23 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       
-      - name: Cache pip dependencies
+      - name: Cache uv and dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-security-${{ hashFiles('**/requirements.txt') }}
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-security-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-security-
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-uv-security-
+            ${{ runner.os }}-uv-
         continue-on-error: true
       
       - name: Install pip-licenses
-        run: pip install pip-licenses
+        run: |
+          pip install --no-cache-dir uv
+          uv pip install --system pip-licenses
       
       - name: Install project dependencies
-        run: pip install -r requirements.txt
+        run: uv pip install --system -r requirements.txt
       
       - name: Generate license report
         run: |

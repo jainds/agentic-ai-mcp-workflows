@@ -60,19 +60,20 @@ jobs:
         with:
           python-version: '3.13'
       
-      - name: Cache pip dependencies
+      - name: Cache uv and dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-uv-
         continue-on-error: true
       
       - name: Install dependencies
         run: |
-          pip install black flake8 mypy
-          pip install -r requirements.txt
+          pip install --no-cache-dir uv
+          uv pip install --system black flake8 mypy
+          uv pip install --system -r requirements.txt
       
       - name: Black formatting check
         run: black --check --diff .
@@ -97,10 +98,21 @@ jobs:
         with:
           python-version: '3.13'
       
+      - name: Cache uv and dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-tests-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-tests-
+            ${{ runner.os }}-uv-
+        continue-on-error: true
+      
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-cov pytest-json-report
+          pip install --no-cache-dir uv
+          uv pip install --system -r requirements.txt
+          uv pip install --system pytest pytest-cov pytest-json-report
       
       - name: Run unit tests
         run: |
@@ -133,7 +145,8 @@ jobs:
       - name: Run Bandit security scan
         id: bandit-scan
         run: |
-          pip install bandit[toml]
+          pip install --no-cache-dir uv
+          uv pip install --system bandit[toml]
           echo "🔍 Running Bandit security scan..."
           bandit -r . -f json -o bandit-report.json || {
             echo "⚠️ Bandit scan completed with warnings"
@@ -153,7 +166,8 @@ jobs:
       - name: Run Safety dependency check
         id: safety-scan
         run: |
-          pip install safety
+          pip install --no-cache-dir uv
+          uv pip install --system safety
           echo "🔍 Running Safety dependency scan..."
           safety check --json --output safety-report.json || {
             echo "⚠️ Safety scan completed with warnings"
@@ -241,8 +255,9 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-json-report
+          pip install --no-cache-dir uv
+          uv pip install --system -r requirements.txt
+          uv pip install --system pytest pytest-json-report
       
       - name: Run integration tests
         run: |

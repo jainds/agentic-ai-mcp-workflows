@@ -45,22 +45,22 @@ runs:
       with:
         python-version: ${{ inputs.python-version }}
     
-    - name: Cache pip dependencies
+    - name: Cache uv and dependencies
       uses: actions/cache@v4
       with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-tests-${{ hashFiles('**/requirements.txt') }}
+        path: ~/.cache/uv
+        key: ${{ runner.os }}-uv-tests-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
-          ${{ runner.os }}-pip-tests-
-          ${{ runner.os }}-pip-
+          ${{ runner.os }}-uv-tests-
+          ${{ runner.os }}-uv-
       continue-on-error: true
     
     - name: Install test dependencies
       shell: bash
       run: |
-        pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-cov pytest-json-report pytest-xdist pytest-mock
+        pip install --no-cache-dir uv
+        uv pip install --system -r requirements.txt
+        uv pip install --system pytest pytest-cov pytest-json-report pytest-xdist pytest-mock
     
     - name: Create test results directory
       shell: bash

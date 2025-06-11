@@ -236,8 +236,12 @@ jobs:
         id: test
         if: ${{ !github.event.inputs.skip_tests && matrix.image.name == 'main' }}
         run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-cov pytest-json-report
+          # Install uv for faster package management
+          pip install --no-cache-dir uv
+          
+          # Install dependencies with uv
+          uv pip install --system -r requirements.txt
+          uv pip install --system pytest pytest-cov pytest-json-report
           
           echo "Running unit tests..."
           python -m pytest tests/unit/ -v \

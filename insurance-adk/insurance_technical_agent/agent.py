@@ -21,11 +21,22 @@ openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
 model_name = os.getenv("PRIMARY_MODEL", "openai/gpt-4o-mini")
 policy_server_url = os.getenv("POLICY_SERVER_URL", "http://localhost:8001/mcp")
 
+# Set LiteLLM OpenRouter environment variables per official documentation
+os.environ["OPENROUTER_API_KEY"] = openrouter_api_key
+os.environ["OR_SITE_URL"] = "https://insurance-ai-poc"  # Optional but recommended
+os.environ["OR_APP_NAME"] = "Insurance AI POC"  # Optional but recommended
+
+# Convert model name to OpenRouter format per documentation
+openrouter_model = f"openrouter/{model_name}"
+
+print(f"🔧 Technical Agent: Using model {openrouter_model} with OpenRouter")
+print(f"🔑 Technical Agent: API key configured: {bool(openrouter_api_key)}")
+
 # Create LiteLLM model for technical operations
 technical_model = LiteLlm(
-    model=model_name,
-    api_base="https://openrouter.ai/api/v1", 
-    api_key=openrouter_api_key
+    model=openrouter_model,  # "openrouter/openai/gpt-4o-mini"
+    api_key=openrouter_api_key,
+    api_base="https://openrouter.ai/api/v1"
 )
 
 # Initialize monitoring if available

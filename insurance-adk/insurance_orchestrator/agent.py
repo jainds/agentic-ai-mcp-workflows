@@ -8,10 +8,23 @@ It follows Google ADK multi-agent patterns with LiteLLM + OpenRouter integration
 import os
 from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
+import litellm
 
 # Get configuration from environment
-openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
+openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "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")
 model_name = os.getenv("PRIMARY_MODEL", "anthropic/claude-3-5-sonnet")  # Use more powerful model for orchestration
+
+# Set LiteLLM OpenRouter environment variables per official documentation
+# litellm.use_litellm_proxy = True
+litellm.set_verbose = True
+litellm.set_debug = True
+
+
+# Convert model name to OpenRouter format per documentation
+# openrouter_model = f"openrouter/{model_name}"
+
+print(f"🔧 Orchestrator Agent: Using model {model_name} with OpenRouter")
+print(f"🔑 Orchestrator Agent: API key configured: {bool(openrouter_api_key)}")
 
 # Initialize monitoring if available
 try:
@@ -29,9 +42,10 @@ except ImportError:
 
 # Create LiteLLM model for orchestration
 orchestrator_model = LiteLlm(
-    model=model_name,
-    api_base="https://openrouter.ai/api/v1",
-    api_key=openrouter_api_key
+    model="openrouter/"+model_name,  # "openrouter/anthropic/claude-3-5-sonnet"
+    api_key=openrouter_api_key,
+    api_base="https://openrouter.ai/api/v1"
+   
 )
 
 # Create the insurance orchestrator agent

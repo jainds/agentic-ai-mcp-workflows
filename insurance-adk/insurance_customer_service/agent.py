@@ -13,6 +13,17 @@ from google.adk.models.lite_llm import LiteLlm
 openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "")
 model_name = os.getenv("PRIMARY_MODEL", "openai/gpt-4o-mini")
 
+# Set LiteLLM OpenRouter environment variables per official documentation
+os.environ["OPENROUTER_API_KEY"] = openrouter_api_key
+os.environ["OR_SITE_URL"] = "https://insurance-ai-poc"  # Optional but recommended
+os.environ["OR_APP_NAME"] = "Insurance AI POC"  # Optional but recommended
+
+# Convert model name to OpenRouter format per documentation
+openrouter_model = f"openrouter/{model_name}"
+
+print(f"🔧 Customer Service Agent: Using model {openrouter_model} with OpenRouter")
+print(f"🔑 Customer Service Agent: API key configured: {bool(openrouter_api_key)}")
+
 # Initialize monitoring if available
 try:
     from monitoring.setup.monitoring_setup import MonitoringManager
@@ -27,13 +38,13 @@ except ImportError:
     monitoring_enabled = False
     print("ℹ️  Customer Service Agent: Monitoring not available")
 
-# Create the insurance customer service agent using direct OpenRouter integration
+# Create the insurance customer service agent using LiteLLM OpenRouter per official docs
 root_agent = LlmAgent(
     name="insurance_customer_service", 
     model=LiteLlm(
-        model=model_name,
-        api_base="https://openrouter.ai/api/v1",
-        api_key=openrouter_api_key
+        model=openrouter_model,  # "openrouter/openai/gpt-4o-mini"
+        api_key=openrouter_api_key,
+        api_base="https://openrouter.ai/api/v1"
     ),
     instruction=(
         "You are a helpful insurance customer service agent powered by OpenRouter. "

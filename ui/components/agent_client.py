@@ -9,7 +9,7 @@ import requests
 import json
 import time
 from typing import Dict, Any, List, Optional
-from ui.components.config import UIConfig
+from .config import UIConfig
 
 class ADKAgentClient:
     """Client for communicating with Google ADK agents"""

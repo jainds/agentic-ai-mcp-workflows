@@ -8,7 +8,7 @@ import requests
 import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
-from ui.components.config import UIConfig
+from .config import UIConfig
 
 def check_service_health() -> Dict[str, Dict[str, Any]]:
     """Check health of all monitored services"""

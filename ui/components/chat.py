@@ -6,8 +6,8 @@ Chat Interface Component for Insurance AI UI
 import streamlit as st
 from datetime import datetime
 from typing import Dict, Any
-from ui.components.config import UIConfig
-from ui.components.agent_client import DomainAgentClient, send_chat_message_simple
+from .config import UIConfig
+from .agent_client import DomainAgentClient, send_chat_message_simple
 
 def initialize_chat_state():
     """Initialize chat-related session state"""

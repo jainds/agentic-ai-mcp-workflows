@@ -241,7 +241,8 @@ jobs:
           
           echo "Running unit tests..."
           python -m pytest tests/unit/ -v \
-            --cov=. --cov-report=xml --cov-report=term \
+            --cov=tests --cov=policy_server --cov=ui \
+            --cov-report=xml --cov-report=term \
             --json-report --json-report-file=unit-test-results.json || true
           
           echo "Running integration tests..."

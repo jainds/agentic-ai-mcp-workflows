@@ -103,8 +103,8 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
-    "--cov=agents",
-    "--cov=services", 
+    "--cov=tests",
+    "--cov=policy_server", 
     "--cov=ui",
     "--cov-report=html",
     "--cov-report=term-missing",
@@ -116,6 +116,7 @@ filterwarnings = [
     "error",
     "ignore::UserWarning",
     "ignore::DeprecationWarning",
+    "ignore::coverage.exceptions.CoverageWarning:coverage.control",
 ]
 markers = [
     "unit: Unit tests",
@@ -124,6 +125,7 @@ markers = [
     "e2e: End-to-end tests",
     "slow: Slow running tests",
 ]
+asyncio_mode = "auto"
 
 [tool.black]
 line-length = 88

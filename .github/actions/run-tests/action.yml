@@ -89,7 +89,7 @@ runs:
           fi
           
           if [[ "${{ inputs.coverage }}" == "true" && "$test_type" == "unit" ]]; then
-            TEST_OPTIONS="$TEST_OPTIONS --cov=. --cov-report=xml --cov-report=term"
+            TEST_OPTIONS="$TEST_OPTIONS --cov=tests --cov=policy_server --cov=ui --cov-report=xml --cov-report=term"
           fi
           
           # Set environment variables for E2E tests

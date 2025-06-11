@@ -232,7 +232,7 @@ cli.main(["api_server", "insurance_technical_agent", "--port", "8002"])
                 "id": 2,
                 "method": "tools/call",
                 "params": {
-                    "name": "policy_lookup",
+                    "name": "get_policies",
                     "arguments": {
                         "customer_id": "CUST001"
                     }
@@ -248,9 +248,9 @@ cli.main(["api_server", "insurance_technical_agent", "--port", "8002"])
             
             if response.status_code == 200:
                 data = response.json()
-                if "result" in data and "content" in data["result"]:
+                if "result" in data and data["result"]:
                     print("✅ Policy data retrieval: PASSED")
-                    content = data["result"]["content"]
+                    content = data["result"]
                     print(f"   Retrieved data type: {type(content)}")
                     if isinstance(content, list) and content:
                         print(f"   Sample content: {str(content[0])[:100]}...")
@@ -261,6 +261,99 @@ cli.main(["api_server", "insurance_technical_agent", "--port", "8002"])
                 
         except Exception as e:
             print(f"⚠️  Policy data retrieval test error: {e}")
+    
+    def test_comprehensive_customer_data_retrieval(self, policy_server_process):
+        """Test policy data retrieval for all valid customers"""
+        try:
+            print("\n🔍 Testing comprehensive customer data retrieval...")
+            
+            # Test all valid customers from updated mock data
+            test_customers = [
+                ("CUST001", "John Smith", 2),      # Should have 2 policies
+                ("CUST002", "Jane Doe", 1),        # Should have 1 policy  
+                ("CUST003", "Bob Johnson", 1),     # Should have 1 policy
+                ("CUST004", "Alice Williams", 1)   # Should have 1 policy
+            ]
+            
+            for customer_id, name, expected_policies in test_customers:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "id": 10 + int(customer_id[-1]),
+                    "method": "tools/call",
+                    "params": {
+                        "name": "get_policies",
+                        "arguments": {"customer_id": customer_id}
+                    }
+                }
+                
+                response = requests.post(
+                    "http://localhost:8001/mcp",
+                    json=mcp_request,
+                    headers={"Content-Type": "application/json"},
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data:
+                        policies = data["result"]
+                        if len(policies) == expected_policies:
+                            print(f"   ✅ {customer_id} ({name}): {len(policies)} policies (as expected)")
+                        else:
+                            print(f"   ⚠️  {customer_id} ({name}): {len(policies)} policies (expected {expected_policies})")
+                    else:
+                        print(f"   ❌ {customer_id}: Error - {data.get('error', 'Unknown')}")
+                else:
+                    print(f"   ❌ {customer_id}: Request failed with status {response.status_code}")
+                    
+        except Exception as e:
+            print(f"⚠️  Comprehensive customer data retrieval test error: {e}")
+    
+    def test_invalid_customer_handling_integration(self, policy_server_process):
+        """Test how integration handles invalid customer IDs"""
+        try:
+            print("\n🚫 Testing invalid customer handling in integration...")
+            
+            invalid_customers = [
+                "CUST999",     # Non-existent
+                "INVALID_ID",  # Wrong format
+                "",           # Empty
+                "CUST-001"    # Old format with dash
+            ]
+            
+            for customer_id in invalid_customers:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "id": 20 + len(customer_id),
+                    "method": "tools/call",
+                    "params": {
+                        "name": "get_policies",
+                        "arguments": {"customer_id": customer_id}
+                    }
+                }
+                
+                response = requests.post(
+                    "http://localhost:8001/mcp",
+                    json=mcp_request,
+                    headers={"Content-Type": "application/json"},
+                    timeout=5
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data:
+                        policies = data["result"]
+                        if not policies:  # Empty list expected
+                            print(f"   ✅ {customer_id}: Correctly handled (empty result)")
+                        else:
+                            print(f"   ⚠️  {customer_id}: Unexpected policies found")
+                    else:
+                        print(f"   ✅ {customer_id}: Error response (acceptable)")
+                else:
+                    print(f"   ⚠️  {customer_id}: Request failed")
+                    
+        except Exception as e:
+            print(f"⚠️  Invalid customer handling test error: {e}")
     
     def test_error_handling_integration(self, policy_server_process):
         """Test error handling in agent-policy integration"""

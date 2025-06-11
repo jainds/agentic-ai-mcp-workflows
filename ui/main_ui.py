@@ -87,9 +87,10 @@ def render_simple_mode():
         st.info("👋 Please log in to start chatting with the Insurance AI Assistant")
         st.markdown("""
         **Available Demo Customers:**
-        - `CUST-001` - John Smith (Premium)
-        - `CUST-002` - Jane Doe (Standard)  
-        - `CUST-003` - Bob Johnson (Basic)
+        - `CUST001` - John Smith (Premium)
+        - `CUST002` - Jane Doe (Standard)  
+        - `CUST003` - Bob Johnson (Basic)
+        - `CUST004` - Alice Williams (Standard)
         - `TEST-CUSTOMER` - Test User (Demo)
         """)
 
@@ -119,9 +120,10 @@ def render_advanced_mode():
             st.info("👋 Please log in to access the Insurance AI Assistant")
             st.markdown("""
             **Available Demo Customers:**
-            - `CUST-001` - John Smith (Premium)
-            - `CUST-002` - Jane Doe (Standard)  
-            - `CUST-003` - Bob Johnson (Basic)
+            - `CUST001` - John Smith (Premium)
+            - `CUST002` - Jane Doe (Standard)  
+            - `CUST003` - Bob Johnson (Basic)
+            - `CUST004` - Alice Williams (Standard)
             - `TEST-CUSTOMER` - Test User (Demo)
             """)
         return

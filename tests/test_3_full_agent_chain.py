@@ -190,7 +190,7 @@ cli.main(["api_server", "insurance_customer_service", "--port", "8003"])
                 "id": 1,
                 "method": "tools/call",
                 "params": {
-                    "name": "policy_lookup",
+                    "name": "get_policies",
                     "arguments": {
                         "customer_id": customer_request["customer_id"]
                     }
@@ -223,6 +223,90 @@ cli.main(["api_server", "insurance_customer_service", "--port", "8003"])
         except Exception as e:
             print(f"⚠️  Agent communication simulation error: {e}")
     
+    def test_comprehensive_workflow_simulation(self, policy_server_process):
+        """Test comprehensive workflow with multiple customers and scenarios"""
+        try:
+            print("\n🎭 COMPREHENSIVE WORKFLOW SIMULATION")
+            print("-" * 50)
+            
+            # Test scenarios for different customers
+            test_scenarios = [
+                {
+                    "customer_id": "CUST001",
+                    "name": "John Smith", 
+                    "scenario": "Multi-policy customer inquiry",
+                    "expected_policies": 2
+                },
+                {
+                    "customer_id": "CUST002", 
+                    "name": "Jane Doe",
+                    "scenario": "Single policy customer inquiry",
+                    "expected_policies": 1
+                },
+                {
+                    "customer_id": "CUST003",
+                    "name": "Bob Johnson", 
+                    "scenario": "Life insurance inquiry",
+                    "expected_policies": 1
+                },
+                {
+                    "customer_id": "CUST004",
+                    "name": "Alice Williams",
+                    "scenario": "New customer inquiry", 
+                    "expected_policies": 1
+                }
+            ]
+            
+            successful_scenarios = 0
+            
+            for scenario in test_scenarios:
+                print(f"\n📋 Testing: {scenario['scenario']}")
+                print(f"   Customer: {scenario['name']} ({scenario['customer_id']})")
+                
+                # Simulate policy lookup
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "id": 100 + int(scenario['customer_id'][-1]),
+                    "method": "tools/call",
+                    "params": {
+                        "name": "get_policies",
+                        "arguments": {"customer_id": scenario['customer_id']}
+                    }
+                }
+                
+                response = requests.post(
+                    "http://localhost:8001/mcp",
+                    json=mcp_request,
+                    headers={"Content-Type": "application/json"},
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data:
+                        policies = data["result"]
+                        if len(policies) == scenario['expected_policies']:
+                            print(f"   ✅ SUCCESS: Found {len(policies)} policies (as expected)")
+                            successful_scenarios += 1
+                        else:
+                            print(f"   ⚠️  PARTIAL: Found {len(policies)} policies (expected {scenario['expected_policies']})")
+                    else:
+                        print(f"   ❌ FAILED: {data.get('error', 'Unknown error')}")
+                else:
+                    print(f"   ❌ FAILED: Status {response.status_code}")
+            
+            success_rate = (successful_scenarios / len(test_scenarios)) * 100
+            print(f"\n📊 WORKFLOW SIMULATION RESULTS:")
+            print(f"   Successful scenarios: {successful_scenarios}/{len(test_scenarios)} ({success_rate:.0f}%)")
+            
+            if success_rate >= 75:
+                print("✅ Comprehensive workflow simulation: PASSED")
+            else:
+                print("⚠️  Comprehensive workflow simulation: PARTIAL SUCCESS")
+                
+        except Exception as e:
+            print(f"❌ Comprehensive workflow simulation error: {e}")
+    
     def test_error_propagation_workflow(self, policy_server_process):
         """Test error handling across agent chain"""
         try:
@@ -232,7 +316,7 @@ cli.main(["api_server", "insurance_customer_service", "--port", "8003"])
                 "id": 2,
                 "method": "tools/call",
                 "params": {
-                    "name": "policy_lookup",
+                    "name": "get_policies",
                     "arguments": {
                         "customer_id": "INVALID_CUSTOMER"
                     }
@@ -248,7 +332,7 @@ cli.main(["api_server", "insurance_customer_service", "--port", "8003"])
             
             if response.status_code == 200:
                 data = response.json()
-                if "error" in data or ("result" in data and not data["result"].get("content")):
+                if "error" in data or ("result" in data and not data["result"]):
                     print("✅ Error propagation: PASSED (Properly handles invalid customer)")
                 else:
                     print("⚠️  Error propagation: Should handle invalid customer ID")
@@ -272,7 +356,7 @@ cli.main(["api_server", "insurance_customer_service", "--port", "8003"])
                     "id": int(time.time() * 1000),
                     "method": "tools/call",
                     "params": {
-                        "name": "policy_lookup",
+                        "name": "get_policies",
                         "arguments": {"customer_id": customer_id}
                     }
                 }
@@ -320,7 +404,7 @@ cli.main(["api_server", "insurance_customer_service", "--port", "8003"])
                     "id": i + 10,
                     "method": "tools/call",
                     "params": {
-                        "name": "policy_lookup",
+                        "name": "get_policies",
                         "arguments": {"customer_id": customer_id}
                     }
                 }
@@ -384,7 +468,7 @@ cli.main(["api_server", "insurance_customer_service", "--port", "8003"])
                     "id": 1,
                     "method": "tools/call",
                     "params": {
-                        "name": "policy_lookup",
+                        "name": "get_policies",
                         "arguments": {"customer_id": customer_request["customer_id"]}
                     }
                 },
@@ -407,7 +491,7 @@ cli.main(["api_server", "insurance_customer_service", "--port", "8003"])
                             "id": 2,
                             "method": "tools/call",
                             "params": {
-                                "name": "claims_lookup",
+                                "name": "get_coverage_information",
                                 "arguments": {"customer_id": customer_request["customer_id"]}
                             }
                         },

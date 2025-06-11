@@ -48,9 +48,10 @@ class UIConfig:
     
     # Demo customer data
     DEMO_CUSTOMERS = {
-        "CUST-001": {"name": "John Smith", "status": "Active", "type": "Premium"},
-        "CUST-002": {"name": "Jane Doe", "status": "Active", "type": "Standard"},
-        "CUST-003": {"name": "Bob Johnson", "status": "Active", "type": "Basic"},
+        "CUST001": {"name": "John Smith", "status": "Active", "type": "Premium"},
+        "CUST002": {"name": "Jane Doe", "status": "Active", "type": "Standard"},
+        "CUST003": {"name": "Bob Johnson", "status": "Active", "type": "Basic"},
+        "CUST004": {"name": "Alice Williams", "status": "Active", "type": "Standard"},
         "TEST-CUSTOMER": {"name": "Test User", "status": "Active", "type": "Demo"}
     }
     

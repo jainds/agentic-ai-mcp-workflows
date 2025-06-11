@@ -136,7 +136,7 @@ class TestPolicyServer:
                 "id": 2,
                 "method": "tools/call",
                 "params": {
-                    "name": "policy_lookup",
+                    "name": "get_policies",
                     "arguments": {
                         "customer_id": "CUST001"
                     }
@@ -162,6 +162,186 @@ class TestPolicyServer:
                 
         except Exception as e:
             print(f"⚠️  Policy data test error: {e}")
+    
+    def test_valid_customer_ids(self):
+        """Test all valid customer IDs from mock data"""
+        try:
+            print("\n🔍 Testing valid customer IDs...")
+            
+            # Customer IDs that should exist in the mock data
+            valid_customers = [
+                ("CUST001", "John Smith"),
+                ("CUST002", "Jane Doe"), 
+                ("CUST003", "Bob Johnson"),
+                ("CUST004", "Alice Williams")
+            ]
+            
+            for customer_id, expected_name in valid_customers:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "id": 100 + int(customer_id[-1]),
+                    "method": "tools/call",
+                    "params": {
+                        "name": "get_policies",
+                        "arguments": {"customer_id": customer_id}
+                    }
+                }
+                
+                response = requests.post(
+                    "http://localhost:8001/mcp",
+                    json=mcp_request,
+                    headers={"Content-Type": "application/json"},
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data and data["result"]:
+                        policies = data["result"]
+                        print(f"   ✅ {customer_id} ({expected_name}): {len(policies)} policies found")
+                    else:
+                        print(f"   ⚠️  {customer_id}: No policies found (expected some)")
+                else:
+                    print(f"   ❌ {customer_id}: Request failed with status {response.status_code}")
+            
+        except Exception as e:
+            print(f"⚠️  Valid customer IDs test error: {e}")
+    
+    def test_invalid_customer_ids(self):
+        """Test invalid customer IDs that should return empty results or errors"""
+        try:
+            print("\n🚫 Testing invalid customer IDs...")
+            
+            # Customer IDs that should NOT exist
+            invalid_customers = [
+                "CUST999",     # Non-existent customer
+                "CUST000",     # Invalid customer
+                "CUSTOMER1",   # Wrong format
+                "TEST123",     # Wrong format
+                "INVALID",     # Wrong format
+                "",            # Empty string
+                "CUST",        # Incomplete ID
+                "cust001",     # Wrong case
+                "CUST-001",    # Old format with dash
+                "CUST 001"     # With space
+            ]
+            
+            for customer_id in invalid_customers:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "id": 200 + len(customer_id),
+                    "method": "tools/call",
+                    "params": {
+                        "name": "get_policies", 
+                        "arguments": {"customer_id": customer_id}
+                    }
+                }
+                
+                response = requests.post(
+                    "http://localhost:8001/mcp",
+                    json=mcp_request,
+                    headers={"Content-Type": "application/json"},
+                    timeout=5
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data:
+                        policies = data["result"]
+                        if not policies:  # Empty list is expected for invalid customers
+                            print(f"   ✅ {customer_id}: Correctly returned empty result")
+                        else:
+                            print(f"   ⚠️  {customer_id}: Unexpectedly found {len(policies)} policies")
+                    else:
+                        print(f"   ✅ {customer_id}: Error response (acceptable)")
+                else:
+                    print(f"   ⚠️  {customer_id}: Request failed with status {response.status_code}")
+            
+        except Exception as e:
+            print(f"⚠️  Invalid customer IDs test error: {e}")
+    
+    def test_multiple_policies_per_customer(self):
+        """Test customers with multiple policies"""
+        try:
+            print("\n📋 Testing customers with multiple policies...")
+            
+            # CUST001 should have multiple policies (Auto + Home)
+            mcp_request = {
+                "jsonrpc": "2.0",
+                "id": 300,
+                "method": "tools/call",
+                "params": {
+                    "name": "get_policies",
+                    "arguments": {"customer_id": "CUST001"}
+                }
+            }
+            
+            response = requests.post(
+                "http://localhost:8001/mcp",
+                json=mcp_request,
+                headers={"Content-Type": "application/json"},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if "result" in data:
+                    policies = data["result"]
+                    if len(policies) >= 2:
+                        print(f"   ✅ CUST001: Has {len(policies)} policies (Multi-policy customer)")
+                        policy_types = [p.get("type") for p in policies]
+                        print(f"   Policy types: {policy_types}")
+                    else:
+                        print(f"   ⚠️  CUST001: Only {len(policies)} policies found (expected multiple)")
+                else:
+                    print(f"   ❌ CUST001: Error in response")
+            else:
+                print(f"   ❌ Multiple policies test failed: Status {response.status_code}")
+                
+        except Exception as e:
+            print(f"⚠️  Multiple policies test error: {e}")
+    
+    def test_different_mcp_tools(self):
+        """Test different MCP tools with various customer IDs"""
+        try:
+            print("\n🔧 Testing different MCP tools...")
+            
+            test_tools = [
+                "get_policies",
+                "get_policy_types",
+                "get_payment_information",
+                "get_coverage_information"
+            ]
+            
+            for tool_name in test_tools:
+                mcp_request = {
+                    "jsonrpc": "2.0",
+                    "id": 400,
+                    "method": "tools/call",
+                    "params": {
+                        "name": tool_name,
+                        "arguments": {"customer_id": "CUST001"}
+                    }
+                }
+                
+                response = requests.post(
+                    "http://localhost:8001/mcp",
+                    json=mcp_request,
+                    headers={"Content-Type": "application/json"},
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data:
+                        print(f"   ✅ {tool_name}: Working")
+                    else:
+                        print(f"   ⚠️  {tool_name}: Error response")
+                else:
+                    print(f"   ❌ {tool_name}: Request failed")
+                    
+        except Exception as e:
+            print(f"⚠️  Different MCP tools test error: {e}")
     
     def test_error_handling(self):
         """Test error handling for invalid requests"""

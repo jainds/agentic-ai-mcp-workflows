@@ -151,7 +151,7 @@ class TestCompleteSystem:
                 "id": 1,
                 "method": "tools/call",
                 "params": {
-                    "name": "policy_lookup",
+                    "name": "get_policies",
                     "arguments": {"customer_id": customer_id}
                 }
             }
@@ -181,7 +181,7 @@ class TestCompleteSystem:
                 "id": 2,
                 "method": "tools/call",
                 "params": {
-                    "name": "claims_lookup",
+                    "name": "get_coverage_information",
                     "arguments": {"customer_id": customer_id}
                 }
             }
@@ -211,7 +211,7 @@ class TestCompleteSystem:
                 "id": 3,
                 "method": "tools/call",
                 "params": {
-                    "name": "coverage_analysis",
+                    "name": "get_coverage_information",
                     "arguments": {"customer_id": customer_id}
                 }
             }
@@ -241,7 +241,7 @@ class TestCompleteSystem:
                 "id": 4,
                 "method": "tools/call",
                 "params": {
-                    "name": "payment_lookup",
+                    "name": "get_payment_information",
                     "arguments": {"customer_id": customer_id}
                 }
             }
@@ -284,6 +284,106 @@ class TestCompleteSystem:
             print(f"❌ Customer journey error: {e}")
             return False
     
+    def test_comprehensive_customer_scenarios(self, policy_server_process):
+        """Test comprehensive customer scenarios with different customer profiles"""
+        try:
+            print("\n🎭 COMPREHENSIVE CUSTOMER SCENARIOS")
+            print("=" * 60)
+            
+            # Test different customer profiles
+            customer_scenarios = [
+                {
+                    "customer_id": "CUST001",
+                    "name": "John Smith",
+                    "profile": "Multi-policy Premium Customer",
+                    "expected_policies": 2,
+                    "policy_types": ["Auto", "Home"]
+                },
+                {
+                    "customer_id": "CUST002", 
+                    "name": "Jane Doe",
+                    "profile": "Single Home Policy Customer",
+                    "expected_policies": 1,
+                    "policy_types": ["Home"]
+                },
+                {
+                    "customer_id": "CUST003",
+                    "name": "Bob Johnson",
+                    "profile": "Life Insurance Customer", 
+                    "expected_policies": 1,
+                    "policy_types": ["Life"]
+                },
+                {
+                    "customer_id": "CUST004",
+                    "name": "Alice Williams",
+                    "profile": "Auto Insurance Customer",
+                    "expected_policies": 1, 
+                    "policy_types": ["Auto"]
+                }
+            ]
+            
+            successful_scenarios = 0
+            
+            for scenario in customer_scenarios:
+                print(f"\n📋 Testing: {scenario['profile']}")
+                print(f"   Customer: {scenario['name']} ({scenario['customer_id']})")
+                
+                # Test policy retrieval
+                policy_request = {
+                    "jsonrpc": "2.0",
+                    "id": 100 + int(scenario['customer_id'][-1]),
+                    "method": "tools/call", 
+                    "params": {
+                        "name": "get_policies",
+                        "arguments": {"customer_id": scenario['customer_id']}
+                    }
+                }
+                
+                response = requests.post(
+                    "http://localhost:8001/mcp",
+                    json=policy_request,
+                    headers={"Content-Type": "application/json"},
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "result" in data:
+                        policies = data["result"]
+                        actual_count = len(policies)
+                        actual_types = [p.get("type") for p in policies]
+                        
+                        if actual_count == scenario['expected_policies']:
+                            print(f"   ✅ Policy count: {actual_count} (expected {scenario['expected_policies']})")
+                            
+                            # Check policy types
+                            if set(actual_types) == set(scenario['policy_types']):
+                                print(f"   ✅ Policy types: {actual_types} (as expected)")
+                                successful_scenarios += 1
+                            else:
+                                print(f"   ⚠️  Policy types: {actual_types} (expected {scenario['policy_types']})")
+                        else:
+                            print(f"   ⚠️  Policy count: {actual_count} (expected {scenario['expected_policies']})")
+                    else:
+                        print(f"   ❌ Error: {data.get('error', 'Unknown')}")
+                else:
+                    print(f"   ❌ Request failed: Status {response.status_code}")
+            
+            success_rate = (successful_scenarios / len(customer_scenarios)) * 100
+            print(f"\n📊 CUSTOMER SCENARIOS SUMMARY:")
+            print(f"   Successful scenarios: {successful_scenarios}/{len(customer_scenarios)} ({success_rate:.0f}%)")
+            
+            if success_rate >= 75:
+                print("✅ Comprehensive customer scenarios: PASSED")
+                return True
+            else:
+                print("⚠️  Comprehensive customer scenarios: PARTIAL SUCCESS")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Customer scenarios error: {e}")
+            return False
+    
     def test_system_performance(self, policy_server_process):
         """Test overall system performance under load"""
         try:
@@ -296,13 +396,17 @@ class TestCompleteSystem:
             
             def make_request(request_id):
                 try:
+                    # Use valid customer IDs for performance testing
+                    customer_ids = ["CUST001", "CUST002", "CUST003", "CUST004"]
+                    customer_id = customer_ids[request_id % len(customer_ids)]
+                    
                     mcp_request = {
                         "jsonrpc": "2.0",
                         "id": request_id,
                         "method": "tools/call",
                         "params": {
-                            "name": "policy_lookup",
-                            "arguments": {"customer_id": f"CUST{request_id:03d}"}
+                            "name": "get_policies",
+                            "arguments": {"customer_id": customer_id}
                         }
                     }
                     

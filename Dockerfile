@@ -25,7 +25,7 @@ LABEL insurance.ai.version="${VERSION}"
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies in a single layer
+# Install system dependencies and uv in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     g++ \
@@ -35,15 +35,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
+# Install uv for fast Python package management
+RUN pip install --no-cache-dir uv
+
 # ========================================
 # Dependencies Stage
 # ========================================
 FROM base as dependencies
 
-# Copy requirements and install Python dependencies
+# Copy requirements and install Python dependencies using uv
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --system --no-cache -r requirements.txt
 
 # ========================================
 # Production Stage
@@ -73,7 +75,8 @@ RUN echo "{\
   \"build_date\": \"${BUILD_DATE}\", \
   \"git_commit\": \"${VCS_REF}\", \
   \"component\": \"main\", \
-  \"platform\": \"${TARGETPLATFORM}\" \
+  \"platform\": \"${TARGETPLATFORM}\", \
+  \"package_manager\": \"uv\" \
 }" > /app/version.json
 
 # Expose ports for all services

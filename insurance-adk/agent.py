@@ -9,7 +9,7 @@ https://google.github.io/adk-docs/agents/models/#using-openai-provider
 import os
 from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
-from agents import technical_agent, domain_agent
+from agents import technical_agent, domain_agent, orchestrator_agent
 
 # Get configuration from environment
 litellm_base_url = os.getenv("OPENROUTER_BASE_URL", "http://localhost:8090/v1")

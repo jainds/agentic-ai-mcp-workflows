@@ -293,7 +293,7 @@ jobs:
           echo "images=$IMAGE_NAME" >> $GITHUB_OUTPUT
 
       - name: 🐳 Build and push Docker image (direct approach)
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || github.ref == 'refs/heads/feature/adk-testing'
         run: |
           # Set up image names and tags
           IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}"
@@ -444,3 +444,28 @@ jobs:
           
           # Only show published images if build was successful
           if [[ "${{ needs.build-and-test.result }}" == "success" ]]; then
+            echo "### 📦 Published Docker Images" >> $GITHUB_STEP_SUMMARY
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.docker-tag }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.docker-tag }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### 🔧 Usage Commands" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "# Pull latest images" >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.docker-tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.docker-tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "# Run locally" >> $GITHUB_STEP_SUMMARY
+            echo "docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.docker-tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "docker run -p 8001:8001 ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.docker-tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ Build Status" >> $GITHUB_STEP_SUMMARY
+            echo "Docker images were not published due to build failure." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Workflow Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Event:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY

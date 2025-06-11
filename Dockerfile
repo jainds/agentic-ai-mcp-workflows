@@ -38,23 +38,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv for fast Python package management
 RUN pip install --no-cache-dir uv
 
-# ========================================
-# Dependencies Stage
-# ========================================
-FROM base as dependencies
-
-# Copy requirements and install Python dependencies using uv
+# Copy requirements and install Python dependencies directly
 COPY requirements.txt .
 RUN uv pip install --system --no-cache -r requirements.txt
-
-# ========================================
-# Production Stage
-# ========================================
-FROM base as production
-
-# Copy installed packages from dependencies stage
-COPY --from=dependencies /usr/local/lib/python*/site-packages/ /usr/local/lib/python*/site-packages/
-COPY --from=dependencies /usr/local/bin/ /usr/local/bin/
 
 # Copy application code
 COPY . .
@@ -87,4 +73,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import sys; sys.exit(0)" || exit 1
 
 # Default command (can be overridden in Kubernetes)
-CMD ["python", "-c", "print('Insurance AI PoC Main Container v${VERSION} ready'); import json; print(json.dumps(json.load(open('/app/version.json')), indent=2))"] 
+CMD ["python", "-c", "print('Insurance AI PoC Main Container ready'); import json; print(json.dumps(json.load(open('/app/version.json')), indent=2))"] 

@@ -318,7 +318,11 @@ spec:
           name: http
         env:
         - name: POLICY_SERVER_URL
-          value: "http://policy-server:8001/mcp"
+          value: "http://adk-customer-service:8000"
+        - name: ADK_CUSTOMER_SERVICE_URL
+          value: "http://adk-customer-service:8000"
+        - name: UI_MODE
+          value: "advanced"
         resources:
           requests:
             memory: "256Mi"
@@ -395,6 +399,10 @@ spec:
           value: "8000"
         - name: HOST
           value: "0.0.0.0"
+        - name: TECHNICAL_AGENT_URL
+          value: "http://adk-technical-agent:8002"
+        - name: ORCHESTRATOR_URL
+          value: "http://adk-orchestrator:8003"
         resources:
           requests:
             memory: "256Mi"
@@ -459,6 +467,10 @@ spec:
           value: "8002"
         - name: HOST
           value: "0.0.0.0"
+        - name: POLICY_SERVER_URL
+          value: "http://policy-server:8001/mcp"
+        - name: MCP_SERVER_URL
+          value: "http://policy-server:8001/mcp"
         resources:
           requests:
             memory: "256Mi"
@@ -523,6 +535,10 @@ spec:
           value: "8003"
         - name: HOST
           value: "0.0.0.0"
+        - name: CUSTOMER_SERVICE_URL
+          value: "http://adk-customer-service:8000"
+        - name: TECHNICAL_AGENT_URL
+          value: "http://adk-technical-agent:8002"
         resources:
           requests:
             memory: "256Mi"

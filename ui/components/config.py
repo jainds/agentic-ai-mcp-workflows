@@ -22,21 +22,21 @@ class UIConfig:
     
     # Google ADK Agent endpoints - Updated for LiteLLM + OpenRouter integration
     ADK_CUSTOMER_SERVICE_ENDPOINTS = [
-        "http://insurance-adk-customer-service:8000",   # Kubernetes service
+        "http://adk-customer-service:8000",             # Kubernetes service
         "http://localhost:8000",                        # Port forwarded ADK web
         "http://127.0.0.1:8000"                        # Local ADK web
     ]
     
     ADK_TECHNICAL_AGENT_ENDPOINTS = [
-        "http://insurance-adk-technical:8001",          # Kubernetes service  
-        "http://localhost:8001",                        # Port forwarded ADK API
-        "http://127.0.0.1:8001"                        # Local ADK API
+        "http://adk-technical-agent:8002",              # Kubernetes service  
+        "http://localhost:8002",                        # Port forwarded ADK API
+        "http://127.0.0.1:8002"                        # Local ADK API
     ]
     
     ADK_ORCHESTRATOR_ENDPOINTS = [
-        "http://insurance-adk-orchestrator:8002",       # Kubernetes service
-        "http://localhost:8002",                        # Port forwarded orchestrator
-        "http://127.0.0.1:8002"                        # Local orchestrator
+        "http://adk-orchestrator:8003",                 # Kubernetes service
+        "http://localhost:8003",                        # Port forwarded orchestrator
+        "http://127.0.0.1:8003"                        # Local orchestrator
     ]
     
     # Legacy endpoints (for backwards compatibility)
@@ -58,9 +58,9 @@ class UIConfig:
     # Service endpoints for monitoring - Updated for Google ADK architecture
     MONITORED_SERVICES = {
         "ADK Customer Service": "http://localhost:8000/health",
-        "ADK Technical Agent": "http://localhost:8001/health", 
-        "ADK Orchestrator": "http://localhost:8002/health",
-        "Policy Server (MCP)": "http://localhost:8003/health",
+        "ADK Technical Agent": "http://localhost:8002/health", 
+        "ADK Orchestrator": "http://localhost:8003/health",
+        "Policy Server (MCP)": "http://localhost:8001/mcp",
         "Google ADK Web UI": "http://localhost:8000/dev-ui/",
         "Streamlit UI": "http://localhost:8501"
     }

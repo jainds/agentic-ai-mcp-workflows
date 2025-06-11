@@ -85,7 +85,8 @@ cd ../policy_server && python main.py
 
 # Start ADK system (terminal 2)  
 cd insurance-adk
-python server/main.py
+export GOOGLE_API_KEY=your_api_key_here
+adk web --port 8000
 ```
 
 ## 🔧 Configuration

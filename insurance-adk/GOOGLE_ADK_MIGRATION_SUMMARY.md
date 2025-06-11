@@ -288,7 +288,7 @@ MCP_SERVER_URL=http://localhost:8001/mcp
 1. **Install Google ADK**: `pip install google-adk>=1.0.0`
 2. **Configure environment**: Set OpenRouter API key
 3. **Start policy server**: `cd policy_server && python main.py`
-4. **Launch ADK system**: `cd insurance-adk && python server/main.py`
+4. **Launch ADK system**: `cd insurance-adk && export GOOGLE_API_KEY=your_api_key_here && adk web --port 8000`
 
 ### Optional Enhancements
 - Deploy to production environment

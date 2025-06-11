@@ -62,7 +62,7 @@ COPY --from=dependencies /usr/local/bin/ /usr/local/bin/
 # Copy application code
 COPY insurance-adk/ ./insurance-adk/
 COPY policy_server/ ./policy_server/
-COPY main_ui.py .
+COPY ui/ ./ui/
 COPY .env.example .env
 
 # Create non-root user for security
@@ -92,4 +92,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/dev-ui/ || exit 1
 
 # Default command runs Google ADK web with versioning info
-CMD ["sh", "-c", "echo 'Starting Google ADK v${VERSION}' && cat /app/version.json && cd insurance-adk && adk web --host 0.0.0.0 --port 8000"] 
+CMD ["sh", "-c", "echo 'Starting Google ADK v${VERSION}' && cat /app/version.json && if [ \"$SERVICE_TYPE\" = \"streamlit\" ]; then cd ui && streamlit run main_ui.py --server.port 8501 --server.address 0.0.0.0; else cd insurance-adk && adk web --host 0.0.0.0 --port 8000; fi"] 

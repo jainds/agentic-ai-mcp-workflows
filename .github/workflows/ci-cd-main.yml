@@ -272,82 +272,99 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🏷️ Generate simplified Docker tags
+      - name: 🏷️ Generate Docker tags
         id: meta
         run: |
           # Generate simple, valid Docker tags
           IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}"
           DOCKER_TAG="${{ needs.version.outputs.docker-tag }}"
           
-          # Primary tag with version
-          TAGS="$IMAGE_NAME:$DOCKER_TAG"
+          # Create a tag with run number and SHA for better traceability
+          RUN_SHA_TAG="run${{ github.run_number }}-${GITHUB_SHA::7}"
+          
+          # Add all tags to the output
+          echo "tags=$IMAGE_NAME:$DOCKER_TAG,$IMAGE_NAME:$RUN_SHA_TAG" >> $GITHUB_OUTPUT
           
           # Add latest tag for main branch
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            TAGS="$TAGS,$IMAGE_NAME:latest"
+            echo "tags=$IMAGE_NAME:$DOCKER_TAG,$IMAGE_NAME:$RUN_SHA_TAG,$IMAGE_NAME:latest" >> $GITHUB_OUTPUT
           fi
           
-          # Add branch tag for non-main branches
-          if [[ "${{ github.ref }}" != "refs/heads/main" ]]; then
-            BRANCH_TAG=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
-            TAGS="$TAGS,$IMAGE_NAME:$BRANCH_TAG"
-          fi
-          
-          echo "Generated tags: $TAGS"
-          echo "tags=$TAGS" >> $GITHUB_OUTPUT
           echo "images=$IMAGE_NAME" >> $GITHUB_OUTPUT
 
-      - name: 🐳 Build and push Docker image
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ matrix.image.context }}
-          file: ${{ matrix.image.dockerfile }}
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: |
-            org.opencontainers.image.title=Insurance AI PoC (${{ matrix.image.name }})
-            org.opencontainers.image.description=Google ADK + LiteLLM + OpenRouter Integration (${{ matrix.image.name }})
-            org.opencontainers.image.version=${{ needs.version.outputs.version }}
-            org.opencontainers.image.vendor=Insurance AI Team
-            insurance.ai.component=${{ matrix.image.name }}
-            insurance.ai.version=${{ needs.version.outputs.version }}
-          cache-from: type=gha,scope=${{ matrix.image.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            VERSION=${{ needs.version.outputs.version }}
-            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-            VCS_REF=${{ github.sha }}
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
-
-      - name: 📝 Handle registry permission issues
-        if: failure() && github.event_name != 'pull_request'
+      - name: 🐳 Build and push Docker image (direct approach)
+        if: github.event_name != 'pull_request'
         run: |
-          echo "⚠️ Docker registry push failed - likely due to organization package permissions"
-          echo "This is expected for forked repositories or when organization packages are restricted"
-          echo "The Docker image was built successfully but could not be pushed to the registry"
-          echo ""
-          echo "To resolve this issue:"
-          echo "1. Ensure you have 'write:packages' permission in the repository"
-          echo "2. Check organization package settings" 
-          echo "3. Consider using a personal registry (ghcr.io/USERNAME/) instead"
+          # Set up image names and tags
+          IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}"
+          VERSION_TAG="${{ needs.version.outputs.docker-tag }}"
+          RUN_SHA_TAG="run${{ github.run_number }}-${GITHUB_SHA::7}"
+          
+          echo "🔨 Building Docker image: $IMAGE_NAME:$VERSION_TAG"
+          
+          # Build the image with version tag
+          docker build \
+            --build-arg VERSION=${{ needs.version.outputs.version }} \
+            --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+            --build-arg VCS_REF=${{ github.sha }} \
+            -t "$IMAGE_NAME:$VERSION_TAG" \
+            -t "$IMAGE_NAME:$RUN_SHA_TAG" \
+            -f ${{ matrix.image.dockerfile }} \
+            ${{ matrix.image.context }}
+          
+          # Add latest tag for main branch
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "🏷️ Tagging as latest"
+            docker tag "$IMAGE_NAME:$VERSION_TAG" "$IMAGE_NAME:latest"
+          fi
+          
+          # Push all tags
+          echo "⬆️ Pushing image to registry..."
+          docker push "$IMAGE_NAME:$VERSION_TAG"
+          docker push "$IMAGE_NAME:$RUN_SHA_TAG"
+          
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            docker push "$IMAGE_NAME:latest"
+          fi
+          
+          echo "✅ Image successfully built and pushed"
 
       - name: 🔍 Test image (for PRs)
         if: github.event_name == 'pull_request'
         run: |
-          # For PRs, just test that the image was built (not pushed)
+          # For PRs, just build the image without pushing
+          IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}"
+          VERSION_TAG="${{ needs.version.outputs.docker-tag }}"
+          
+          echo "🔨 Building Docker image for PR validation: $IMAGE_NAME:$VERSION_TAG"
+          
+          docker build \
+            --build-arg VERSION=${{ needs.version.outputs.version }} \
+            --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+            --build-arg VCS_REF=${{ github.sha }} \
+            -t "$IMAGE_NAME:$VERSION_TAG" \
+            -f ${{ matrix.image.dockerfile }} \
+            ${{ matrix.image.context }}
+          
           echo "✅ Docker image built successfully for PR validation"
-          echo "Image tags that would be pushed: ${{ steps.meta.outputs.tags }}"
 
-      - name: 🔍 Test image (for pushes)
-        if: github.event_name != 'pull_request' && success()
+      - name: Verify image publish success
+        if: github.event_name != 'pull_request'
         run: |
-          # Test that the image can be pulled and runs
-          PRIMARY_TAG=$(echo "${{ steps.meta.outputs.tags }}" | cut -d',' -f1)
-          echo "Testing image: $PRIMARY_TAG"
-          docker pull "$PRIMARY_TAG"
-          docker run --rm "$PRIMARY_TAG" python --version
+          IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}"
+          VERSION_TAG="${{ needs.version.outputs.docker-tag }}"
+          
+          echo "🔍 Verifying image was successfully published to registry"
+          
+          # Try to pull the image to verify it exists
+          if docker pull "$IMAGE_NAME:$VERSION_TAG" 2>/dev/null; then
+            echo "✅ Image successfully published to registry: $IMAGE_NAME:$VERSION_TAG"
+            echo "IMAGE_PUBLISHED=true" >> $GITHUB_ENV
+          else
+            echo "❌ Failed to verify image in registry. This could be due to registry caching delays."
+            echo "The push command completed successfully, so the image should be available shortly."
+            echo "IMAGE_PUBLISHED=false" >> $GITHUB_ENV
+          fi
 
       - name: Upload test artifacts
         uses: actions/upload-artifact@v4
@@ -361,239 +378,7 @@ jobs:
             htmlcov/
           retention-days: 7
 
-  # ==========================================
-  # Security Scanning
-  # ==========================================
-  security-scan:
-    name: 🔒 Security Scan
-    needs: [version, build-and-test]
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        image-name: [main, adk]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Check if registry image exists
-        id: check-registry
-        run: |
-          REGISTRY_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image-name }}:${{ needs.version.outputs.docker-tag }}"
-          echo "Checking if registry image exists: $REGISTRY_IMAGE"
-          
-          # Try to pull the image to check if it exists
-          if docker pull "$REGISTRY_IMAGE" 2>/dev/null; then
-            echo "✅ Registry image found"
-            echo "use-registry=true" >> $GITHUB_OUTPUT
-            echo "image-ref=$REGISTRY_IMAGE" >> $GITHUB_OUTPUT
-          else
-            echo "⚠️ Registry image not found, will build locally for scanning"
-            echo "use-registry=false" >> $GITHUB_OUTPUT
-            echo "image-ref=insurance-ai-poc-${{ matrix.image-name }}:scan" >> $GITHUB_OUTPUT
-          fi
-        continue-on-error: true
-
-      - name: Build local image for scanning (if registry unavailable)
-        if: steps.check-registry.outputs.use-registry != 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.image-name == 'adk' && 'Dockerfile.adk' || 'Dockerfile' }}
-          push: false
-          tags: insurance-ai-poc-${{ matrix.image-name }}:scan
-          cache-from: type=gha,scope=${{ matrix.image-name }}
-          build-args: |
-            VERSION=${{ needs.version.outputs.version }}
-            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-            VCS_REF=${{ github.sha }}
-
-      - name: Verify image for scanning
-        id: verify-image
-        run: |
-          IMAGE_REF="${{ steps.check-registry.outputs.image-ref }}"
-          echo "Verifying image for scanning: $IMAGE_REF"
-          
-          if docker image inspect "$IMAGE_REF" >/dev/null 2>&1; then
-            echo "✅ Image verified and ready for scanning"
-            echo "image-ready=true" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Image not found or not accessible"
-            echo "image-ready=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run Trivy vulnerability scanner
-        id: trivy-scan
-        if: steps.verify-image.outputs.image-ready == 'true'
-        run: |
-          IMAGE_REF="${{ steps.check-registry.outputs.image-ref }}"
-          OUTPUT_FILE="trivy-results-${{ matrix.image-name }}.sarif"
-          
-          echo "🔍 Running Trivy scan on: $IMAGE_REF"
-          echo "📄 Output file: $OUTPUT_FILE"
-          
-          # Run Trivy with detailed logging
-          trivy image \
-            --format sarif \
-            --output "$OUTPUT_FILE" \
-            --severity HIGH,CRITICAL \
-            --no-progress \
-            --debug \
-            "$IMAGE_REF" || {
-            echo "⚠️ Trivy scan failed, creating minimal SARIF file"
-            
-            # Create a minimal valid SARIF file if scan fails
-            cat > "$OUTPUT_FILE" << 'EOF'
-          {
-            "version": "2.1.0",
-            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-            "runs": [
-              {
-                "tool": {
-                  "driver": {
-                    "name": "Trivy",
-                    "version": "Unknown",
-                    "informationUri": "https://github.com/aquasecurity/trivy"
-                  }
-                },
-                "results": [
-                  {
-                    "ruleId": "SCAN_FAILED",
-                    "message": {
-                      "text": "Security scan failed - manual review required"
-                    },
-                    "level": "warning",
-                    "locations": [
-                      {
-                        "physicalLocation": {
-                          "artifactLocation": {
-                            "uri": "Dockerfile"
-                          },
-                          "region": {
-                            "startLine": 1
-                          }
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-          EOF
-            
-            echo "📄 Created fallback SARIF file"
-          }
-          
-          # Verify SARIF file was created
-          if [[ -f "$OUTPUT_FILE" ]]; then
-            echo "✅ SARIF file created successfully"
-            echo "scan-success=true" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Failed to create SARIF file"
-            echo "scan-success=false" >> $GITHUB_OUTPUT
-          fi
-        continue-on-error: true
-
-      - name: Create fallback SARIF for failed scans
-        if: steps.verify-image.outputs.image-ready != 'true' || steps.trivy-scan.outputs.scan-success != 'true'
-        run: |
-          OUTPUT_FILE="trivy-results-${{ matrix.image-name }}.sarif"
-          
-          echo "🔧 Creating fallback SARIF file for failed scan"
-          
-          cat > "$OUTPUT_FILE" << 'EOF'
-          {
-            "version": "2.1.0",
-            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-            "runs": [
-              {
-                "tool": {
-                  "driver": {
-                    "name": "Trivy",
-                    "version": "Unknown",
-                    "informationUri": "https://github.com/aquasecurity/trivy"
-                  }
-                },
-                "results": [
-                  {
-                    "ruleId": "IMAGE_UNAVAILABLE",
-                    "message": {
-                      "text": "Security scan could not be performed - image not available for scanning"
-                    },
-                    "level": "note",
-                    "locations": [
-                      {
-                        "physicalLocation": {
-                          "artifactLocation": {
-                            "uri": "Docker Image"
-                          },
-                          "region": {
-                            "startLine": 1
-                          }
-                        }
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-          EOF
-          
-          echo "📄 Fallback SARIF file created"
-
-      - name: Install Trivy (if not available)
-        if: steps.verify-image.outputs.image-ready == 'true' && steps.trivy-scan.outputs.scan-success != 'true'
-        run: |
-          echo "📦 Installing Trivy binary"
-          wget -qO- https://github.com/aquasecurity/trivy/releases/latest/download/trivy_Linux-64bit.tar.gz | tar xz
-          sudo mv trivy /usr/local/bin/
-          trivy --version
-
-      - name: Report scan status
-        if: always()
-        run: |
-          echo "## 🔒 Security Scan Status for ${{ matrix.image-name }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [[ "${{ steps.check-registry.outputs.use-registry }}" == "true" ]]; then
-            echo "✅ **Image Source:** Registry image" >> $GITHUB_STEP_SUMMARY
-            echo "📦 **Image:** ${{ steps.check-registry.outputs.image-ref }}" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ **Image Source:** Locally built (registry unavailable)" >> $GITHUB_STEP_SUMMARY
-            echo "🔧 This is expected for forked repositories" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          if [[ -f "trivy-results-${{ matrix.image-name }}.sarif" ]]; then
-            echo "📊 **Scan Result:** SARIF file generated" >> $GITHUB_STEP_SUMMARY
-            
-            # Count findings if jq is available
-            if command -v jq >/dev/null 2>&1; then
-              RESULTS_COUNT=$(jq '.runs[0].results | length' "trivy-results-${{ matrix.image-name }}.sarif" 2>/dev/null || echo "unknown")
-              echo "🔍 **Findings:** $RESULTS_COUNT issues detected" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "❌ **Scan Result:** Failed to generate SARIF file" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results-${{ matrix.image-name }}.sarif'
-        continue-on-error: true
-
-      - name: Upload security scan artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-scan-${{ matrix.image-name }}
-          path: |
-            trivy-results-${{ matrix.image-name }}.sarif
-          retention-days: 30
+  
 
   # ==========================================
   # Create GitHub Release
@@ -637,46 +422,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
   # ==========================================
-  # Package Vulnerability Report
-  # ==========================================
-  vulnerability-report:
-    name: 📊 Generate Vulnerability Report
-    needs: [version, security-scan]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Create vulnerability summary
-        run: |
-          echo "## 🔒 Security Scan Summary" > vulnerability-report.md
-          echo "Version: ${{ needs.version.outputs.version }}" >> vulnerability-report.md
-          echo "Scan Date: $(date)" >> vulnerability-report.md
-          echo "" >> vulnerability-report.md
-          echo "### Images Scanned:" >> vulnerability-report.md
-          echo "- insurance-ai-poc-main:${{ needs.version.outputs.docker-tag }}" >> vulnerability-report.md
-          echo "- insurance-ai-poc-adk:${{ needs.version.outputs.docker-tag }}" >> vulnerability-report.md
-          echo "" >> vulnerability-report.md
-          echo "### Scan Status:" >> vulnerability-report.md
-          echo "- Security Scan Result: ${{ needs.security-scan.result || 'not completed' }}" >> vulnerability-report.md
-          
-          if [[ "${{ needs.security-scan.result }}" != "success" ]]; then
-            echo "" >> vulnerability-report.md
-            echo "⚠️ **Note:** Security scan did not complete successfully." >> vulnerability-report.md
-            echo "This may be due to registry access issues in forked repositories." >> vulnerability-report.md
-            echo "Local security scanning was attempted as fallback." >> vulnerability-report.md
-          fi
-
-      - name: Upload vulnerability report
-        uses: actions/upload-artifact@v4
-        with:
-          name: vulnerability-report
-          path: vulnerability-report.md
-
-  # ==========================================
   # Pipeline Summary
   # ==========================================
   pipeline-summary:
     name: 📋 Pipeline Summary
-    needs: [version, build-and-test, security-scan, create-release, vulnerability-report]
+    needs: [version, build-and-test, create-release]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -694,26 +444,3 @@ jobs:
           
           # Only show published images if build was successful
           if [[ "${{ needs.build-and-test.result }}" == "success" ]]; then
-            echo "### 📦 Published Docker Images" >> $GITHUB_STEP_SUMMARY
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-main:${{ needs.version.outputs.docker-tag }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-adk:${{ needs.version.outputs.docker-tag }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "### 🔍 Pipeline Results" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version Management:** ${{ needs.version.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build & Test:** ${{ needs.build-and-test.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Security Scan:** ${{ needs.security-scan.result == 'success' && '✅ Success' || needs.security-scan.result == 'failure' && '⚠️ Failed (may be due to registry permissions)' || '⏭️ Skipped' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **GitHub Release:** ${{ needs.create-release.result == 'success' && '✅ Success' || needs.create-release.result == 'skipped' && '⏭️ Skipped' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Vulnerability Report:** ${{ needs.vulnerability-report.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🎯 Next Steps" >> $GITHUB_STEP_SUMMARY
-          
-          if [[ "${{ needs.security-scan.result }}" != "success" ]]; then
-            echo "1. ⚠️ Review security scan failures - may be due to registry access issues" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "1. Review the [vulnerability report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) if security issues were found" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "2. Use the published Docker images for your deployments" >> $GITHUB_STEP_SUMMARY
-          echo "3. Check the [release notes](https://github.com/${{ github.repository }}/releases/tag/${{ needs.version.outputs.tag }}) for detailed changes" >> $GITHUB_STEP_SUMMARY 

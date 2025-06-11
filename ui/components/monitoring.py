@@ -14,40 +14,78 @@ def check_service_health() -> Dict[str, Dict[str, Any]]:
     """Check health of all monitored services"""
     health_status = {}
     
-    for service_name, endpoint in UIConfig.MONITORED_SERVICES.items():
-        try:
-            start_time = time.time()
-            
-            # Adjust endpoint for FastMCP services (they use /mcp/ instead of /health)
-            if "FastMCP" in service_name:
-                # For FastMCP services, try to ping the base MCP endpoint
-                health_url = endpoint  # Already has /mcp/
-            else:
-                # For regular services, use /health
-                if not endpoint.endswith('/health'):
-                    health_url = endpoint.rstrip('/') + '/health'
+    for service_name, endpoints in UIConfig.MONITORED_SERVICES.items():
+        # Handle both single endpoint (string) and multiple endpoints (list)
+        if isinstance(endpoints, str):
+            endpoints_list = [endpoints]
+        else:
+            endpoints_list = endpoints
+        
+        # Try endpoints in order (Kubernetes DNS first, then localhost fallback)
+        service_found = False
+        for endpoint in endpoints_list:
+            try:
+                start_time = time.time()
+                
+                # Different health check strategies for different services
+                if "Policy Server" in service_name and "mcp" in endpoint:
+                    # For Policy Server, try the MCP endpoint directly
+                    health_url = endpoint  # Already has /mcp/
+                elif "ADK" in service_name:
+                    # For ADK services, check the root endpoint or dev-ui
+                    if service_name == "ADK Customer Service":
+                        health_url = endpoint.replace("/health", "/dev-ui/")
+                    elif service_name == "Google ADK Web UI":
+                        health_url = endpoint  # Already points to /dev-ui/
+                    else:
+                        # For Technical Agent and Orchestrator, check root
+                        health_url = endpoint.replace("/health", "/")
                 else:
-                    health_url = endpoint
-            
-            response = requests.get(health_url, timeout=3)
-            response_time = (time.time() - start_time) * 1000
-            
-            health_status[service_name] = {
-                "status": "healthy" if response.status_code == 200 else "unhealthy",
-                "status_code": response.status_code,
-                "response_time_ms": round(response_time, 2),
-                "endpoint": health_url,
-                "last_checked": datetime.now()
-            }
-            
-        except requests.RequestException as e:
+                    # For other services, use standard health endpoint
+                    if not endpoint.endswith('/health'):
+                        health_url = endpoint.rstrip('/') + '/health'
+                    else:
+                        health_url = endpoint
+                
+                response = requests.get(health_url, timeout=5)
+                response_time = (time.time() - start_time) * 1000
+                
+                # Determine health based on service type and response
+                if "ADK" in service_name or "Policy Server" in service_name:
+                    # For ADK services and Policy Server, 200, 307 (redirect), 404 (no health endpoint), and 406 (method not allowed for MCP) are all healthy
+                    is_healthy = response.status_code in [200, 307, 404, 406]
+                else:
+                    # For other services, only 200 is healthy
+                    is_healthy = response.status_code == 200
+                
+                if is_healthy:
+                    health_status[service_name] = {
+                        "status": "healthy",
+                        "status_code": response.status_code,
+                        "response_time_ms": round(response_time, 2),
+                        "endpoint": health_url,
+                        "endpoint_type": "kubernetes" if any(dns in endpoint for dns in [".svc.cluster.local", ":8000", ":8001", ":8002", ":8003"]) and "localhost" not in endpoint else "localhost",
+                        "last_checked": datetime.now(),
+                        "service_type": "adk" if "ADK" in service_name else "standard"
+                    }
+                    service_found = True
+                    break  # Stop trying other endpoints for this service
+                    
+            except requests.RequestException:
+                # Continue to next endpoint
+                continue
+        
+        # If no endpoint worked, record failure with the first endpoint
+        if not service_found:
             health_status[service_name] = {
                 "status": "unreachable",
                 "status_code": None,
                 "response_time_ms": None,
-                "endpoint": endpoint,
-                "error": str(e),
-                "last_checked": datetime.now()
+                "endpoint": endpoints_list[0],
+                "endpoint_type": "kubernetes" if any(dns in endpoints_list[0] for dns in [".svc.cluster.local", ":8000", ":8001", ":8002", ":8003"]) and "localhost" not in endpoints_list[0] else "localhost",
+                "error": "All endpoints failed",
+                "last_checked": datetime.now(),
+                "service_type": "unknown"
             }
     
     return health_status

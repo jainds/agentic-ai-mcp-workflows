@@ -22,28 +22,36 @@ class UIConfig:
     
     # Google ADK Agent endpoints - Updated for LiteLLM + OpenRouter integration
     ADK_CUSTOMER_SERVICE_ENDPOINTS = [
-        "http://adk-customer-service:8000",             # Kubernetes service
-        "http://localhost:8000",                        # Port forwarded ADK web
-        "http://127.0.0.1:8000"                        # Local ADK web
+        "http://adk-customer-service.insurance-ai-poc.svc.cluster.local:8000",   # Full Kubernetes DNS
+        "http://adk-customer-service.insurance-ai-poc:8000",                     # Namespace-scoped DNS  
+        "http://adk-customer-service:8000",                                      # Service name (same namespace)
+        "http://localhost:8000",                                                 # Port forwarded ADK web
+        "http://127.0.0.1:8000"                                                 # Local ADK web
     ]
     
     ADK_TECHNICAL_AGENT_ENDPOINTS = [
-        "http://adk-technical-agent:8002",              # Kubernetes service  
-        "http://localhost:8002",                        # Port forwarded ADK API
-        "http://127.0.0.1:8002"                        # Local ADK API
+        "http://adk-technical-agent.insurance-ai-poc.svc.cluster.local:8002",   # Full Kubernetes DNS
+        "http://adk-technical-agent.insurance-ai-poc:8002",                     # Namespace-scoped DNS
+        "http://adk-technical-agent:8002",                                      # Service name (same namespace)
+        "http://localhost:8002",                                                # Port forwarded ADK API
+        "http://127.0.0.1:8002"                                                # Local ADK API
     ]
     
     ADK_ORCHESTRATOR_ENDPOINTS = [
-        "http://adk-orchestrator:8003",                 # Kubernetes service
-        "http://localhost:8003",                        # Port forwarded orchestrator
-        "http://127.0.0.1:8003"                        # Local orchestrator
+        "http://adk-orchestrator.insurance-ai-poc.svc.cluster.local:8003",      # Full Kubernetes DNS  
+        "http://adk-orchestrator.insurance-ai-poc:8003",                        # Namespace-scoped DNS
+        "http://adk-orchestrator:8003",                                         # Service name (same namespace)
+        "http://localhost:8003",                                                # Port forwarded orchestrator
+        "http://127.0.0.1:8003"                                                # Local orchestrator
     ]
     
-    # Legacy endpoints (for backwards compatibility)
-    DOMAIN_AGENT_ENDPOINTS = [
-        "http://insurance-ai-poc-domain-agent:8003",    # Legacy Kubernetes service
-        "http://localhost:8003",                        # Legacy port forwarded  
-        "http://127.0.0.1:8003"                        # Legacy local
+    # Policy Server endpoints (MCP)
+    POLICY_SERVER_ENDPOINTS = [
+        "http://policy-server.insurance-ai-poc.svc.cluster.local:8001",         # Full Kubernetes DNS
+        "http://policy-server.insurance-ai-poc:8001",                           # Namespace-scoped DNS
+        "http://policy-server:8001",                                            # Service name (same namespace)
+        "http://localhost:8001",                                                # Port forwarded
+        "http://127.0.0.1:8001"                                                # Local
     ]
     
     # Demo customer data
@@ -57,12 +65,12 @@ class UIConfig:
     
     # Service endpoints for monitoring - Updated for Google ADK architecture
     MONITORED_SERVICES = {
-        "ADK Customer Service": "http://localhost:8000/health",
-        "ADK Technical Agent": "http://localhost:8002/health", 
-        "ADK Orchestrator": "http://localhost:8003/health",
-        "Policy Server (MCP)": "http://localhost:8001/mcp",
-        "Google ADK Web UI": "http://localhost:8000/dev-ui/",
-        "Streamlit UI": "http://localhost:8501"
+        "ADK Customer Service": "http://adk-customer-service:8000/health",
+        "ADK Technical Agent": "http://adk-technical-agent:8002/health", 
+        "ADK Orchestrator": "http://adk-orchestrator:8003/health",
+        "Policy Server (MCP)": "http://policy-server:8001/mcp",
+        "Google ADK Web UI": "http://adk-customer-service:8000/dev-ui/",
+        "Streamlit UI": "http://streamlit-ui:8501"
     }
     
     # Google ADK specific configuration
@@ -91,8 +99,20 @@ class UIConfig:
             "type": "LlmAgent",
             "capabilities": ["workflow_coordination", "multi_agent_communication", "response_synthesis"],
             "endpoints": ADK_ORCHESTRATOR_ENDPOINTS
+        },
+        "policy_server": {
+            "type": "MCP_Server",
+            "capabilities": ["policy_lookup", "customer_data", "business_rules"],
+            "endpoints": POLICY_SERVER_ENDPOINTS
         }
     }
+
+    # Legacy endpoints (for backwards compatibility)
+    DOMAIN_AGENT_ENDPOINTS = [
+        "http://insurance-ai-poc-domain-agent:8003",    # Legacy Kubernetes service
+        "http://localhost:8003",                        # Legacy port forwarded  
+        "http://127.0.0.1:8003"                        # Legacy local
+    ]
 
     @classmethod
     def is_simple_mode(cls) -> bool:

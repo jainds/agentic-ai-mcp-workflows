@@ -71,8 +71,8 @@ def load_session_tool():
         import os
         sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'tools'))
         
-        from session_tools import SessionManagementTool
-        return SessionManagementTool()
+        from session_tools import session_management_tool
+        return session_management_tool
         
     except ImportError as e:
         logger.warning(f"Could not load session tool: {e}")

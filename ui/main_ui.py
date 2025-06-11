@@ -11,7 +11,7 @@ import os
 # Add ui directory to Python path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from ui.components import (
+from components import (
     UIConfig,
     # Authentication
     render_authentication, ensure_authentication, 

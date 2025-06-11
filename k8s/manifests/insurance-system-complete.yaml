@@ -356,4 +356,196 @@ spec:
   - port: 8501
     targetPort: 8501
     protocol: TCP
+    name: http
+
+---
+# ADK Customer Service Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adk-customer-service
+  namespace: insurance-ai-poc
+  labels:
+    app: adk-customer-service
+    component: adk-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: adk-customer-service
+  template:
+    metadata:
+      labels:
+        app: adk-customer-service
+        component: adk-agent
+    spec:
+      containers:
+      - name: adk-customer-service
+        image: insurance-ai-poc:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /app/insurance-adk
+        command: ["python", "-m", "google.adk.cli", "web", "insurance_customer_service", "--port", "8000", "--host", "0.0.0.0"]
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: GOOGLE_API_KEY
+          value: "test_placeholder"
+        - name: PORT
+          value: "8000"
+        - name: HOST
+          value: "0.0.0.0"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+
+---
+# ADK Customer Service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: adk-customer-service
+  namespace: insurance-ai-poc
+  labels:
+    app: adk-customer-service
+spec:
+  type: ClusterIP
+  selector:
+    app: adk-customer-service
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+
+---
+# ADK Technical Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adk-technical-agent
+  namespace: insurance-ai-poc
+  labels:
+    app: adk-technical-agent
+    component: adk-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: adk-technical-agent
+  template:
+    metadata:
+      labels:
+        app: adk-technical-agent
+        component: adk-agent
+    spec:
+      containers:
+      - name: adk-technical-agent
+        image: insurance-ai-poc:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /app/insurance-adk
+        command: ["python", "-m", "google.adk.cli", "api_server", "insurance_technical_agent", "--port", "8002", "--host", "0.0.0.0"]
+        ports:
+        - containerPort: 8002
+          name: http
+        env:
+        - name: GOOGLE_API_KEY
+          value: "test_placeholder"
+        - name: PORT
+          value: "8002"
+        - name: HOST
+          value: "0.0.0.0"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+
+---
+# ADK Technical Agent Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: adk-technical-agent
+  namespace: insurance-ai-poc
+  labels:
+    app: adk-technical-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: adk-technical-agent
+  ports:
+  - port: 8002
+    targetPort: 8002
+    protocol: TCP
+    name: http
+
+---
+# ADK Orchestrator Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adk-orchestrator
+  namespace: insurance-ai-poc
+  labels:
+    app: adk-orchestrator
+    component: adk-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: adk-orchestrator
+  template:
+    metadata:
+      labels:
+        app: adk-orchestrator
+        component: adk-agent
+    spec:
+      containers:
+      - name: adk-orchestrator
+        image: insurance-ai-poc:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /app/insurance-adk
+        command: ["python", "-m", "google.adk.cli", "api_server", "insurance_orchestrator", "--port", "8003", "--host", "0.0.0.0"]
+        ports:
+        - containerPort: 8003
+          name: http
+        env:
+        - name: GOOGLE_API_KEY
+          value: "test_placeholder"
+        - name: PORT
+          value: "8003"
+        - name: HOST
+          value: "0.0.0.0"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+
+---
+# ADK Orchestrator Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: adk-orchestrator
+  namespace: insurance-ai-poc
+  labels:
+    app: adk-orchestrator
+spec:
+  type: ClusterIP
+  selector:
+    app: adk-orchestrator
+  ports:
+  - port: 8003
+    targetPort: 8003
+    protocol: TCP
     name: http 

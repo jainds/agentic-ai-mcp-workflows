@@ -1,0 +1,211 @@
+system_prompt: |
+  You are an error handling specialist for insurance AI systems.
+  Handle errors gracefully while maintaining customer trust and providing helpful alternatives.
+
+mcp_connection_error_prompt: |
+  MCP connection to policy server failed.
+  
+  Error Details: {error_details}
+  Customer Request: {customer_request}
+  Customer ID: {customer_id}
+  
+  ERROR HANDLING STRATEGY:
+  1. Check if it's a temporary connectivity issue
+  2. Attempt retry with exponential backoff
+  3. Fall back to cached data if available
+  4. Provide apologetic but helpful response to customer
+  
+  Customer Response Options:
+  - "I'm temporarily having trouble accessing your policy details. Let me try a different approach."
+  - "I'm experiencing a brief system delay. Would you like me to email you this information instead?"
+  - "Our policy system is updating right now. I can help you with general questions or connect you with a specialist."
+  
+  Return error handling plan:
+  {{
+      "retry_recommended": true/false,
+      "fallback_available": true/false,
+      "customer_message": "appropriate response",
+      "alternative_actions": ["list of alternatives"],
+      "escalation_needed": true/false,
+      "estimated_resolution_time": "1-5 minutes"
+  }}
+
+data_validation_error_prompt: |
+  Data validation failed during processing.
+  
+  Validation Error: {validation_error}
+  Invalid Data: {invalid_data}
+  Expected Format: {expected_format}
+  Customer Context: {customer_context}
+  
+  VALIDATION ERROR TYPES:
+  1. Invalid Customer ID format
+  2. Missing required fields
+  3. Data type mismatch
+  4. Business rule violations
+  5. Expired or inactive records
+  
+  Handle validation gracefully:
+  - Never expose technical validation details to customer
+  - Provide clear, actionable guidance
+  - Offer to help correct the information
+  - Suggest alternative approaches
+  
+  Customer-friendly responses:
+  {{
+      "invalid_customer_id": "I need to verify your customer information. Could you double-check your policy number?",
+      "missing_fields": "I need a bit more information to help you. Could you provide [specific field]?",
+      "expired_policy": "I see there might be an issue with your policy status. Let me connect you with our policy services team.",
+      "general_validation": "Let me verify that information and get back to you with accurate details."
+  }}
+
+llm_processing_error_prompt: |
+  Language model processing encountered an error.
+  
+  LLM Error: {llm_error}
+  Input Context: {input_context}
+  Processing Stage: {processing_stage}
+  
+  LLM ERROR RECOVERY:
+  1. Token limit exceeded → Summarize input and retry
+  2. Invalid JSON response → Request structured response
+  3. Model unavailable → Switch to backup model
+  4. Context too complex → Break into smaller parts
+  5. Rate limit hit → Queue request and provide estimated wait time
+  
+  Recovery strategies:
+  {{
+      "token_limit": "simplify_and_retry",
+      "invalid_json": "request_structured_format",
+      "model_unavailable": "switch_to_backup_model",
+      "rate_limit": "queue_with_estimated_time",
+      "context_complex": "break_into_parts"
+  }}
+
+timeout_error_prompt: |
+  Request timeout occurred during processing.
+  
+  Timeout Details: {timeout_details}
+  Operation: {operation}
+  Customer Impact: {customer_impact}
+  
+  TIMEOUT HANDLING:
+  1. Acknowledge the delay to customer
+  2. Provide realistic time estimate
+  3. Offer alternatives (callback, email, etc.)
+  4. Log for system performance monitoring
+  
+  Customer communication for timeouts:
+  "I apologize for the delay in accessing your information. This sometimes happens during peak hours. 
+  I can either:
+  • Continue trying (may take 1-2 more minutes)
+  • Send this information to your email
+  • Have a specialist call you back within the hour
+  
+  What would work best for you?"
+
+user_input_error_prompt: |
+  User provided invalid or unclear input.
+  
+  User Input: "{user_input}"
+  Error Type: {error_type}
+  Suggested Corrections: {suggested_corrections}
+  
+  USER INPUT ERROR TYPES:
+  1. Ambiguous intent (multiple possible meanings)
+  2. Insufficient information provided  
+  3. Invalid format (dates, phone numbers, etc.)
+  4. Conflicting information in request
+  5. Unclear pronouns or references
+  
+  RESPONSE STRATEGIES:
+  - Ask clarifying questions
+  - Provide examples of correct format
+  - Suggest specific alternatives
+  - Break complex requests into steps
+  
+  Clarification templates:
+  {{
+      "ambiguous": "I want to make sure I help you with the right information. Are you asking about [option A] or [option B]?",
+      "insufficient": "To look that up for you, I'll need [specific information]. Could you provide [specific field]?",
+      "invalid_format": "I need that in [correct format]. For example: [example]. Could you try again?",
+      "conflicting": "I'm seeing conflicting information. You mentioned [A] but also [B]. Which is correct?"
+  }}
+
+business_rule_violation_prompt: |
+  Business rule validation failed.
+  
+  Rule Violated: {business_rule}
+  Customer Request: {customer_request}
+  Current Status: {current_status}
+  
+  BUSINESS RULE VIOLATIONS:
+  1. Policy not active for requested operation
+  2. Customer not authorized for this information
+  3. Request outside of allowed time window
+  4. Coverage limits exceeded
+  5. Required waiting period not met
+  
+  Handle business rules professionally:
+  - Explain the rule in customer-friendly terms
+  - Provide context for why the rule exists
+  - Suggest alternative solutions
+  - Offer to connect with appropriate department
+  
+  Customer explanations:
+  {{
+      "policy_inactive": "I see your policy status needs to be updated before I can process this request. Let me connect you with our policy services team.",
+      "not_authorized": "For security reasons, I can only share certain information with the policy holder. You may need to verify additional details or have the policy holder contact us.",
+      "time_window": "This type of request can only be processed during [time period]. You can [alternative action] or I can schedule this for you.",
+      "coverage_limits": "Based on your current coverage, [explain limitation]. Would you like to explore options to adjust your coverage?"
+  }}
+
+system_maintenance_error_prompt: |
+  System is under maintenance or experiencing planned downtime.
+  
+  Maintenance Type: {maintenance_type}
+  Expected Duration: {expected_duration}
+  Alternative Services: {alternative_services}
+  
+  MAINTENANCE COMMUNICATION:
+  - Be transparent about maintenance
+  - Provide specific timeframes when possible
+  - Offer alternative ways to get help
+  - Apologize for inconvenience
+  
+  Maintenance message:
+  "I apologize, but our [system name] is currently undergoing scheduled maintenance. 
+  This should be completed by [time].
+  
+  In the meantime, I can:
+  • Help you with general policy questions
+  • Schedule a callback for after maintenance
+  • Direct you to our mobile app for basic account access
+  • Connect you with our emergency claims line if urgent
+  
+  How would you like to proceed?"
+
+critical_system_failure_prompt: |
+  Critical system failure requires immediate escalation.
+  
+  Failure Type: {failure_type}
+  Impact Level: {impact_level}
+  Customer Affected: {customer_affected}
+  
+  CRITICAL FAILURE RESPONSE:
+  1. Acknowledge issue without technical details
+  2. Escalate immediately to technical team
+  3. Provide alternative contact methods
+  4. Log detailed information for resolution
+  5. Follow up proactively
+  
+  Crisis communication:
+  "I sincerely apologize, but we're experiencing a technical issue that's preventing me from accessing your account right now. 
+  This is being addressed by our technical team as a priority.
+  
+  For immediate assistance, please:
+  • Call our main customer service line at [number]
+  • Use our mobile app if you have it installed
+  • Email us at [email] and we'll respond within 2 hours
+  
+  I'm also logging your information to have someone follow up with you directly once this is resolved." 

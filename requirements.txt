@@ -25,7 +25,7 @@ langfuse>=2.60.0
 prometheus-client>=0.21.0
 
 # Logging
-structlog==25.3.0
+structlog==25.4.0
 
 # MCP Integration (for policy server)
 mcp>=1.9.0

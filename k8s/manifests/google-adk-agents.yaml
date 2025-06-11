@@ -1,0 +1,437 @@
+# Google ADK Customer Service Agent
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insurance-adk-customer-service
+  namespace: insurance-ai-agentic
+  labels:
+    app: insurance-adk-customer-service
+    component: adk-agent
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: insurance-adk-customer-service
+  template:
+    metadata:
+      labels:
+        app: insurance-adk-customer-service
+        component: adk-agent
+        version: v1
+    spec:
+      containers:
+      - name: customer-service-agent
+        image: insurance-ai-poc:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /app/insurance-adk
+        command:
+          - adk
+          - web
+          - --port
+          - "8000"
+          - insurance_customer_service
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        - name: OPENROUTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: openrouter-api-key
+        - name: PRIMARY_MODEL
+          value: "openai/gpt-4o-mini"
+        - name: OPENROUTER_BASE_URL
+          value: "https://openrouter.ai/api/v1"
+        # Monitoring environment variables
+        - name: LANGFUSE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: langfuse-secret-key
+              optional: true
+        - name: LANGFUSE_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: langfuse-public-key
+              optional: true
+        - name: LANGFUSE_HOST
+          value: "https://cloud.langfuse.com"
+        - name: PROMETHEUS_JOB_NAME
+          value: "adk-customer-service"
+        - name: SERVICE_NAME
+          value: "customer-service-agent"
+        - name: SERVICE_VERSION
+          value: "v1"
+        envFrom:
+        - configMapRef:
+            name: agent-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insurance-adk-customer-service
+  namespace: insurance-ai-agentic
+  labels:
+    app: insurance-adk-customer-service
+    component: adk-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: insurance-adk-customer-service
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+
+---
+# Google ADK Technical Agent
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insurance-adk-technical
+  namespace: insurance-ai-agentic
+  labels:
+    app: insurance-adk-technical
+    component: adk-agent
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: insurance-adk-technical
+  template:
+    metadata:
+      labels:
+        app: insurance-adk-technical
+        component: adk-agent
+        version: v1
+    spec:
+      containers:
+      - name: technical-agent
+        image: insurance-ai-poc:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /app/insurance-adk
+        command:
+          - adk
+          - api_server
+          - --port
+          - "8001"
+          - insurance_technical_agent
+        ports:
+        - containerPort: 8001
+          name: http
+          protocol: TCP
+        env:
+        - name: OPENROUTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: openrouter-api-key
+        - name: PRIMARY_MODEL
+          value: "openai/gpt-4o-mini"
+        - name: POLICY_SERVER_URL
+          value: "http://policy-server:8001/mcp"
+        - name: OPENROUTER_BASE_URL
+          value: "https://openrouter.ai/api/v1"
+        # Monitoring environment variables
+        - name: LANGFUSE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: langfuse-secret-key
+              optional: true
+        - name: LANGFUSE_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: langfuse-public-key
+              optional: true
+        - name: LANGFUSE_HOST
+          value: "https://cloud.langfuse.com"
+        - name: PROMETHEUS_JOB_NAME
+          value: "adk-technical"
+        - name: SERVICE_NAME
+          value: "technical-agent"
+        - name: SERVICE_VERSION
+          value: "v1"
+        envFrom:
+        - configMapRef:
+            name: agent-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insurance-adk-technical
+  namespace: insurance-ai-agentic
+  labels:
+    app: insurance-adk-technical
+    component: adk-agent
+spec:
+  type: ClusterIP
+  selector:
+    app: insurance-adk-technical
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: http
+
+---
+# Google ADK Orchestrator Agent
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: insurance-adk-orchestrator
+  namespace: insurance-ai-agentic
+  labels:
+    app: insurance-adk-orchestrator
+    component: adk-orchestrator
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: insurance-adk-orchestrator
+  template:
+    metadata:
+      labels:
+        app: insurance-adk-orchestrator
+        component: adk-orchestrator
+        version: v1
+    spec:
+      containers:
+      - name: orchestrator-agent
+        image: insurance-ai-poc:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /app/insurance-adk
+        command:
+          - adk
+          - api_server
+          - --port
+          - "8002"
+          - insurance_orchestrator
+        ports:
+        - containerPort: 8002
+          name: http
+          protocol: TCP
+        env:
+        - name: OPENROUTER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: openrouter-api-key
+        - name: PRIMARY_MODEL
+          value: "anthropic/claude-3-5-sonnet"
+        - name: CUSTOMER_SERVICE_URL
+          value: "http://insurance-adk-customer-service:8000"
+        - name: TECHNICAL_AGENT_URL
+          value: "http://insurance-adk-technical:8001"
+        - name: OPENROUTER_BASE_URL
+          value: "https://openrouter.ai/api/v1"
+        # Monitoring environment variables
+        - name: LANGFUSE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: langfuse-secret-key
+              optional: true
+        - name: LANGFUSE_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: langfuse-public-key
+              optional: true
+        - name: LANGFUSE_HOST
+          value: "https://cloud.langfuse.com"
+        - name: PROMETHEUS_JOB_NAME
+          value: "adk-orchestrator"
+        - name: SERVICE_NAME
+          value: "orchestrator-agent"
+        - name: SERVICE_VERSION
+          value: "v1"
+        envFrom:
+        - configMapRef:
+            name: agent-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "300m"
+          limits:
+            memory: "2Gi"
+            cpu: "1500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8002
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8002
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: insurance-adk-orchestrator
+  namespace: insurance-ai-agentic
+  labels:
+    app: insurance-adk-orchestrator
+    component: adk-orchestrator
+spec:
+  type: ClusterIP
+  selector:
+    app: insurance-adk-orchestrator
+  ports:
+  - port: 8002
+    targetPort: 8002
+    protocol: TCP
+    name: http
+
+---
+# Policy Server (MCP) - Required for technical agent
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: policy-server
+  namespace: insurance-ai-agentic
+  labels:
+    app: policy-server
+    component: mcp-server
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: policy-server
+  template:
+    metadata:
+      labels:
+        app: policy-server
+        component: mcp-server
+        version: v1
+    spec:
+      containers:
+      - name: policy-server
+        image: insurance-ai-poc:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /app/policy_server
+        command:
+          - python
+          - main.py
+        ports:
+        - containerPort: 8001
+          name: mcp
+          protocol: TCP
+        env:
+        - name: MCP_PORT
+          value: "8001"
+        - name: DATA_PATH
+          value: "/app/data"
+        # Monitoring environment variables
+        - name: LANGFUSE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: langfuse-secret-key
+              optional: true
+        - name: LANGFUSE_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-keys
+              key: langfuse-public-key
+              optional: true
+        - name: LANGFUSE_HOST
+          value: "https://cloud.langfuse.com"
+        - name: PROMETHEUS_JOB_NAME
+          value: "policy-server"
+        - name: SERVICE_NAME
+          value: "policy-server"
+        - name: SERVICE_VERSION
+          value: "v1"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: policy-server
+  namespace: insurance-ai-agentic
+  labels:
+    app: policy-server
+    component: mcp-server
+spec:
+  type: ClusterIP
+  selector:
+    app: policy-server
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: mcp 

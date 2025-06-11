@@ -218,3 +218,5 @@ htmlcov/
 
 .history/
 .DS_Store
+*.env
+.env

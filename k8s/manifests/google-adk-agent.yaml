@@ -1,0 +1,254 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: google-adk-config
+  namespace: insurance-poc
+  labels:
+    app: google-adk
+    component: agent-runtime
+data:
+  GOOGLE_API_KEY: "placeholder_will_be_overridden_by_secret"
+  MODEL_NAME: "gemini-2.0-flash"
+  LOG_LEVEL: "INFO"
+  ADK_WEB_PORT: "8000"
+  ADK_API_PORT: "8001"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: google-adk-secrets
+  namespace: insurance-poc
+  labels:
+    app: google-adk
+type: Opaque
+data:
+  # Base64 encoded API key - update this with: echo -n "your_api_key" | base64
+  GOOGLE_API_KEY: cGxhY2Vob2xkZXJfYXBpX2tleQ==  # placeholder_api_key
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: google-adk-agent
+  namespace: insurance-poc
+  labels:
+    app: google-adk
+    component: agent-runtime
+    version: v1
+spec:
+  replicas: 1  # Google ADK web runs single instance
+  selector:
+    matchLabels:
+      app: google-adk
+  template:
+    metadata:
+      labels:
+        app: google-adk
+        component: agent-runtime
+        version: v1
+    spec:
+      containers:
+      - name: google-adk-web
+        image: insurance-ai-poc:adk
+        imagePullPolicy: IfNotPresent
+        workingDir: /app/insurance-adk
+        command:
+          - adk
+          - web
+          - --port
+          - "8000"
+          - --host
+          - "0.0.0.0"
+        ports:
+        - containerPort: 8000
+          name: web-ui
+          protocol: TCP
+        env:
+        - name: GOOGLE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: google-adk-secrets
+              key: GOOGLE_API_KEY
+        - name: MODEL_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: google-adk-config
+              key: MODEL_NAME
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: google-adk-config
+              key: LOG_LEVEL
+        - name: PYTHONPATH
+          value: "/app"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /dev-ui/
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /dev-ui/
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /dev-ui/
+            port: 8000
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 20
+
+      - name: google-adk-api
+        image: insurance-ai-poc:adk
+        imagePullPolicy: IfNotPresent
+        workingDir: /app/insurance-adk
+        command:
+          - adk
+          - api_server
+          - --port
+          - "8001"
+          - --host
+          - "0.0.0.0"
+        ports:
+        - containerPort: 8001
+          name: api-server
+          protocol: TCP
+        env:
+        - name: GOOGLE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: google-adk-secrets
+              key: GOOGLE_API_KEY
+        - name: MODEL_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: google-adk-config
+              key: MODEL_NAME
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: google-adk-config
+              key: LOG_LEVEL
+        - name: PYTHONPATH
+          value: "/app"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: google-adk-web
+  namespace: insurance-poc
+  labels:
+    app: google-adk
+    component: web-ui
+spec:
+  type: ClusterIP
+  selector:
+    app: google-adk
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: web-ui
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: google-adk-api
+  namespace: insurance-poc
+  labels:
+    app: google-adk
+    component: api-server
+spec:
+  type: ClusterIP
+  selector:
+    app: google-adk
+  ports:
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: api-server
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: google-adk-web-nodeport
+  namespace: insurance-poc
+  labels:
+    app: google-adk
+    component: web-ui
+spec:
+  type: NodePort
+  selector:
+    app: google-adk
+  ports:
+  - port: 8000
+    targetPort: 8000
+    nodePort: 30800
+    protocol: TCP
+    name: web-ui
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: google-adk-api-nodeport
+  namespace: insurance-poc
+  labels:
+    app: google-adk
+    component: api-server
+spec:
+  type: NodePort
+  selector:
+    app: google-adk
+  ports:
+  - port: 8001
+    targetPort: 8001
+    nodePort: 30801
+    protocol: TCP
+    name: api-server 

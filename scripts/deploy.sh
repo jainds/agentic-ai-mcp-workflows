@@ -1,263 +1,740 @@
 #!/bin/bash
 
-# Enhanced Deployment Script with Automatic Port Forwarding for Insurance AI POC
-# This script handles deployment and automatically sets up port forwarding
+# =============================================================================
+# Insurance AI POC - Complete Deployment Script
+# =============================================================================
+# This script deploys the entire Insurance AI system to Kubernetes with:
+# - All components (Policy Server, Technical Agent, Domain Agent, Streamlit UI)
+# - Monitoring and observability
+# - Port forwarding setup
+# - Health checks and validation
+# =============================================================================
 
 set -e  # Exit on any error
 
-# Colors for output
+# Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
 NAMESPACE="insurance-ai-agentic"
-APP_NAME="insurance-ai-poc"
-ENV_FILE=".env"
+RELEASE_NAME="insurance-ai-poc"
+CHART_PATH="./k8s/insurance-ai-poc"
+DOCKER_IMAGE="insurance-ai-poc:session-fix"
+PORT_FORWARD_SCRIPT="./start_port_forwards.sh"
 
-# Port forwarding configuration
-STREAMLIT_LOCAL_PORT=8501
-DOMAIN_AGENT_LOCAL_PORT=8003
-TECHNICAL_AGENT_LOCAL_PORT=8002
-POLICY_SERVER_LOCAL_PORT=8001
+# Timeouts (in seconds)
+DEPLOY_TIMEOUT=300
+POD_READY_TIMEOUT=180
+PORT_FORWARD_TIMEOUT=30
 
-# Function to kill existing port forwards
-cleanup_port_forwards() {
-    echo -e "${BLUE}🧹 Cleaning up existing port forwards${NC}"
+# =============================================================================
+# Environment Setup
+# =============================================================================
+
+load_env_file() {
+    step "Loading environment variables..."
     
-    # Kill any existing kubectl port-forward processes
-    pkill -f "kubectl port-forward" || true
+    # Check for .env file in project root
+    if [[ -f ".env" ]]; then
+        log "Found .env file in project root"
+        
+        # Source the .env file more robustly
+        set -a  # Automatically export all variables
+        
+        # Process .env file line by line to handle various formats
+        while IFS= read -r line; do
+            # Skip comments and empty lines
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "$line" ]] && continue
+            
+            # Remove leading/trailing whitespace
+            line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            
+            # Skip if still empty after trimming
+            [[ -z "$line" ]] && continue
+            
+            # Export the variable
+            if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+                export "$line"
+            fi
+        done < .env
+        
+        set +a  # Stop auto-exporting
+        
+        # Count loaded variables
+        local env_vars=$(grep -v '^[[:space:]]*#' .env | grep -v '^[[:space:]]*$' | grep '=' | wc -l | tr -d ' ')
+        success "Loaded $env_vars environment variables from .env"
+        
+        # Debug: Show what was actually loaded for key variables
+        log "Checking loaded variables..."
+        
+        # Show which key variables were loaded (without values)
+        local loaded_keys=()
+        if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+            loaded_keys+=("OPENROUTER_API_KEY")
+            log "✓ OPENROUTER_API_KEY loaded (${#OPENROUTER_API_KEY} chars)"
+        else
+            warning "✗ OPENROUTER_API_KEY not found or empty"
+        fi
+        
+        if [[ -n "${OPENAI_API_KEY:-}" ]] || [[ -n "${OPENAI_KEY:-}" ]]; then
+            loaded_keys+=("OPENAI_API_KEY")
+            if [[ -n "${OPENAI_KEY:-}" ]]; then
+                log "✓ OPENAI_KEY found, will map to OPENAI_API_KEY"
+            fi
+        fi
+        
+        if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+            loaded_keys+=("ANTHROPIC_API_KEY")
+        fi
+        
+        if [[ -n "${LANGFUSE_SECRET_KEY:-}" ]]; then
+            loaded_keys+=("LANGFUSE_SECRET_KEY")
+        fi
+        
+        if [[ -n "${LANGFUSE_PUBLIC_KEY:-}" ]]; then
+            loaded_keys+=("LANGFUSE_PUBLIC_KEY")
+        fi
+        
+        if [[ ${#loaded_keys[@]} -gt 0 ]]; then
+            info "API keys found: ${loaded_keys[*]}"
+        else
+            warning "No API keys found in .env file"
+        fi
+        
+        # Handle OPENAI_KEY vs OPENAI_API_KEY naming convention
+        if [[ -n "${OPENAI_KEY:-}" ]] && [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            export OPENAI_API_KEY="$OPENAI_KEY"
+            info "Mapped OPENAI_KEY to OPENAI_API_KEY"
+        fi
+        
+    else
+        warning "No .env file found in project root"
+        info "You can create a .env file with your API keys, or export them manually"
+        info "Example .env file:"
+        echo "  OPENROUTER_API_KEY=sk-or-v1-xxxxxx"
+        echo "  OPENAI_API_KEY=sk-xxxxxx"
+        echo "  ANTHROPIC_API_KEY=sk-ant-xxxxxx"
+        echo "  LANGFUSE_SECRET_KEY=lf_sk_xxxxxx"
+        echo "  LANGFUSE_PUBLIC_KEY=lf_pk_xxxxxx"
+    fi
+}
+
+# =============================================================================
+# Utility Functions
+# =============================================================================
+
+log() {
+    echo -e "${BLUE}[$(date +'%H:%M:%S')]${NC} $1"
+}
+
+success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+info() {
+    echo -e "${CYAN}ℹ️  $1${NC}"
+}
+
+step() {
+    echo -e "\n${PURPLE}🚀 $1${NC}"
+}
+
+# =============================================================================
+# Prerequisite Checks
+# =============================================================================
+
+check_prerequisites() {
+    step "Checking prerequisites..."
     
-    # Wait a moment for processes to die
+    # Check if kubectl is installed and configured
+    if ! command -v kubectl &> /dev/null; then
+        error "kubectl is not installed. Please install kubectl first."
+        exit 1
+    fi
+    
+    # Check if helm is installed
+    if ! command -v helm &> /dev/null; then
+        error "Helm is not installed. Please install Helm first."
+        exit 1
+    fi
+    
+    # Check if Docker is available (for building images)
+    if ! command -v docker &> /dev/null; then
+        error "Docker is not installed. Please install Docker first."
+        exit 1
+    fi
+    
+    # Check if jq is available (for JSON parsing)
+    if ! command -v jq &> /dev/null; then
+        warning "jq is not installed. Installing via brew (if available)..."
+        if command -v brew &> /dev/null; then
+            brew install jq || warning "Failed to install jq. Some features may not work."
+        else
+            warning "jq is not available. Some features may not work optimally."
+        fi
+    fi
+    
+    # Check Kubernetes connection
+    if ! kubectl cluster-info &> /dev/null; then
+        error "Cannot connect to Kubernetes cluster. Please check your kubeconfig."
+        exit 1
+    fi
+    
+    # Check Docker daemon
+    if ! docker info &> /dev/null; then
+        error "Docker daemon is not running. Please start Docker."
+        exit 1
+    fi
+    
+    success "All prerequisites satisfied"
+}
+
+# =============================================================================
+# Environment Validation
+# =============================================================================
+
+validate_environment() {
+    step "Validating environment variables..."
+    
+    local missing_vars=()
+    
+    # Check for required API keys
+    if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
+        missing_vars+=("OPENROUTER_API_KEY")
+    fi
+    
+    if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+        warning "OPENAI_API_KEY is not set (optional fallback)"
+    fi
+    
+    if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+        warning "ANTHROPIC_API_KEY is not set (optional)"
+    fi
+    
+    # Optional monitoring keys
+    if [[ -z "${LANGFUSE_SECRET_KEY:-}" ]]; then
+        info "LANGFUSE_SECRET_KEY is not set (monitoring will be limited)"
+    fi
+    
+    if [[ -z "${LANGFUSE_PUBLIC_KEY:-}" ]]; then
+        info "LANGFUSE_PUBLIC_KEY is not set (monitoring will be limited)"
+    fi
+    
+    if [[ ${#missing_vars[@]} -gt 0 ]]; then
+        error "Missing required environment variables: ${missing_vars[*]}"
+        info "Please set these variables and run the script again:"
+        for var in "${missing_vars[@]}"; do
+            echo "  export $var=\"your-key-here\""
+        done
+        exit 1
+    fi
+    
+    success "Environment validation complete"
+}
+
+# =============================================================================
+# Docker Image Building
+# =============================================================================
+
+build_docker_image() {
+    step "Building Docker image..."
+    
+    if [[ ! -f "Dockerfile" ]]; then
+        error "Dockerfile not found in current directory"
+        exit 1
+    fi
+    
+    log "Building $DOCKER_IMAGE..."
+    if docker build -t "$DOCKER_IMAGE" .; then
+        success "Docker image built successfully"
+    else
+        error "Failed to build Docker image"
+        exit 1
+    fi
+}
+
+# =============================================================================
+# Kubernetes Setup
+# =============================================================================
+
+setup_namespace() {
+    step "Setting up Kubernetes namespace..."
+    
+    if kubectl get namespace "$NAMESPACE" &> /dev/null; then
+        info "Namespace '$NAMESPACE' already exists"
+    else
+        log "Creating namespace '$NAMESPACE'..."
+        kubectl create namespace "$NAMESPACE"
+        success "Namespace created"
+    fi
+}
+
+setup_secrets() {
+    step "Setting up Kubernetes secrets..."
+    
+    local secret_name="api-keys"
+    
+    # Prepare secret data
+    local secret_data=()
+    
+    if [[ -n "${OPENROUTER_API_KEY:-}" ]]; then
+        secret_data+=(--from-literal=OPENROUTER_API_KEY="$OPENROUTER_API_KEY")
+    fi
+    
+    if [[ -n "${OPENAI_API_KEY:-}" ]]; then
+        secret_data+=(--from-literal=OPENAI_API_KEY="$OPENAI_API_KEY")
+    fi
+    
+    if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+        secret_data+=(--from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY")
+    fi
+    
+    if [[ -n "${LANGFUSE_SECRET_KEY:-}" ]]; then
+        secret_data+=(--from-literal=LANGFUSE_SECRET_KEY="$LANGFUSE_SECRET_KEY")
+    fi
+    
+    if [[ -n "${LANGFUSE_PUBLIC_KEY:-}" ]]; then
+        secret_data+=(--from-literal=LANGFUSE_PUBLIC_KEY="$LANGFUSE_PUBLIC_KEY")
+    fi
+    
+    # Delete existing secret if it exists
+    if kubectl get secret "$secret_name" -n "$NAMESPACE" &> /dev/null; then
+        log "Updating existing secret '$secret_name'..."
+        kubectl delete secret "$secret_name" -n "$NAMESPACE"
+    else
+        log "Creating new secret '$secret_name'..."
+    fi
+    
+    # Create the secret
+    if [[ ${#secret_data[@]} -gt 0 ]]; then
+        kubectl create secret generic "$secret_name" -n "$NAMESPACE" "${secret_data[@]}"
+        success "Secret '$secret_name' created with ${#secret_data[@]} keys"
+    else
+        error "No API keys available to create secret"
+        exit 1
+    fi
+}
+
+# =============================================================================
+# Helm Deployment
+# =============================================================================
+
+deploy_helm_chart() {
+    step "Deploying Helm chart..."
+    
+    if [[ ! -d "$CHART_PATH" ]]; then
+        error "Helm chart not found at $CHART_PATH"
+        exit 1
+    fi
+    
+    log "Deploying release '$RELEASE_NAME' to namespace '$NAMESPACE'..."
+    
+    # Prepare Helm values
+    local helm_args=(
+        --namespace "$NAMESPACE"
+        --create-namespace
+        --wait
+        --timeout "${DEPLOY_TIMEOUT}s"
+        --set "image.tag=session-fix"
+        --set "image.pullPolicy=Never"
+        --set "secrets.useExistingSecret=true"
+        --set "secrets.secretName=api-keys"
+        --set "deploymentUpdate.timestamp=$(date +%s)"
+    )
+    
+    # Deploy or upgrade
+    if helm list -n "$NAMESPACE" | grep -q "$RELEASE_NAME"; then
+        log "Upgrading existing release..."
+        helm upgrade "$RELEASE_NAME" "$CHART_PATH" "${helm_args[@]}"
+    else
+        log "Installing new release..."
+        helm install "$RELEASE_NAME" "$CHART_PATH" "${helm_args[@]}"
+    fi
+    
+    success "Helm deployment completed"
+}
+
+# =============================================================================
+# Health Checks
+# =============================================================================
+
+wait_for_pods() {
+    step "Waiting for pods to be ready..."
+    
+    local components=("domain-agent" "technical-agent" "policy-server" "streamlit-ui")
+    local start_time=$(date +%s)
+    
+    for component in "${components[@]}"; do
+        log "Waiting for $component to be ready..."
+        
+        local pod_selector="app.kubernetes.io/name=insurance-ai-poc,component=$component"
+        
+        if kubectl wait --for=condition=ready pod -l "$pod_selector" -n "$NAMESPACE" --timeout="${POD_READY_TIMEOUT}s"; then
+            success "$component is ready"
+        else
+            error "$component failed to become ready within timeout"
+            kubectl get pods -l "$pod_selector" -n "$NAMESPACE"
+            kubectl logs -l "$pod_selector" -n "$NAMESPACE" --tail=20
+            exit 1
+        fi
+    done
+    
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    success "All pods ready in ${duration}s"
+}
+
+check_pod_health() {
+    step "Checking pod health..."
+    
+    log "Current pod status:"
+    kubectl get pods -n "$NAMESPACE" -o wide
+    
+    log "Checking for any failed pods..."
+    local failed_pods=$(kubectl get pods -n "$NAMESPACE" --field-selector=status.phase=Failed -o jsonpath='{.items[*].metadata.name}')
+    
+    if [[ -n "$failed_pods" ]]; then
+        error "Failed pods detected: $failed_pods"
+        for pod in $failed_pods; do
+            echo "Logs for failed pod $pod:"
+            kubectl logs "$pod" -n "$NAMESPACE" --tail=50
+        done
+        exit 1
+    fi
+    
+    success "All pods are healthy"
+}
+
+# =============================================================================
+# Port Forwarding
+# =============================================================================
+
+setup_port_forwarding() {
+    step "Setting up port forwarding..."
+    
+    # Kill any existing port forwards
+    log "Cleaning up existing port forwards..."
+    pkill -f "kubectl.*port-forward" || true
     sleep 2
     
-    # Check specific ports and kill processes using them
-    for port in $STREAMLIT_LOCAL_PORT $DOMAIN_AGENT_LOCAL_PORT $TECHNICAL_AGENT_LOCAL_PORT $POLICY_SERVER_LOCAL_PORT; do
-        if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-            echo -e "${YELLOW}⚠️  Port $port is in use, attempting to free it${NC}"
-            lsof -ti :$port | xargs kill -9 2>/dev/null || true
-        fi
-    done
+    # Check if port forward script exists
+    if [[ ! -f "$PORT_FORWARD_SCRIPT" ]]; then
+        warning "Port forward script not found at $PORT_FORWARD_SCRIPT"
+        create_port_forward_script
+    fi
     
-    sleep 1
-}
-
-# Function to setup port forwarding
-setup_port_forwards() {
-    echo -e "${PURPLE}🌐 Setting up port forwarding${NC}"
+    # Make script executable
+    chmod +x "$PORT_FORWARD_SCRIPT"
     
-    # Wait for all pods to be ready
-    echo -e "${BLUE}⏳ Waiting for all pods to be ready${NC}"
-    kubectl wait --for=condition=ready pod -l component=streamlit-ui -n "$NAMESPACE" --timeout=300s
-    kubectl wait --for=condition=ready pod -l component=domain-agent -n "$NAMESPACE" --timeout=300s
-    kubectl wait --for=condition=ready pod -l component=technical-agent -n "$NAMESPACE" --timeout=300s
-    kubectl wait --for=condition=ready pod -l component=policy-server -n "$NAMESPACE" --timeout=300s
-    
-    # Start port forwards in background
-    echo -e "${BLUE}🚀 Starting port forwards${NC}"
-    
-    # Streamlit UI (main interface)
-    kubectl port-forward -n "$NAMESPACE" service/"$APP_NAME"-streamlit-ui "$STREAMLIT_LOCAL_PORT":80 &
-    STREAMLIT_PID=$!
-    
-    # Domain Agent
-    kubectl port-forward -n "$NAMESPACE" service/"$APP_NAME"-domain-agent "$DOMAIN_AGENT_LOCAL_PORT":8003 &
-    DOMAIN_PID=$!
-    
-    # Technical Agent
-    kubectl port-forward -n "$NAMESPACE" service/"$APP_NAME"-technical-agent "$TECHNICAL_AGENT_LOCAL_PORT":8002 &
-    TECHNICAL_PID=$!
-    
-    # Policy Server
-    kubectl port-forward -n "$NAMESPACE" service/"$APP_NAME"-policy-server "$POLICY_SERVER_LOCAL_PORT":8001 &
-    POLICY_PID=$!
+    # Run port forwarding script
+    log "Starting port forwards..."
+    if ./"$PORT_FORWARD_SCRIPT"; then
+        success "Port forwarding started"
+    else
+        error "Failed to start port forwarding"
+        exit 1
+    fi
     
     # Wait a moment for port forwards to establish
-    sleep 3
-    
-    # Check if port forwards are working
-    echo -e "${BLUE}🔍 Verifying port forwards${NC}"
-    
-    local all_good=true
-    
-    if ! curl -s http://localhost:$STREAMLIT_LOCAL_PORT >/dev/null 2>&1; then
-        echo -e "${YELLOW}⚠️  Streamlit UI port forward may not be ready yet${NC}"
-        all_good=false
-    fi
-    
-    if ! curl -s http://localhost:$POLICY_SERVER_LOCAL_PORT >/dev/null 2>&1; then
-        echo -e "${YELLOW}⚠️  Policy Server port forward may not be ready yet${NC}"
-        all_good=false
-    fi
-    
-    # Save PIDs to file for later cleanup
-    cat > /tmp/insurance-ai-port-forwards.pids << EOF
-STREAMLIT_PID=$STREAMLIT_PID
-DOMAIN_PID=$DOMAIN_PID
-TECHNICAL_PID=$TECHNICAL_PID
-POLICY_PID=$POLICY_PID
-EOF
-    
-    if [ "$all_good" = true ]; then
-        echo -e "${GREEN}✅ All port forwards are active${NC}"
-    else
-        echo -e "${YELLOW}⚠️  Some port forwards may still be starting up${NC}"
-    fi
-    
-    # Display access information
-    echo -e "${GREEN}🌟 Application is now accessible at:${NC}"
-    echo -e "${PURPLE}   🖥️  Streamlit UI:      ${YELLOW}http://localhost:$STREAMLIT_LOCAL_PORT${NC}"
-    echo -e "${PURPLE}   🤖 Domain Agent:      ${YELLOW}http://localhost:$DOMAIN_AGENT_LOCAL_PORT${NC}"
-    echo -e "${PURPLE}   ⚙️  Technical Agent:   ${YELLOW}http://localhost:$TECHNICAL_AGENT_LOCAL_PORT${NC}"
-    echo -e "${PURPLE}   📋 Policy Server:     ${YELLOW}http://localhost:$POLICY_SERVER_LOCAL_PORT${NC}"
-    echo ""
-    echo -e "${BLUE}📝 Port forward PIDs saved to /tmp/insurance-ai-port-forwards.pids${NC}"
+    sleep 5
 }
 
-# Function to create a stop script
-create_stop_script() {
-    cat > scripts/stop_port_forwards.sh << 'EOF'
+create_port_forward_script() {
+    log "Creating port forward script..."
+    
+    cat > "$PORT_FORWARD_SCRIPT" << 'EOF'
 #!/bin/bash
 
-# Script to stop all port forwards for Insurance AI POC
+echo "🚀 Starting port forwards for Insurance AI POC..."
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-NC='\033[0m'
+# Kill any existing port forwards
+pkill -f "kubectl port-forward" || true
+sleep 2
 
-echo -e "${BLUE}🛑 Stopping Insurance AI POC port forwards${NC}"
+NAMESPACE="insurance-ai-agentic"
 
-# Kill all kubectl port-forward processes
-pkill -f "kubectl port-forward.*insurance-ai-poc" || true
+# Start port forwards in background
+echo "📱 Starting Streamlit UI on port 8501..."
+kubectl port-forward -n "$NAMESPACE" service/insurance-ai-poc-streamlit-ui 8501:80 &
 
-# Kill specific PIDs if file exists
-if [ -f /tmp/insurance-ai-port-forwards.pids ]; then
-    source /tmp/insurance-ai-port-forwards.pids
+echo "🤖 Starting Domain Agent on port 8003..."
+kubectl port-forward -n "$NAMESPACE" service/insurance-ai-poc-domain-agent 8003:8003 &
+
+echo "⚙️ Starting Technical Agent on port 8002..."
+kubectl port-forward -n "$NAMESPACE" service/insurance-ai-poc-technical-agent 8002:8002 &
+
+echo "📋 Starting Policy Server on port 8001..."
+kubectl port-forward -n "$NAMESPACE" service/insurance-ai-poc-policy-server 8001:8001 &
+
+echo "📊 Starting Monitoring on port 8080..."
+kubectl port-forward -n "$NAMESPACE" service/insurance-ai-poc-monitoring 8080:8080 &
+
+# Wait for port forwards to establish
+sleep 5
+
+echo ""
+echo "✅ All port forwards started!"
+echo ""
+echo "🌟 Application URLs:"
+echo "   🖥️  Streamlit UI:      http://localhost:8501"
+echo "   🤖 Domain Agent:      http://localhost:8003"
+echo "   ⚙️  Technical Agent:   http://localhost:8002"
+echo "   📋 Policy Server:     http://localhost:8001"
+echo "   📊 Monitoring:        http://localhost:8080"
+echo ""
+echo "💡 To stop all port forwards, run: pkill -f 'kubectl port-forward'"
+EOF
     
-    for pid in $STREAMLIT_PID $DOMAIN_PID $TECHNICAL_PID $POLICY_PID; do
-        if [ ! -z "$pid" ] && ps -p $pid > /dev/null 2>&1; then
-            kill $pid 2>/dev/null || true
+    chmod +x "$PORT_FORWARD_SCRIPT"
+    success "Port forward script created"
+}
+
+# =============================================================================
+# Service Validation
+# =============================================================================
+
+validate_services() {
+    step "Validating deployed services..."
+    
+    local services=("8001" "8002" "8003" "8501")
+    local service_names=("Policy Server" "Technical Agent" "Domain Agent" "Streamlit UI")
+    local all_healthy=true
+    
+    for i in "${!services[@]}"; do
+        local port="${services[$i]}"
+        local name="${service_names[$i]}"
+        
+        log "Testing $name on port $port..."
+        
+        # Give the service a moment to start
+        sleep 2
+        
+        # Test the service
+        if curl -s --max-time 10 "http://localhost:$port/health" > /dev/null 2>&1 || \
+           curl -s --max-time 10 "http://localhost:$port/" > /dev/null 2>&1; then
+            success "$name is responding"
+        else
+            error "$name is not responding on port $port"
+            all_healthy=false
         fi
     done
     
-    rm -f /tmp/insurance-ai-port-forwards.pids
-fi
-
-# Clean up any remaining processes on our ports
-for port in 8501 8003 8002 8001; do
-    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-        lsof -ti :$port | xargs kill -9 2>/dev/null || true
+    if [[ "$all_healthy" == "true" ]]; then
+        success "All services are healthy and responding"
+    else
+        error "Some services are not responding properly"
+        warning "Check the logs with: kubectl logs -l app.kubernetes.io/name=insurance-ai-poc -n $NAMESPACE"
+        exit 1
     fi
-done
-
-echo -e "${GREEN}✅ Port forwards stopped${NC}"
-EOF
-
-    chmod +x scripts/stop_port_forwards.sh
-    echo -e "${BLUE}📝 Created scripts/stop_port_forwards.sh to stop port forwards later${NC}"
 }
 
-echo -e "${BLUE}🚀 Starting enhanced deployment with auto port forwarding${NC}"
+# =============================================================================
+# Monitoring Setup
+# =============================================================================
 
-# Check if .env file exists
-if [ ! -f "$ENV_FILE" ]; then
-    echo -e "${RED}❌ Error: $ENV_FILE file not found!${NC}"
-    echo -e "${YELLOW}Please create a .env file with your API keys:${NC}"
-    echo "OPENAI_API_KEY=your-openrouter-api-key"
-    echo "ANTHROPIC_API_KEY=your-anthropic-api-key"
-    exit 1
-fi
+setup_monitoring() {
+    step "Configuring monitoring..."
+    
+    log "Checking monitoring components..."
+    
+    # Check if monitoring pods are running
+    local monitoring_pods=$(kubectl get pods -n "$NAMESPACE" -l component=monitoring -o jsonpath='{.items[*].metadata.name}')
+    
+    if [[ -n "$monitoring_pods" ]]; then
+        success "Monitoring components are running: $monitoring_pods"
+        
+        # Test monitoring endpoints if available
+        if [[ -n "${LANGFUSE_SECRET_KEY:-}" ]] && [[ -n "${LANGFUSE_PUBLIC_KEY:-}" ]]; then
+            info "Langfuse monitoring is configured"
+        else
+            warning "Langfuse monitoring is not fully configured (missing API keys)"
+        fi
+        
+    else
+        warning "No monitoring components found"
+    fi
+}
 
-# Source environment variables
-echo -e "${BLUE}📁 Loading environment variables from $ENV_FILE${NC}"
-source "$ENV_FILE"
+# =============================================================================
+# Cleanup Functions
+# =============================================================================
 
-# Validate required environment variables
-if [ -z "$OPENAI_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
-    echo -e "${RED}❌ Error: Neither OPENAI_KEY nor OPENROUTER_API_KEY found in $ENV_FILE${NC}"
-    exit 1
-fi
+cleanup_on_error() {
+    if [[ $? -ne 0 ]]; then
+        error "Deployment failed. Cleaning up..."
+        
+        # Show recent events
+        echo "Recent Kubernetes events:"
+        kubectl get events -n "$NAMESPACE" --sort-by='.lastTimestamp' | tail -10
+        
+        # Show pod statuses
+        echo "Pod statuses:"
+        kubectl get pods -n "$NAMESPACE"
+        
+        # Optionally rollback
+        read -p "Do you want to rollback the deployment? (y/N): " -r
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            helm rollback "$RELEASE_NAME" -n "$NAMESPACE" || true
+        fi
+    fi
+}
 
-# Use OPENROUTER_API_KEY if available, otherwise fall back to OPENAI_KEY
-OPENAI_API_KEY="${OPENROUTER_API_KEY:-$OPENAI_KEY}"
+# =============================================================================
+# Main Deployment Function
+# =============================================================================
 
-if [ -z "$OPENAI_API_KEY" ]; then
-    echo -e "${RED}❌ Error: OPENAI_API_KEY is empty${NC}"
-    exit 1
-fi
+deploy() {
+    echo "============================================================================="
+    echo "🚀 Insurance AI POC - Complete Kubernetes Deployment"
+    echo "============================================================================="
+    echo ""
+    
+    local start_time=$(date +%s)
+    
+    # Set up error handling
+    trap cleanup_on_error EXIT
+    
+    # Run deployment steps
+    load_env_file
+    check_prerequisites
+    validate_environment
+    build_docker_image
+    setup_namespace
+    setup_secrets
+    deploy_helm_chart
+    wait_for_pods
+    check_pod_health
+    setup_port_forwarding
+    validate_services
+    setup_monitoring
+    
+    # Calculate total deployment time
+    local end_time=$(date +%s)
+    local total_duration=$((end_time - start_time))
+    
+    echo ""
+    echo "============================================================================="
+    success "🎉 Deployment completed successfully in ${total_duration}s!"
+    echo "============================================================================="
+    echo ""
+    
+    # Display access information
+    echo "🌟 Application Access URLs:"
+    echo "   🖥️  Streamlit UI:      http://localhost:8501"
+    echo "   🤖 Domain Agent:      http://localhost:8003"
+    echo "   ⚙️  Technical Agent:   http://localhost:8002"
+    echo "   📋 Policy Server:     http://localhost:8001"
+    echo "   📊 Monitoring:        http://localhost:8080"
+    echo ""
+    
+    # Display useful commands
+    echo "📋 Useful Commands:"
+    echo "   View pods:           kubectl get pods -n $NAMESPACE"
+    echo "   View logs:           kubectl logs -l app.kubernetes.io/name=insurance-ai-poc -n $NAMESPACE"
+    echo "   Stop port forwards:  pkill -f 'kubectl port-forward'"
+    echo "   Uninstall:           helm uninstall $RELEASE_NAME -n $NAMESPACE"
+    echo ""
+    
+    # Display test command
+    echo "🧪 Test the deployment:"
+    echo "   curl -X POST http://localhost:8003/a2a/tasks/send \\"
+    echo "     -H 'Content-Type: application/json' \\"
+    echo "     -d '{\"task\": \"ask\", \"parameters\": {\"question\": \"What policies do I have?\", \"customer_id\": \"CUST-2024-001\"}}'"
+    echo ""
+    
+    # Remove error trap since we succeeded
+    trap - EXIT
+}
 
-echo -e "${GREEN}✅ Environment variables loaded successfully${NC}"
+# =============================================================================
+# Command Line Interface
+# =============================================================================
 
-# Clean up any existing port forwards first
-cleanup_port_forwards
+show_help() {
+    echo "Insurance AI POC Deployment Script"
+    echo ""
+    echo "Usage: $0 [COMMAND]"
+    echo ""
+    echo "Commands:"
+    echo "  deploy     Full deployment (default)"
+    echo "  build      Build Docker image only"
+    echo "  secrets    Setup secrets only"
+    echo "  ports      Setup port forwarding only"
+    echo "  validate   Validate services only"
+    echo "  clean      Clean up deployment"
+    echo "  help       Show this help"
+    echo ""
+    echo "Environment Variables:"
+    echo "  OPENROUTER_API_KEY   Required: OpenRouter API key"
+    echo "  OPENAI_API_KEY       Optional: OpenAI API key"
+    echo "  ANTHROPIC_API_KEY    Optional: Anthropic API key"
+    echo "  LANGFUSE_SECRET_KEY  Optional: Langfuse secret key"
+    echo "  LANGFUSE_PUBLIC_KEY  Optional: Langfuse public key"
+    echo ""
+    echo "Configuration:"
+    echo "  The script automatically loads environment variables from .env file"
+    echo "  if it exists in the project root. You can also export variables manually."
+    echo ""
+    echo "Example .env file:"
+    echo "  OPENROUTER_API_KEY=sk-or-v1-xxxxxx"
+    echo "  OPENAI_API_KEY=sk-xxxxxx"
+    echo "  LANGFUSE_SECRET_KEY=lf_sk_xxxxxx"
+    echo "  LANGFUSE_PUBLIC_KEY=lf_pk_xxxxxx"
+    echo ""
+}
 
-# Create namespace if it doesn't exist
-echo -e "${BLUE}🏗️  Creating namespace: $NAMESPACE${NC}"
-kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-
-# Delete existing secrets (if any) to ensure clean state
-echo -e "${BLUE}🧹 Cleaning up existing secrets${NC}"
-kubectl delete secret api-keys -n "$NAMESPACE" --ignore-not-found=true
-
-# Create Kubernetes secret from environment variables
-echo -e "${BLUE}🔐 Creating Kubernetes secrets${NC}"
-kubectl create secret generic api-keys \
-    --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
-    --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
-    -n "$NAMESPACE"
-
-echo -e "${GREEN}✅ Secrets created successfully${NC}"
-
-# Build Docker image with timestamp tag
-TIMESTAMP=$(date +%s)
-IMAGE_TAG="$APP_NAME:secure-deploy-$TIMESTAMP"
-
-echo -e "${BLUE}🐳 Building Docker image: $IMAGE_TAG${NC}"
-docker build -t "$IMAGE_TAG" .
-
-echo -e "${GREEN}✅ Docker image built successfully${NC}"
-
-# Deploy with Helm, using the new image and referencing the secret
-echo -e "${BLUE}⚡ Deploying with Helm${NC}"
-helm upgrade --install "$APP_NAME" k8s/insurance-ai-poc \
-    --namespace "$NAMESPACE" \
-    --set image.tag="secure-deploy-$TIMESTAMP" \
-    --set secrets.useExistingSecret=true \
-    --set secrets.secretName=api-keys
-
-# Wait for deployment to complete
-echo -e "${BLUE}⏳ Waiting for deployment to complete${NC}"
-kubectl rollout status deployment/"$APP_NAME"-domain-agent -n "$NAMESPACE" --timeout=300s
-kubectl rollout status deployment/"$APP_NAME"-technical-agent -n "$NAMESPACE" --timeout=300s
-kubectl rollout status deployment/"$APP_NAME"-policy-server -n "$NAMESPACE" --timeout=300s
-kubectl rollout status deployment/"$APP_NAME"-streamlit-ui -n "$NAMESPACE" --timeout=300s
-
-# Apply session affinity for better reliability
-echo -e "${BLUE}🔧 Applying session affinity to policy server${NC}"
-kubectl patch service "$APP_NAME"-policy-server -n "$NAMESPACE" -p '{"spec":{"sessionAffinity":"ClientIP"}}'
-
-# Show deployment status
-echo -e "${BLUE}📊 Deployment Status:${NC}"
-kubectl get pods -n "$NAMESPACE"
-echo ""
-kubectl get services -n "$NAMESPACE"
-
-echo -e "${GREEN}🎉 Deployment completed successfully!${NC}"
-
-# Set up automatic port forwarding
-setup_port_forwards
-
-# Create stop script for later use
-create_stop_script
-
-echo ""
-echo -e "${GREEN}✅ Enhanced deployment with auto port forwarding completed!${NC}"
-echo -e "${YELLOW}💡 Tips:${NC}"
-echo -e "   • The main UI is at: ${PURPLE}http://localhost:$STREAMLIT_LOCAL_PORT${NC}"
-echo -e "   • To stop port forwards: ${PURPLE}./scripts/stop_port_forwards.sh${NC}"
-echo -e "   • Port forwards run in background - close terminal carefully"
-echo -e "   • If ports don't work, wait 30 seconds and try again" 
+case "${1:-deploy}" in
+    "deploy")
+        deploy
+        ;;
+    "build")
+        load_env_file
+        check_prerequisites
+        build_docker_image
+        ;;
+    "secrets")
+        load_env_file
+        check_prerequisites
+        validate_environment
+        setup_namespace
+        setup_secrets
+        ;;
+    "ports")
+        check_prerequisites
+        setup_port_forwarding
+        ;;
+    "validate")
+        check_prerequisites
+        validate_services
+        ;;
+    "clean")
+        echo "🧹 Cleaning up deployment..."
+        pkill -f "kubectl.*port-forward" || true
+        helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" || true
+        kubectl delete namespace "$NAMESPACE" || true
+        success "Cleanup completed"
+        ;;
+    "help"|"-h"|"--help")
+        show_help
+        ;;
+    *)
+        error "Unknown command: $1"
+        show_help
+        exit 1
+        ;;
+esac 

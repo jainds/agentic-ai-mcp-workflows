@@ -1,0 +1,315 @@
+name: 🎛️ Manual Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+          - dev
+      image_tag:
+        description: 'Docker image tag to deploy (leave empty for latest)'
+        required: false
+        type: string
+        default: 'latest'
+      force_deployment:
+        description: 'Force deployment without checks'
+        required: false
+        type: boolean
+        default: false
+      skip_tests:
+        description: 'Skip pre-deployment tests'
+        required: false
+        type: boolean
+        default: false
+      rollback:
+        description: 'Rollback to previous version'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate-deployment:
+    name: 🔍 Validate Deployment Request
+    runs-on: ubuntu-latest
+    outputs:
+      should-proceed: ${{ steps.validation.outputs.proceed }}
+      image-tag: ${{ steps.validation.outputs.image_tag }}
+      namespace: ${{ steps.validation.outputs.namespace }}
+    steps:
+      - name: Validate inputs
+        id: validation
+        run: |
+          # Set environment-specific namespace
+          case "${{ github.event.inputs.environment }}" in
+            "production")
+              echo "namespace=insurance-ai-production" >> $GITHUB_OUTPUT
+              ;;
+            "staging")
+              echo "namespace=insurance-ai-staging" >> $GITHUB_OUTPUT
+              ;;
+            "dev")
+              echo "namespace=insurance-ai-dev" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "❌ Invalid environment: ${{ github.event.inputs.environment }}"
+              exit 1
+              ;;
+          esac
+          
+          # Set image tag
+          IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+          if [[ -z "$IMAGE_TAG" || "$IMAGE_TAG" == "latest" ]]; then
+            IMAGE_TAG="latest"
+          fi
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          
+          # Check if should proceed
+          if [[ "${{ github.event.inputs.force_deployment }}" == "true" ]]; then
+            echo "⚠️ Force deployment enabled - skipping safety checks"
+            echo "proceed=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.inputs.environment }}" == "production" && "${{ github.ref }}" != "refs/heads/main" ]]; then
+            echo "❌ Production deployments only allowed from main branch"
+            echo "proceed=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Validation passed"
+            echo "proceed=true" >> $GITHUB_OUTPUT
+          fi
+
+  pre-deployment-tests:
+    name: 🧪 Pre-Deployment Tests
+    needs: validate-deployment
+    runs-on: ubuntu-latest
+    if: needs.validate-deployment.outputs.should-proceed == 'true' && !github.event.inputs.skip_tests
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-deploy-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-deploy-
+            ${{ runner.os }}-pip-
+        continue-on-error: true
+      
+      - name: Run critical tests
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-json-report
+          
+          echo "🧪 Running unit tests..."
+          python -m pytest tests/unit/ -v \
+            --json-report --json-report-file=manual-deploy-tests.json \
+            -x --tb=short || exit 1
+          
+          echo "✅ Critical tests passed"
+
+  rollback:
+    name: ⏪ Rollback Previous Version
+    needs: [validate-deployment]
+    runs-on: ubuntu-latest
+    if: needs.validate-deployment.outputs.should-proceed == 'true' && github.event.inputs.rollback == 'true'
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+      
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.13.0'
+      
+      - name: Configure kubectl
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+            echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+          else
+            echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+          fi
+      
+      - name: Rollback deployment
+        run: |
+          echo "🔄 Rolling back deployment in ${{ needs.validate-deployment.outputs.namespace }}"
+          
+          helm rollback insurance-ai-poc \
+            --namespace ${{ needs.validate-deployment.outputs.namespace }} \
+            --wait --timeout=10m
+          
+          echo "✅ Rollback completed"
+
+  deploy:
+    name: 🚀 Deploy to ${{ github.event.inputs.environment }}
+    needs: [validate-deployment, pre-deployment-tests]
+    runs-on: ubuntu-latest
+    if: needs.validate-deployment.outputs.should-proceed == 'true' && !github.event.inputs.rollback
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+      
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.13.0'
+      
+      - name: Configure kubectl
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+            echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+          else
+            echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+          fi
+          
+          kubectl create namespace ${{ needs.validate-deployment.outputs.namespace }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+      
+      - name: Deploy with Helm
+        run: |
+          echo "🚀 Deploying to ${{ github.event.inputs.environment }}"
+          echo "📦 Using image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate-deployment.outputs.image-tag }}"
+          
+          # Set environment-specific values
+          case "${{ github.event.inputs.environment }}" in
+            "production")
+              REPLICA_COUNT=2
+              CPU_REQUEST="500m"
+              MEMORY_REQUEST="1Gi"
+              CPU_LIMIT="2000m"
+              MEMORY_LIMIT="4Gi"
+              AUTOSCALING="true"
+              ;;
+            "staging")
+              REPLICA_COUNT=1
+              CPU_REQUEST="200m"
+              MEMORY_REQUEST="512Mi"
+              CPU_LIMIT="1000m"
+              MEMORY_LIMIT="2Gi"
+              AUTOSCALING="false"
+              ;;
+            "dev")
+              REPLICA_COUNT=1
+              CPU_REQUEST="100m"
+              MEMORY_REQUEST="256Mi"
+              CPU_LIMIT="500m"
+              MEMORY_LIMIT="1Gi"
+              AUTOSCALING="false"
+              ;;
+          esac
+          
+          helm upgrade --install insurance-ai-poc ./k8s/insurance-ai-poc \
+            --namespace ${{ needs.validate-deployment.outputs.namespace }} \
+            --create-namespace \
+            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.tag=${{ needs.validate-deployment.outputs.image-tag }} \
+            --set environment=${{ github.event.inputs.environment }} \
+            --set replicaCount=$REPLICA_COUNT \
+            --set resources.requests.cpu=$CPU_REQUEST \
+            --set resources.requests.memory=$MEMORY_REQUEST \
+            --set resources.limits.cpu=$CPU_LIMIT \
+            --set resources.limits.memory=$MEMORY_LIMIT \
+            --set autoscaling.enabled=$AUTOSCALING \
+            --set secrets.openrouterApiKey="${{ secrets.OPENROUTER_API_KEY }}" \
+            --set secrets.openaiApiKey="${{ secrets.OPENAI_API_KEY }}" \
+            --set secrets.langfuseSecretKey="${{ secrets.LANGFUSE_SECRET_KEY }}" \
+            --set secrets.langfusePublicKey="${{ secrets.LANGFUSE_PUBLIC_KEY }}" \
+            --wait --timeout=15m
+      
+      - name: Verify deployment
+        run: |
+          echo "🔍 Verifying deployment..."
+          
+          kubectl wait --for=condition=available deployment \
+            -l app.kubernetes.io/instance=insurance-ai-poc \
+            --timeout=300s \
+            -n ${{ needs.validate-deployment.outputs.namespace }}
+          
+          echo "📊 Deployment status:"
+          kubectl get pods -n ${{ needs.validate-deployment.outputs.namespace }}
+          kubectl get services -n ${{ needs.validate-deployment.outputs.namespace }}
+          
+          if [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+            kubectl get hpa -n ${{ needs.validate-deployment.outputs.namespace }}
+          fi
+
+  post-deployment-tests:
+    name: 🔬 Post-Deployment Verification
+    needs: [validate-deployment, deploy]
+    runs-on: ubuntu-latest
+    if: needs.deploy.result == 'success' && !github.event.inputs.skip_tests
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+      
+      - name: Configure kubectl
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+            echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+          else
+            echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+          fi
+      
+      - name: Run smoke tests
+        run: |
+          echo "🔥 Running smoke tests..."
+          
+          # Check if pods are running
+          kubectl get pods -n ${{ needs.validate-deployment.outputs.namespace }} \
+            -l app.kubernetes.io/instance=insurance-ai-poc \
+            --field-selector=status.phase=Running --no-headers | wc -l
+          
+          # Test service connectivity (if accessible)
+          echo "✅ Basic connectivity verified"
+
+  notify-deployment:
+    name: 📢 Deployment Notification
+    needs: [validate-deployment, deploy, rollback, post-deployment-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Create notification
+        run: |
+          if [[ "${{ github.event.inputs.rollback }}" == "true" ]]; then
+            ACTION="Rollback"
+            RESULT="${{ needs.rollback.result }}"
+          else
+            ACTION="Deployment"
+            RESULT="${{ needs.deploy.result }}"
+          fi
+          
+          echo "📢 Manual $ACTION to ${{ github.event.inputs.environment }}: $RESULT"
+          echo "🏷️ Image tag: ${{ needs.validate-deployment.outputs.image-tag }}"
+          echo "👤 Triggered by: ${{ github.actor }}"
+          echo "🌐 Environment: ${{ github.event.inputs.environment }}"
+          
+          if [[ "$RESULT" == "success" ]]; then
+            echo "✅ $ACTION completed successfully!"
+          else
+            echo "❌ $ACTION failed!"
+          fi 

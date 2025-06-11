@@ -6,7 +6,7 @@ Thinking Steps and Orchestration Component for Insurance AI UI
 import streamlit as st
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
-from ui.components.config import UIConfig
+from .config import UIConfig
 
 def render_thinking_steps():
     """Render LLM thinking steps visualization"""

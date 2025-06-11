@@ -1,315 +1,374 @@
-# Insurance AI PoC - Kubernetes Deployment Guide
+# 🚀 Deployment Guide: Auto-Versioning & Multi-Image Publishing
 
-## 🚀 Deployment Overview
+## 📋 **Overview**
 
-This guide covers the complete deployment of the Insurance AI PoC to Kubernetes, including all agents and their LLM integrations.
+This guide explains the enhanced CI/CD pipeline with automatic semantic versioning and multi-image publishing to GitHub Container Registry (GHCR).
 
-## 📋 Prerequisites
+## 🏗️ **Enhanced Architecture**
 
-- Kubernetes cluster (Docker Desktop, Rancher Desktop, or any K8s cluster)
-- kubectl configured and connected to your cluster
-- Docker for building images
-- OpenRouter API key (get one at https://openrouter.ai/keys)
-- `envsubst` command (usually available on Linux/macOS, install with `brew install gettext` on macOS if needed)
-
-## 🏗️ Architecture
-
-The deployment includes:
-
-### Domain Agents (LLM-Enabled)
-- **Support Agent** (Port 8005/30005): Customer support workflows with LLM intelligence
-- **Claims Agent** (Port 8007/30008): Claims processing workflows with LLM intelligence
-
-### Technical Agents (Data Processing)
-- **Customer Agent** (Port 8010): Customer data operations
-- **Policy Agent** (Port 8011): Policy data operations  
-- **Claims Data Agent** (Port 8012): Claims data operations
-
-## 🛠️ Deployment Steps
-
-### 1. Environment Setup
-
-**Option A: Interactive Setup (Recommended)**
-```bash
-# Run the setup script
-./scripts/setup_env.sh
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   GitHub Push   │───▶│  Auto-Version   │───▶│  Multi-Image    │
+│   (main/develop)│    │   Management    │    │     Build       │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Git Tagging   │    │ Security Scan   │    │   GHCR Publish  │
+│   (v1.2.3)      │    │    (Trivy)      │    │ (multi-platform)│
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ GitHub Release  │    │   Deploy K8s    │    │   Monitoring    │
+│   Generation    │    │ (Staging/Prod)  │    │ & Notifications │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-**Option B: Manual Setup**
+## 🔄 **Automatic Versioning**
+
+### **Semantic Versioning Rules**
+The pipeline automatically determines version bumps based on commit messages:
+
+- **🔥 MAJOR** (`1.0.0` → `2.0.0`): `break`, `breaking`, `major`
+- **✨ MINOR** (`1.0.0` → `1.1.0`): `feat`, `feature`, `minor`  
+- **🐛 PATCH** (`1.0.0` → `1.0.1`): All other commits
+
+### **Example Commit Messages**
 ```bash
-# Copy environment template
-cp .env.example .env
+# Patch release (1.0.0 → 1.0.1)
+git commit -m "fix: resolve LiteLLM connection issue"
 
-# Edit .env file and add your API key
-nano .env  # or vim .env
+# Minor release (1.0.0 → 1.1.0) 
+git commit -m "feat: add new monitoring dashboard"
 
-# Add this line:
-OPENROUTER_API_KEY=your-actual-api-key-here
+# Major release (1.0.0 → 2.0.0)
+git commit -m "breaking: change API endpoint structure"
 ```
 
-**Option C: Export Environment Variable**
-```bash
-# Export directly (for CI/CD or temporary use)
-export OPENROUTER_API_KEY=your-actual-api-key-here
+### **Manual Version Control**
+Override automatic versioning via GitHub Actions:
+
+```yaml
+# Manual workflow dispatch
+workflow_dispatch:
+  inputs:
+    version_bump:
+      description: 'Version bump type'
+      type: choice
+      options: [patch, minor, major]
 ```
 
-### 2. Build and Deploy
+## 📦 **Multi-Image Publishing**
 
-```bash
-# Make deployment script executable
-chmod +x scripts/deploy_k8s.sh
+### **Published Images**
+Two optimized Docker images are built and published:
 
-# Deploy everything (will automatically use your API key from .env or environment)
-./scripts/deploy_k8s.sh
+1. **Main Image**: `ghcr.io/your-org/insurance-ai-poc-main:v1.2.3`
+   - Legacy services compatibility
+   - Policy server, technical agent, UI
+   - Multi-stage build for optimization
+
+2. **ADK Image**: `ghcr.io/your-org/insurance-ai-poc-adk:v1.2.3`
+   - Google ADK + LiteLLM + OpenRouter 
+   - Customer service, technical, orchestrator agents
+   - Optimized for cloud deployment
+
+### **Image Tags Strategy**
+```
+ghcr.io/your-org/insurance-ai-poc-main:
+  ├── v1.2.3              # Semantic version
+  ├── latest              # Latest stable (main branch)
+  ├── main-abc123f        # Git commit SHA
+  ├── 20250610-143022     # Build timestamp
+  └── develop-20250610143022  # Pre-release
 ```
 
-### 3. Verify Deployment
+### **Platform Support**
+- **linux/amd64** (Intel/AMD x64)
+- **linux/arm64** (Apple Silicon, ARM servers)
 
+## 🚀 **Deployment Workflow**
+
+### **Automatic Triggers**
+1. **Push to `main`**: Full production pipeline
+2. **Push to `develop`**: Staging deployment with pre-release versions
+3. **Pull Request**: Build and test only
+4. **Manual Trigger**: Custom environment and version control
+
+### **Pipeline Stages**
+
+#### **1. Version Management** 🏷️
 ```bash
-# Check all pods are running
-kubectl get pods -n insurance-poc
-
-# Check services
-kubectl get services -n insurance-poc
-
-# Check deployment status
-kubectl get deployments -n insurance-poc
-
-# Verify API key was properly set (check first few characters)
-kubectl get secret llm-api-keys -n insurance-poc -o jsonpath='{.data.OPENROUTER_API_KEY}' | base64 -d | cut -c1-10
+# Determines new version based on:
+- Commit messages analysis
+- Manual override input
+- Branch context (main vs develop)
+- Creates git tag and updates pyproject.toml
 ```
 
-## 🌐 Access URLs
-
-Once deployed, the following services are available:
-
-### External Access (NodePort Services)
-- **Support Agent**: http://localhost:30005
-- **Claims Agent**: http://localhost:30008
-
-### Internal Services (ClusterIP)
-- Customer Agent: http://customer-agent:8010
-- Policy Agent: http://policy-agent:8011
-- Claims Data Agent: http://claims-data-agent:8012
-
-## 🧪 Testing
-
-### Health Checks
+#### **2. Multi-Image Build** 🏗️
 ```bash
-# Support Agent health
-curl http://localhost:30005/health
-
-# Claims Agent health  
-curl http://localhost:30008/health
+# Parallel matrix build:
+- insurance-ai-poc-main (Dockerfile)
+- insurance-ai-poc-adk (Dockerfile.adk)
+# Features:
+- Multi-stage optimization
+- Multi-platform support (amd64, arm64)
+- Build cache optimization
+- Automatic metadata labeling
 ```
 
-### LLM Integration Tests
-
-#### In-Cluster Testing
+#### **3. Security Scanning** 🔒
 ```bash
-# Run smoke tests
-kubectl exec -it deployment/support-agent -n insurance-poc -- \
-  python scripts/test_llm_integration.py smoke
-
-# Run all agent tests
-kubectl exec -it deployment/support-agent -n insurance-poc -- \
-  python scripts/test_llm_integration.py agents
-
-# Run complete integration tests
-kubectl exec -it deployment/support-agent -n insurance-poc -- \
-  python scripts/test_llm_integration.py integration
+# Trivy vulnerability scanning
+- Critical/High vulnerability detection
+- SARIF report upload to GitHub Security
+- Automated security alerts
 ```
 
-#### External API Testing
-
-**Support Agent - General Support:**
+#### **4. Staging Deployment** 🧪
 ```bash
-curl -X POST "http://localhost:30005/execute" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "skill_name": "HandleGeneralSupport",
-    "parameters": {
-      "user_message": "How do I file a claim?"
-    }
-  }'
+# Kubernetes deployment:
+- Namespace: insurance-ai-staging
+- Replicas: 1 (resource optimized)
+- Health checks and monitoring
+- E2E test execution
 ```
 
-**Claims Agent - Claims Support:**
+#### **5. Production Deployment** 🎯
 ```bash
-curl -X POST "http://localhost:30008/execute" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "skill_name": "HandleGeneralClaimsSupport", 
-    "parameters": {
-      "user_message": "What documents do I need for a car accident claim?"
-    }
-  }'
+# Production deployment (if staging passes):
+- Namespace: insurance-ai-production  
+- Replicas: 2 (with auto-scaling 2-10)
+- Enhanced resource limits
+- Rolling deployment strategy
 ```
 
-## 📊 Available Skills
-
-### Support Agent Skills
-- `HandleCustomerInquiry`: Process general customer inquiries and route to appropriate workflow
-- `HandlePolicyInquiry`: Handle policy status and information requests
-- `HandleClaimStatusInquiry`: Handle claim status check requests
-- `HandleBillingInquiry`: Handle billing and payment related questions
-- `HandleGeneralSupport`: Handle general support questions
-- `CheckPolicyStatus`: Quick policy status check for specific policy
-
-### Claims Agent Skills
-- `HandleClaimFiling`: Guide customers through claim filing process
-- `HandleClaimInquiry`: Handle general claim-related questions
-- `HandleClaimStatusCheck`: Check and report on claim status
-- `HandleGeneralClaimsSupport`: Handle general claims support questions
-- `CreateClaim`: Create a new claim
-- `GetClaimStatus`: Get status of existing claim
-
-## 🔧 Configuration
-
-### Environment Variables
-All agents receive the following configuration:
-
-**LLM Configuration:**
-- `OPENROUTER_API_KEY`: API key for OpenRouter (loaded from .env or environment)
-- `PRIMARY_MODEL`: Primary LLM model (openai/gpt-4o-mini)
-- `FALLBACK_MODEL`: Fallback LLM model (anthropic/claude-3-haiku)
-- `OPENROUTER_BASE_URL`: OpenRouter API base URL
-
-**Service URLs:**
-- `CUSTOMER_AGENT_URL`: http://customer-agent:8010
-- `POLICY_AGENT_URL`: http://policy-agent:8011
-- `CLAIMS_DATA_AGENT_URL`: http://claims-agent:8012
-
-### Resource Allocation
-- **Domain Agents**: 256Mi-1Gi memory, 200m-1000m CPU
-- **Technical Agents**: 128Mi-512Mi memory, 100m-500m CPU
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-**1. Pods in CrashLoopBackOff**
+#### **6. Release Creation** 📦
 ```bash
-# Check logs
-kubectl logs deployment/<agent-name> -n insurance-poc
+# GitHub Release:
+- Automatic changelog generation
+- Docker image references
+- Deployment instructions
+- Version metadata
 ```
 
-**2. API Key Issues**
+## 🛠️ **Local Usage**
+
+### **Version Management Script**
 ```bash
-# Check if API key is properly set
-kubectl get secret llm-api-keys -n insurance-poc -o yaml
+# Auto-detect version bump
+python scripts/version.py
 
-# Update API key if needed
-export OPENROUTER_API_KEY=your-new-key
-envsubst < k8s/manifests/secrets.yaml | kubectl apply -f -
+# Manual version bump
+python scripts/version.py --bump minor --update-file
 
-# Or update directly
-kubectl patch secret llm-api-keys -n insurance-poc \
-  --type='json' -p='[{"op": "replace", "path": "/data/OPENROUTER_API_KEY", "value":"'$(echo -n $OPENROUTER_API_KEY | base64)'"}]'
+# Generate pre-release version
+python scripts/version.py --branch feature/new-agents --prerelease
+
+# JSON output for automation
+python scripts/version.py --output-format json --changelog
 ```
 
-**3. Missing envsubst command**
+### **Local Docker Builds**
 ```bash
-# On macOS
-brew install gettext
+# Build main image
+docker build -f Dockerfile \
+  --build-arg VERSION=1.2.3-dev \
+  --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+  --build-arg VCS_REF=$(git rev-parse HEAD) \
+  -t insurance-ai-poc-main:dev .
 
-# On Ubuntu/Debian
-sudo apt-get install gettext-base
+# Build ADK image  
+docker build -f Dockerfile.adk \
+  --build-arg VERSION=1.2.3-dev \
+  -t insurance-ai-poc-adk:dev .
 ```
 
-**4. Service Discovery Issues**
+### **Local Testing**
 ```bash
-# Check service endpoints
-kubectl get endpoints -n insurance-poc
+# Test version script
+python scripts/version.py --changelog
 
-# Test internal connectivity
-kubectl exec -it deployment/support-agent -n insurance-poc -- \
-  curl http://customer-agent:8010/health
+# Test images
+docker run --rm insurance-ai-poc-main:dev python --version
+docker run --rm insurance-ai-poc-adk:dev cat /app/version.json
 ```
 
-## 🔄 Updates and Maintenance
+## 🔧 **Configuration**
 
-### Rolling Updates
+### **Required GitHub Secrets**
 ```bash
-# Update image and trigger rolling update
-kubectl set image deployment/support-agent support-agent=insurance-ai-poc:v2 -n insurance-poc
+# Container Registry
+GITHUB_TOKEN                 # Auto-provided
 
-# Check rollout status
-kubectl rollout status deployment/support-agent -n insurance-poc
+# Kubernetes  
+KUBE_CONFIG_STAGING         # Base64-encoded kubeconfig
+KUBE_CONFIG_PRODUCTION      # Base64-encoded kubeconfig
+
+# API Keys
+OPENROUTER_API_KEY          # OpenRouter API access
+OPENAI_API_KEY              # OpenAI API access (backup)
+LANGFUSE_SECRET_KEY         # LLM observability
+LANGFUSE_PUBLIC_KEY         # LLM observability
+
+# Notifications (optional)
+SLACK_WEBHOOK_URL           # Team notifications
 ```
 
-### Scaling
-```bash
-# Scale deployment
-kubectl scale deployment support-agent --replicas=3 -n insurance-poc
+### **Kubernetes Configuration**
+```yaml
+# Update Helm values for new images
+image:
+  repository: ghcr.io/your-org/insurance-ai-poc
+  tag: "1.2.3"
+  mainImage: ghcr.io/your-org/insurance-ai-poc-main:1.2.3
+  adkImage: ghcr.io/your-org/insurance-ai-poc-adk:1.2.3
 ```
 
-### Updating API Keys
+## 🎯 **Usage Examples**
+
+### **Production Release**
 ```bash
-# Update your .env file with new key
-echo "OPENROUTER_API_KEY=new-key-here" >> .env
+# 1. Create feature branch
+git checkout -b feat/new-monitoring-dashboard
 
-# Redeploy secrets
-envsubst < k8s/manifests/secrets.yaml | kubectl apply -f -
+# 2. Make changes and commit with semantic message
+git commit -m "feat: add comprehensive monitoring dashboard with Grafana integration"
 
-# Restart deployments to pick up new secret
-kubectl rollout restart deployment -n insurance-poc
+# 3. Push and create PR
+git push origin feat/new-monitoring-dashboard
+
+# 4. After PR approval and merge to main:
+# ✅ Auto-version bump: 1.0.0 → 1.1.0
+# ✅ Git tag created: v1.1.0
+# ✅ Images built and published:
+#    - ghcr.io/your-org/insurance-ai-poc-main:1.1.0
+#    - ghcr.io/your-org/insurance-ai-poc-adk:1.1.0
+# ✅ Deployed to staging → E2E tests → Production
+# ✅ GitHub Release created with changelog
 ```
 
-## 📈 Monitoring
-
-### Basic Monitoring
+### **Emergency Hotfix**
 ```bash
-# Watch pods
-kubectl get pods -n insurance-poc -w
+# 1. Create hotfix branch from main
+git checkout -b hotfix/critical-security-fix
 
-# Monitor resources
-kubectl top pods -n insurance-poc
-kubectl top nodes
+# 2. Apply fix and commit
+git commit -m "fix: resolve critical authentication vulnerability"
+
+# 3. Emergency deployment via workflow_dispatch:
+#    - Force deploy: true
+#    - Environment: production  
+#    - Version bump: patch
+
+# Result: 1.1.0 → 1.1.1 with immediate production deployment
 ```
 
-### Health Checks
-All agents include:
-- **Liveness Probe**: HTTP GET /health (30s initial delay)
-- **Readiness Probe**: HTTP GET /health (5s initial delay)  
-- **Startup Probe**: HTTP GET /health (10s initial delay)
-
-## 🔐 Security
-
-### Secrets Management
-- ✅ API keys are loaded from environment variables, not hardcoded
-- ✅ Secrets stored securely in Kubernetes secrets
-- ✅ .env file is git-ignored to prevent accidental commits
-- ✅ Template-based deployment with variable substitution
-
-### Best Practices
+### **Development Testing**
 ```bash
-# Never commit your .env file
-echo ".env" >> .gitignore
+# 1. Work on develop branch
+git checkout develop
+git commit -m "feat: experimental agent coordination"
 
-# Use least-privilege access
-kubectl create serviceaccount insurance-poc-sa -n insurance-poc
-
-# Rotate API keys regularly
-# Update .env file and redeploy
+# 2. Push triggers staging deployment:
+# ✅ Version: 1.1.1-develop.20250610143022  
+# ✅ Images: insurance-ai-poc-*:1.1.1-develop.20250610143022
+# ✅ Deployed to staging only
 ```
 
-### RBAC (Optional)
+## 📊 **Monitoring & Observability**
+
+### **Pipeline Metrics**
+- Build duration and success rates
+- Image size optimization
+- Security vulnerability trends  
+- Deployment success rates
+- Test coverage reports
+
+### **Container Metrics**
+- Image pull statistics from GHCR
+- Multi-platform usage analytics
+- Version adoption rates
+- Security scan results
+
+### **Notifications**
+- Slack integration for deployment status
+- GitHub Security alerts for vulnerabilities
+- Release notifications with changelogs
+- Failed deployment alerts
+
+## 🔍 **Troubleshooting**
+
+### **Common Issues**
+
+#### **Version Script Fails**
 ```bash
-# Create service account with limited permissions
-kubectl create serviceaccount insurance-poc-sa -n insurance-poc
+# Check git configuration
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+
+# Verify pyproject.toml exists and has version field
+grep 'version = ' pyproject.toml
 ```
 
-## 📝 Next Steps
+#### **Docker Build Fails**
+```bash
+# Check build arguments
+docker build --build-arg VERSION=test --no-cache .
 
-1. **Production Readiness**: Add monitoring, logging, and alerting
-2. **Load Balancing**: Add ingress controller for external access
-3. **Database Integration**: Connect to persistent storage
-4. **CI/CD Pipeline**: Automate builds and deployments with secure secret management
-5. **Security Hardening**: Implement network policies and RBAC
+# Verify multi-platform support
+docker buildx create --use
+docker buildx inspect --bootstrap
+```
+
+#### **Kubernetes Deployment Fails**
+```bash
+# Check secrets exist
+kubectl get secrets -n insurance-ai-staging
+
+# Verify image accessibility  
+kubectl run test --image=ghcr.io/your-org/insurance-ai-poc-main:latest --rm -it
+
+# Check resource availability
+kubectl describe nodes
+```
+
+## 🎉 **Benefits of Enhanced CI/CD**
+
+### **🔄 Automation**
+- **Zero-touch versioning**: Semantic versioning based on commit messages
+- **Multi-image publishing**: Separate optimized images for different use cases
+- **Automatic changelog**: Generated from git commit history
+- **Tag management**: Git tags created and managed automatically
+
+### **🔒 Security**
+- **Vulnerability scanning**: Trivy security scans on every build
+- **Multi-platform support**: ARM64 and AMD64 for security diversity
+- **Non-root containers**: Enhanced container security
+- **Secret management**: Proper Kubernetes secret handling
+
+### **📦 Distribution**
+- **GitHub Container Registry**: Official GitHub integration
+- **Multi-architecture**: Support for Intel and ARM processors  
+- **Layer optimization**: Multi-stage builds for smaller images
+- **Cache optimization**: Faster builds with layer caching
+
+### **🚀 Deployment**
+- **Blue-green deployments**: Zero-downtime deployments
+- **Auto-scaling**: Production deployments with HPA
+- **Health checks**: Comprehensive readiness and liveness probes
+- **Rollback capability**: Easy version rollback via Helm
 
 ---
 
-## 📞 Support
+## 📚 **Next Steps**
 
-For technical support or questions about the deployment, refer to the main README.md or project documentation. 
+1. **Configure GitHub Secrets**: Add required API keys and kubeconfig
+2. **Test Pipeline**: Create a test commit and observe the pipeline
+3. **Monitor Deployments**: Check GitHub Container Registry for published images
+4. **Configure Notifications**: Set up Slack webhook for team alerts
+5. **Review Security**: Monitor security scan results and alerts
+
+For additional support, check the [GitHub Actions workflow logs](../../actions) and [Container Registry packages](../../packages). 

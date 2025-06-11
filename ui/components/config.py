@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Configuration and Feature Toggles for Insurance AI UI
+Updated for Google ADK + LiteLLM + OpenRouter Integration
 """
 
 import os
@@ -19,31 +20,100 @@ class UIConfig:
     # UI Mode: "simple" or "advanced"
     UI_MODE = os.getenv("UI_MODE", "advanced")  # Default to advanced mode
     
-    # Agent endpoints - Updated for current Kubernetes deployment
-    DOMAIN_AGENT_ENDPOINTS = [
-        os.getenv("DOMAIN_AGENT_URL", "http://insurance-ai-poc-domain-agent:8003"),  # Current Kubernetes service
-        "http://localhost:8003",             # Port forwarded current agent
-        "http://127.0.0.1:8003"              # Fallback
+    # Google ADK Agent endpoints - Updated for LiteLLM + OpenRouter integration
+    ADK_CUSTOMER_SERVICE_ENDPOINTS = [
+        "http://adk-customer-service.insurance-ai-poc.svc.cluster.local:8000",   # Full Kubernetes DNS
+        "http://adk-customer-service.insurance-ai-poc:8000",                     # Namespace-scoped DNS  
+        "http://adk-customer-service:8000",                                      # Service name (same namespace)
+        "http://localhost:8000",                                                 # Port forwarded ADK web
+        "http://127.0.0.1:8000"                                                 # Local ADK web
+    ]
+    
+    ADK_TECHNICAL_AGENT_ENDPOINTS = [
+        "http://adk-technical-agent.insurance-ai-poc.svc.cluster.local:8002",   # Full Kubernetes DNS
+        "http://adk-technical-agent.insurance-ai-poc:8002",                     # Namespace-scoped DNS
+        "http://adk-technical-agent:8002",                                      # Service name (same namespace)
+        "http://localhost:8002",                                                # Port forwarded ADK API
+        "http://127.0.0.1:8002"                                                # Local ADK API
+    ]
+    
+    ADK_ORCHESTRATOR_ENDPOINTS = [
+        "http://adk-orchestrator.insurance-ai-poc.svc.cluster.local:8003",      # Full Kubernetes DNS  
+        "http://adk-orchestrator.insurance-ai-poc:8003",                        # Namespace-scoped DNS
+        "http://adk-orchestrator:8003",                                         # Service name (same namespace)
+        "http://localhost:8003",                                                # Port forwarded orchestrator
+        "http://127.0.0.1:8003"                                                # Local orchestrator
+    ]
+    
+    # Policy Server endpoints (MCP)
+    POLICY_SERVER_ENDPOINTS = [
+        "http://policy-server.insurance-ai-poc.svc.cluster.local:8001",         # Full Kubernetes DNS
+        "http://policy-server.insurance-ai-poc:8001",                           # Namespace-scoped DNS
+        "http://policy-server:8001",                                            # Service name (same namespace)
+        "http://localhost:8001",                                                # Port forwarded
+        "http://127.0.0.1:8001"                                                # Local
     ]
     
     # Demo customer data
     DEMO_CUSTOMERS = {
-        "CUST-001": {"name": "John Smith", "status": "Active", "type": "Premium"},
-        "CUST-002": {"name": "Jane Doe", "status": "Active", "type": "Standard"},
-        "CUST-003": {"name": "Bob Johnson", "status": "Active", "type": "Basic"},
-        "user_001": {"name": "Test User 1", "status": "Active", "type": "Demo"},
-        "user_002": {"name": "Test User 2", "status": "Active", "type": "Demo"},
-        "user_003": {"name": "Test User 3", "status": "Active", "type": "Demo"}
+        "CUST001": {"name": "John Smith", "status": "Active", "type": "Premium"},
+        "CUST002": {"name": "Jane Doe", "status": "Active", "type": "Standard"},
+        "CUST003": {"name": "Bob Johnson", "status": "Active", "type": "Basic"},
+        "CUST004": {"name": "Alice Williams", "status": "Active", "type": "Standard"},
+        "TEST-CUSTOMER": {"name": "Test User", "status": "Active", "type": "Demo"}
     }
     
-    # Service endpoints for monitoring - Updated for current deployment
+    # Service endpoints for monitoring - Updated for Google ADK architecture
     MONITORED_SERVICES = {
-        "Domain Agent": os.getenv("DOMAIN_AGENT_URL", "http://insurance-ai-poc-domain-agent:8003") + "/agent.json",
-        "Technical Agent": os.getenv("TECHNICAL_AGENT_URL", "http://insurance-ai-poc-technical-agent:8002") + "/agent.json",
-        "Policy Server": os.getenv("POLICY_SERVER_URL", "http://insurance-ai-poc-policy-server:8001") + "/mcp",
-        "Streamlit UI": "http://insurance-ai-poc-streamlit-ui:80/healthz"
+        "ADK Customer Service": "http://adk-customer-service:8000/health",
+        "ADK Technical Agent": "http://adk-technical-agent:8002/health", 
+        "ADK Orchestrator": "http://adk-orchestrator:8003/health",
+        "Policy Server (MCP)": "http://policy-server:8001/mcp",
+        "Google ADK Web UI": "http://adk-customer-service:8000/dev-ui/",
+        "Streamlit UI": "http://streamlit-ui:8501"
     }
     
+    # Google ADK specific configuration
+    ADK_CONFIG = {
+        "framework": "Google ADK v1.2.1",
+        "model_provider": "OpenRouter",
+        "integration": "LiteLLM",
+        "default_model": "openai/gpt-4o-mini",
+        "orchestrator_model": "anthropic/claude-3-5-sonnet",
+        "technical_model": "openai/gpt-4o-mini"
+    }
+    
+    # Agent communication patterns
+    AGENT_PATTERNS = {
+        "customer_service": {
+            "type": "LlmAgent",
+            "capabilities": ["chat", "inquiry_handling", "customer_support"],
+            "endpoints": ADK_CUSTOMER_SERVICE_ENDPOINTS
+        },
+        "technical_agent": {
+            "type": "LlmAgent", 
+            "capabilities": ["policy_analysis", "mcp_integration", "data_processing"],
+            "endpoints": ADK_TECHNICAL_AGENT_ENDPOINTS
+        },
+        "orchestrator": {
+            "type": "LlmAgent",
+            "capabilities": ["workflow_coordination", "multi_agent_communication", "response_synthesis"],
+            "endpoints": ADK_ORCHESTRATOR_ENDPOINTS
+        },
+        "policy_server": {
+            "type": "MCP_Server",
+            "capabilities": ["policy_lookup", "customer_data", "business_rules"],
+            "endpoints": POLICY_SERVER_ENDPOINTS
+        }
+    }
+
+    # Legacy endpoints (for backwards compatibility)
+    DOMAIN_AGENT_ENDPOINTS = [
+        "http://insurance-ai-poc-domain-agent:8003",    # Legacy Kubernetes service
+        "http://localhost:8003",                        # Legacy port forwarded  
+        "http://127.0.0.1:8003"                        # Legacy local
+    ]
+
     @classmethod
     def is_simple_mode(cls) -> bool:
         """Check if UI is in simple mode"""
@@ -66,3 +136,8 @@ class UIConfig:
             "simple_mode": cls.is_simple_mode(),
             "advanced_mode": cls.is_advanced_mode()
         } 
+
+# Backwards compatibility
+class Config(UIConfig):
+    """Legacy config class for backwards compatibility"""
+    pass 

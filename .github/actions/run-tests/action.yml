@@ -1,0 +1,189 @@
+name: 'Run Test Suite'
+description: 'Run comprehensive test suite with coverage and reporting'
+
+inputs:
+  test-types:
+    description: 'Types of tests to run (comma-separated: unit,integration,e2e,system)'
+    required: true
+    default: 'unit'
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.13'
+  coverage:
+    description: 'Generate coverage report'
+    required: false
+    default: 'true'
+  fail-fast:
+    description: 'Stop on first test failure'
+    required: false
+    default: 'false'
+  target-url:
+    description: 'Target URL for E2E tests'
+    required: false
+    default: 'http://localhost'
+
+outputs:
+  total-tests:
+    description: 'Total number of tests run'
+    value: ${{ steps.summary.outputs.total }}
+  passed-tests:
+    description: 'Number of tests passed'
+    value: ${{ steps.summary.outputs.passed }}
+  failed-tests:
+    description: 'Number of tests failed'
+    value: ${{ steps.summary.outputs.failed }}
+  test-duration:
+    description: 'Total test duration'
+    value: ${{ steps.summary.outputs.duration }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+    
+    - name: Cache uv and dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/uv
+        key: ${{ runner.os }}-uv-tests-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-uv-tests-
+          ${{ runner.os }}-uv-
+      continue-on-error: true
+    
+    - name: Install test dependencies
+      shell: bash
+      run: |
+        pip install --no-cache-dir uv
+        uv pip install --system -r requirements.txt
+        uv pip install --system pytest pytest-cov pytest-json-report pytest-xdist pytest-mock
+    
+    - name: Create test results directory
+      shell: bash
+      run: mkdir -p test-results
+    
+    - name: Run tests
+      shell: bash
+      run: |
+        # Parse test types
+        IFS=',' read -ra TEST_TYPES <<< "${{ inputs.test-types }}"
+        
+        TOTAL_TESTS=0
+        TOTAL_PASSED=0
+        TOTAL_FAILED=0
+        TOTAL_DURATION=0
+        
+        for test_type in "${TEST_TYPES[@]}"; do
+          test_type=$(echo "$test_type" | xargs)  # trim whitespace
+          
+          echo "🧪 Running $test_type tests..."
+          
+          # Set test-specific options
+          TEST_OPTIONS=""
+          if [[ "${{ inputs.fail-fast }}" == "true" ]]; then
+            TEST_OPTIONS="$TEST_OPTIONS -x"
+          fi
+          
+          # Add coverage options for unit tests
+          if [[ "$ENABLE_COVERAGE" == "true" ]]; then
+            TEST_OPTIONS="$TEST_OPTIONS --cov=. --cov-config=.coveragerc --cov-report=xml --cov-report=term --cov-report=html --cov-fail-under=0"
+          fi
+          
+          # Set environment variables for E2E tests
+          if [[ "$test_type" == "e2e" ]]; then
+            export TARGET_URL="${{ inputs.target-url }}"
+          fi
+          
+          # Run tests
+          pytest_exit_code=0
+          python -m pytest tests/$test_type/ -v \
+            --json-report --json-report-file=test-results/$test_type-results.json \
+            $TEST_OPTIONS || pytest_exit_code=$?
+          
+          # Extract results from JSON
+          if [[ -f "test-results/$test_type-results.json" ]]; then
+            tests=$(cat test-results/$test_type-results.json | jq -r '.summary.total // 0')
+            passed=$(cat test-results/$test_type-results.json | jq -r '.summary.passed // 0')
+            failed=$(cat test-results/$test_type-results.json | jq -r '.summary.failed // 0')
+            duration=$(cat test-results/$test_type-results.json | jq -r '.duration // 0')
+            
+            TOTAL_TESTS=$((TOTAL_TESTS + tests))
+            TOTAL_PASSED=$((TOTAL_PASSED + passed))
+            TOTAL_FAILED=$((TOTAL_FAILED + failed))
+            TOTAL_DURATION=$(echo "$TOTAL_DURATION + $duration" | bc -l)
+            
+            echo "📊 $test_type tests: $passed/$tests passed (${duration}s)"
+          fi
+          
+          # Check if tests failed and fail-fast is enabled
+          if [[ $pytest_exit_code -ne 0 && "${{ inputs.fail-fast }}" == "true" ]]; then
+            echo "❌ $test_type tests failed and fail-fast is enabled"
+            exit $pytest_exit_code
+          fi
+        done
+        
+        # Save summary
+        echo "total=$TOTAL_TESTS" >> test-results/summary.txt
+        echo "passed=$TOTAL_PASSED" >> test-results/summary.txt
+        echo "failed=$TOTAL_FAILED" >> test-results/summary.txt
+        echo "duration=$TOTAL_DURATION" >> test-results/summary.txt
+        
+        echo "📈 Overall Results: $TOTAL_PASSED/$TOTAL_TESTS passed (${TOTAL_DURATION}s)"
+        
+        # Fail if any tests failed
+        if [[ $TOTAL_FAILED -gt 0 ]]; then
+          echo "❌ Some tests failed"
+          exit 1
+        fi
+    
+    - name: Extract test summary
+      id: summary
+      shell: bash
+      run: |
+        if [[ -f "test-results/summary.txt" ]]; then
+          source test-results/summary.txt
+          echo "total=$total" >> $GITHUB_OUTPUT
+          echo "passed=$passed" >> $GITHUB_OUTPUT
+          echo "failed=$failed" >> $GITHUB_OUTPUT
+          echo "duration=$duration" >> $GITHUB_OUTPUT
+        else
+          echo "total=0" >> $GITHUB_OUTPUT
+          echo "passed=0" >> $GITHUB_OUTPUT
+          echo "failed=0" >> $GITHUB_OUTPUT
+          echo "duration=0" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-and-coverage-results-${{ github.run_id }}
+        path: |
+          test-results/
+          coverage.xml
+          htmlcov/
+        retention-days: 7
+    
+    - name: Generate test summary
+      shell: bash
+      run: |
+        echo "### 🧪 Test Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Total Tests | ${{ steps.summary.outputs.total }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Passed | ${{ steps.summary.outputs.passed }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Failed | ${{ steps.summary.outputs.failed }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Duration | ${{ steps.summary.outputs.duration }}s |" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ steps.summary.outputs.failed }}" == "0" ]]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "❌ Some tests failed. Check the logs for details." >> $GITHUB_STEP_SUMMARY
+        fi 

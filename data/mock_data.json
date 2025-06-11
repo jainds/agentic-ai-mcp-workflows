@@ -1,334 +1,208 @@
 {
-  "users": [
-    {
-      "id": "user_001",
-      "email": "admin@insurance.com",
-      "first_name": "Admin",
-      "last_name": "User",
-      "role": "admin",
-      "status": "active",
-      "phone": "+1-555-0100",
-      "created_at": "2024-01-01T00:00:00Z",
-      "last_login": "2024-05-30T10:00:00Z",
-      "preferences": {
-        "notifications": true,
-        "email_alerts": true,
-        "two_factor_auth": true
-      }
-    },
-    {
-      "id": "user_002",
-      "email": "agent@insurance.com",
-      "first_name": "Jane",
-      "last_name": "Smith",
-      "role": "agent",
-      "status": "active",
-      "phone": "+1-555-0101",
-      "created_at": "2024-01-15T00:00:00Z",
-      "last_login": "2024-05-30T09:30:00Z",
-      "preferences": {
-        "notifications": true,
-        "email_alerts": false,
-        "two_factor_auth": false
-      }
-    },
-    {
-      "id": "user_003",
-      "email": "customer@insurance.com",
-      "first_name": "John",
-      "last_name": "Doe",
-      "role": "customer",
-      "status": "active",
-      "phone": "+1-555-0102",
-      "created_at": "2024-02-01T00:00:00Z",
-      "last_login": "2024-05-29T15:45:00Z",
-      "preferences": {
-        "notifications": true,
-        "email_alerts": true,
-        "two_factor_auth": true
-      }
-    },
-    {
-      "id": "agent_001",
-      "email": "michael.brown@insurance.com",
-      "first_name": "Michael",
-      "last_name": "Brown",
-      "role": "agent",
-      "status": "active",
-      "phone": "+1-555-0103",
-      "created_at": "2024-01-10T00:00:00Z",
-      "last_login": "2024-05-30T08:00:00Z",
-      "preferences": {
-        "notifications": true,
-        "email_alerts": true,
-        "two_factor_auth": true
-      }
-    }
-  ],
   "policies": [
     {
-      "id": "POL-2024-AUTO-001",
-      "customer_id": "user_003",
-      "type": "auto",
+      "policy_id": "POL001",
+      "customer_id": "CUST001", 
+      "policy_type": "Auto",
+      "premium": 1200.00,
+      "deductible": 500,
+      "coverage_limits": {
+        "liability": 100000,
+        "collision": 50000,
+        "comprehensive": 25000
+      },
       "status": "active",
-      "premium": 120.00,
-      "coverage_amount": 100000.00,
-      "deductible": 500.00,
-      "start_date": "2024-01-01T00:00:00Z",
-      "end_date": "2024-12-31T23:59:59Z",
-      "assigned_agent_id": "user_002",
-      "billing_cycle": "monthly",
-      "next_payment_due": "2024-06-15T00:00:00Z",
-      "payment_method": "auto_pay",
-      "details": {
-        "vehicle": {
-          "make": "Toyota",
-          "model": "Camry",
-          "year": 2020,
-          "vin": "1HGBH41JXMN109186"
-        },
-        "coverage_types": ["liability", "collision", "comprehensive"],
-        "policy_limits": {
-          "bodily_injury": 100000,
-          "property_damage": 50000,
-          "collision": 25000,
-          "comprehensive": 25000
-        }
-      }
+      "effective_date": "2024-01-01",
+      "expiry_date": "2025-01-01"
     },
     {
-      "id": "POL-2024-HOME-001",
-      "customer_id": "user_003",
-      "type": "home",
+      "policy_id": "POL002", 
+      "customer_id": "CUST002",
+      "policy_type": "Home",
+      "premium": 2400.00,
+      "deductible": 1000,
+      "coverage_limits": {
+        "dwelling": 300000,
+        "personal_property": 150000,
+        "liability": 500000
+      },
       "status": "active",
-      "premium": 85.00,
-      "coverage_amount": 300000.00,
-      "deductible": 1000.00,
-      "start_date": "2024-01-01T00:00:00Z",
-      "end_date": "2024-12-31T23:59:59Z",
-      "assigned_agent_id": "user_002",
-      "billing_cycle": "monthly",
-      "next_payment_due": "2024-06-15T00:00:00Z",
-      "payment_method": "manual_pay",
-      "details": {
-        "property": {
-          "address": "123 Main St, Anytown, ST 12345",
-          "type": "single_family",
-          "year_built": 1995,
-          "square_feet": 2200
-        },
-        "coverage_types": ["dwelling", "personal_property", "liability"],
-        "policy_limits": {
-          "dwelling": 300000,
-          "personal_property": 150000,
-          "liability": 100000
-        }
-      }
+      "effective_date": "2024-02-01",
+      "expiry_date": "2025-02-01"
     },
     {
-      "id": "POL-2024-AUTO-002",
-      "customer_id": "CUST-001",
-      "type": "auto",
+      "policy_id": "POL003",
+      "customer_id": "CUST003", 
+      "policy_type": "Life",
+      "premium": 600.00,
+      "deductible": 0,
+      "coverage_limits": {
+        "death_benefit": 500000,
+        "cash_value": 50000
+      },
       "status": "active",
-      "premium": 95.00,
-      "coverage_amount": 75000.00,
-      "deductible": 750.00,
-      "start_date": "2024-03-01T00:00:00Z",
-      "end_date": "2025-02-28T23:59:59Z",
-      "assigned_agent_id": "agent_001",
-      "billing_cycle": "quarterly",
-      "next_payment_due": "2024-09-01T00:00:00Z",
-      "payment_method": "auto_pay",
-      "details": {
-        "vehicle": {
-          "make": "Honda",
-          "model": "Civic",
-          "year": 2019,
-          "vin": "2HGFC2F59KH123456"
-        },
-        "coverage_types": ["liability", "collision", "comprehensive"],
-        "policy_limits": {
-          "bodily_injury": 75000,
-          "property_damage": 40000,
-          "collision": 20000,
-          "comprehensive": 20000
-        }
-      }
+      "effective_date": "2024-03-01",
+      "expiry_date": "2034-03-01"
     },
     {
-      "id": "POL-2024-LIFE-001",
-      "customer_id": "CUST-001",
-      "type": "life",
+      "policy_id": "POL004",
+      "customer_id": "CUST001", 
+      "policy_type": "Home",
+      "premium": 1800.00,
+      "deductible": 750,
+      "coverage_limits": {
+        "dwelling": 250000,
+        "personal_property": 100000,
+        "liability": 300000
+      },
       "status": "active",
-      "premium": 45.00,
-      "coverage_amount": 250000.00,
-      "deductible": 0.00,
-      "start_date": "2024-01-15T00:00:00Z",
-      "end_date": "2034-01-14T23:59:59Z",
-      "assigned_agent_id": "agent_001",
-      "billing_cycle": "monthly",
-      "next_payment_due": "2024-06-15T00:00:00Z",
-      "payment_method": "auto_pay",
-      "details": {
-        "policy_type": "term_life",
-        "term_years": 10,
-        "beneficiaries": ["Jane Doe", "John Doe Jr."],
-        "medical_exam_required": false,
-        "coverage_types": ["death_benefit", "accidental_death"]
-      }
+      "effective_date": "2024-01-15",
+      "expiry_date": "2025-01-15"
+    },
+    {
+      "policy_id": "POL005",
+      "customer_id": "CUST004", 
+      "policy_type": "Auto",
+      "premium": 900.00,
+      "deductible": 250,
+      "coverage_limits": {
+        "liability": 75000,
+        "collision": 30000,
+        "comprehensive": 15000
+      },
+      "status": "active",
+      "effective_date": "2024-04-01",
+      "expiry_date": "2025-04-01"
+    }
+  ],
+  "customers": [
+    {
+      "customer_id": "CUST001",
+      "name": "John Smith",
+      "email": "john.smith@email.com",
+      "phone": "+1-555-0123",
+      "address": {
+        "street": "123 Main St",
+        "city": "Anytown", 
+        "state": "NY",
+        "zip": "12345"
+      },
+      "date_of_birth": "1985-06-15",
+      "policies": ["POL001", "POL004"]
+    },
+    {
+      "customer_id": "CUST002",
+      "name": "Jane Doe",
+      "email": "jane.doe@email.com", 
+      "phone": "+1-555-0456",
+      "address": {
+        "street": "456 Oak Ave",
+        "city": "Somewhere",
+        "state": "CA", 
+        "zip": "90210"
+      },
+      "date_of_birth": "1990-03-22",
+      "policies": ["POL002"]
+    },
+    {
+      "customer_id": "CUST003",
+      "name": "Bob Johnson",
+      "email": "bob.johnson@email.com",
+      "phone": "+1-555-0789", 
+      "address": {
+        "street": "789 Pine Dr",
+        "city": "Elsewhere",
+        "state": "TX",
+        "zip": "75201"
+      },
+      "date_of_birth": "1975-11-08",
+      "policies": ["POL003"]
+    },
+    {
+      "customer_id": "CUST004",
+      "name": "Alice Williams",
+      "email": "alice.williams@email.com",
+      "phone": "+1-555-0321", 
+      "address": {
+        "street": "321 Elm St",
+        "city": "Newtown",
+        "state": "FL",
+        "zip": "33101"
+      },
+      "date_of_birth": "1988-09-12",
+      "policies": ["POL005"]
     }
   ],
   "claims": [
     {
-      "id": "CLM-2024-001",
-      "policy_id": "POL-2024-AUTO-001",
-      "customer_id": "user_003",
-      "type": "auto",
-      "status": "processing",
-      "amount_claimed": 2500.00,
-      "amount_approved": null,
-      "filed_date": "2024-05-15T10:30:00Z",
-      "incident_date": "2024-05-10T14:20:00Z",
-      "description": "Rear-end collision at intersection",
-      "adjuster_id": "user_002",
-      "documents": [
-        "police_report_20240510.pdf",
-        "photos_damage_001.jpg",
-        "photos_damage_002.jpg",
-        "estimate_repair_shop.pdf"
-      ],
-      "fraud_score": 0.15,
-      "risk_assessment": "low",
-      "processing_notes": [
-        {
-          "date": "2024-05-15T11:00:00Z",
-          "note": "Initial claim filed, documents pending",
-          "author": "system"
-        },
-        {
-          "date": "2024-05-16T09:30:00Z",
-          "note": "Police report received and reviewed",
-          "author": "user_002"
-        }
-      ]
+      "claim_id": "CLM001",
+      "policy_id": "POL001",
+      "customer_id": "CUST001",
+      "claim_type": "collision",
+      "incident_date": "2024-05-15",
+      "reported_date": "2024-05-16", 
+      "status": "under_review",
+      "amount_claimed": 8500.00,
+      "amount_approved": 0,
+      "description": "Rear-end collision at intersection"
     },
     {
-      "id": "CLM-2024-002",
-      "policy_id": "POL-2024-HOME-001",
-      "customer_id": "user_003",
-      "type": "home",
+      "claim_id": "CLM002",
+      "policy_id": "POL002", 
+      "customer_id": "CUST002",
+      "claim_type": "water_damage",
+      "incident_date": "2024-04-20",
+      "reported_date": "2024-04-21",
       "status": "approved",
-      "amount_claimed": 1200.00,
-      "amount_approved": 1050.00,
-      "filed_date": "2024-04-20T16:45:00Z",
-      "incident_date": "2024-04-18T20:00:00Z",
-      "description": "Water damage from burst pipe in basement",
-      "adjuster_id": "user_002",
-      "documents": [
-        "photos_water_damage_001.jpg",
-        "plumber_report.pdf",
-        "repair_estimate.pdf"
-      ],
-      "fraud_score": 0.05,
-      "risk_assessment": "very_low",
-      "processing_notes": [
-        {
-          "date": "2024-04-20T17:00:00Z",
-          "note": "Claim filed with supporting documentation",
-          "author": "system"
-        },
-        {
-          "date": "2024-04-22T10:15:00Z",
-          "note": "Site inspection completed, damage verified",
-          "author": "user_002"
-        },
-        {
-          "date": "2024-04-25T14:30:00Z",
-          "note": "Claim approved for $1,050 after deductible",
-          "author": "user_002"
-        }
-      ]
+      "amount_claimed": 15000.00,
+      "amount_approved": 12000.00,
+      "description": "Burst pipe caused water damage to living room"
+    },
+    {
+      "claim_id": "CLM003",
+      "policy_id": "POL004", 
+      "customer_id": "CUST001",
+      "claim_type": "theft",
+      "incident_date": "2024-06-01",
+      "reported_date": "2024-06-01",
+      "status": "approved",
+      "amount_claimed": 5000.00,
+      "amount_approved": 4500.00,
+      "description": "Stolen personal property from home"
     }
   ],
-  "analytics": {
-    "customer_risk_profiles": [
-      {
-        "customer_id": "user_003",
-        "overall_risk_score": "low",
-        "fraud_probability": 0.08,
-        "credit_score": 745,
-        "claims_history_score": "good",
-        "payment_history_score": "excellent",
-        "recommendations": [
-          "Consider bundling policies for 15% discount",
-          "Eligible for safe driver discount on auto policy",
-          "Home security system discount available"
-        ],
-        "factors": {
-          "positive": [
-            "No at-fault accidents in 5 years",
-            "Consistent premium payments",
-            "Multiple policies with company",
-            "Good credit history"
-          ],
-          "negative": [
-            "None identified"
-          ]
-        }
-      }
-    ],
-    "market_trends": {
-      "auto_insurance": {
-        "avg_premium_change": 0.03,
-        "claim_frequency_trend": -0.02,
-        "fraud_rate": 0.12
-      },
-      "home_insurance": {
-        "avg_premium_change": 0.05,
-        "claim_frequency_trend": 0.01,
-        "fraud_rate": 0.08
-      }
-    },
-    "fraud_indicators": [
-      {
-        "indicator": "multiple_claims_short_period",
-        "weight": 0.7,
-        "description": "Multiple claims filed within 90 days"
-      },
-      {
-        "indicator": "high_claim_amount_vs_coverage",
-        "weight": 0.6,
-        "description": "Claim amount unusually high relative to coverage"
-      },
-      {
-        "indicator": "inconsistent_documentation",
-        "weight": 0.8,
-        "description": "Documentation inconsistencies or missing key documents"
-      }
-    ]
-  },
-  "quotes": [
+  "agents": [
     {
-      "id": "QTE-2024-001",
-      "customer_id": "user_003",
-      "type": "auto",
-      "status": "pending",
-      "requested_coverage": {
-        "coverage_amount": 150000,
-        "deductible": 250,
-        "coverage_types": ["liability", "collision", "comprehensive", "uninsured_motorist"]
-      },
-      "vehicle_info": {
-        "make": "Honda",
-        "model": "Accord",
-        "year": 2023,
-        "safety_rating": 5
-      },
-      "calculated_premium": 145.50,
-      "discount_applied": 12.50,
-      "final_premium": 133.00,
-      "quote_date": "2024-05-30T12:00:00Z",
-      "expires_date": "2024-06-30T12:00:00Z"
+      "agent_id": "AGT001",
+      "name": "Sarah Wilson",
+      "email": "sarah.wilson@insurance.com",
+      "phone": "+1-555-1001", 
+      "territory": "Northeast",
+      "customers": ["CUST001", "CUST003"]
+    },
+    {
+      "agent_id": "AGT002",
+      "name": "Mike Chen", 
+      "email": "mike.chen@insurance.com",
+      "phone": "+1-555-1002",
+      "territory": "West Coast",
+      "customers": ["CUST002"]
+    },
+    {
+      "agent_id": "AGT003",
+      "name": "Lisa Rodriguez", 
+      "email": "lisa.rodriguez@insurance.com",
+      "phone": "+1-555-1003",
+      "territory": "Southeast",
+      "customers": ["CUST004"]
     }
-  ]
+  ],
+  "metadata": {
+    "version": "1.1.0",
+    "last_updated": "2024-06-11T00:00:00Z",
+    "total_policies": 5,
+    "total_customers": 4,
+    "total_claims": 3,
+    "total_agents": 3
+  }
 } 

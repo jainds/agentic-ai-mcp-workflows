@@ -5,7 +5,7 @@ Authentication Component for Insurance AI UI
 
 import streamlit as st
 from typing import Dict, Any
-from ui.components.config import UIConfig
+from .config import UIConfig
 
 class CustomerValidator:
     """Handles customer authentication for demo purposes"""

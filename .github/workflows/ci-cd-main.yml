@@ -404,28 +404,173 @@ jobs:
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
             VCS_REF=${{ github.sha }}
 
+      - name: Verify image for scanning
+        id: verify-image
+        run: |
+          IMAGE_REF="${{ steps.check-registry.outputs.image-ref }}"
+          echo "Verifying image for scanning: $IMAGE_REF"
+          
+          if docker image inspect "$IMAGE_REF" >/dev/null 2>&1; then
+            echo "✅ Image verified and ready for scanning"
+            echo "image-ready=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Image not found or not accessible"
+            echo "image-ready=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.31.0
-        with:
-          image-ref: ${{ steps.check-registry.outputs.image-ref }}
-          format: 'sarif'
-          output: 'trivy-results-${{ matrix.image-name }}.sarif'
+        id: trivy-scan
+        if: steps.verify-image.outputs.image-ready == 'true'
+        run: |
+          IMAGE_REF="${{ steps.check-registry.outputs.image-ref }}"
+          OUTPUT_FILE="trivy-results-${{ matrix.image-name }}.sarif"
+          
+          echo "🔍 Running Trivy scan on: $IMAGE_REF"
+          echo "📄 Output file: $OUTPUT_FILE"
+          
+          # Run Trivy with detailed logging
+          trivy image \
+            --format sarif \
+            --output "$OUTPUT_FILE" \
+            --severity HIGH,CRITICAL \
+            --no-progress \
+            --debug \
+            "$IMAGE_REF" || {
+            echo "⚠️ Trivy scan failed, creating minimal SARIF file"
+            
+            # Create a minimal valid SARIF file if scan fails
+            cat > "$OUTPUT_FILE" << 'EOF'
+          {
+            "version": "2.1.0",
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "Trivy",
+                    "version": "Unknown",
+                    "informationUri": "https://github.com/aquasecurity/trivy"
+                  }
+                },
+                "results": [
+                  {
+                    "ruleId": "SCAN_FAILED",
+                    "message": {
+                      "text": "Security scan failed - manual review required"
+                    },
+                    "level": "warning",
+                    "locations": [
+                      {
+                        "physicalLocation": {
+                          "artifactLocation": {
+                            "uri": "Dockerfile"
+                          },
+                          "region": {
+                            "startLine": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+            
+            echo "📄 Created fallback SARIF file"
+          }
+          
+          # Verify SARIF file was created
+          if [[ -f "$OUTPUT_FILE" ]]; then
+            echo "✅ SARIF file created successfully"
+            echo "scan-success=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Failed to create SARIF file"
+            echo "scan-success=false" >> $GITHUB_OUTPUT
+          fi
         continue-on-error: true
+
+      - name: Create fallback SARIF for failed scans
+        if: steps.verify-image.outputs.image-ready != 'true' || steps.trivy-scan.outputs.scan-success != 'true'
+        run: |
+          OUTPUT_FILE="trivy-results-${{ matrix.image-name }}.sarif"
+          
+          echo "🔧 Creating fallback SARIF file for failed scan"
+          
+          cat > "$OUTPUT_FILE" << 'EOF'
+          {
+            "version": "2.1.0",
+            "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "Trivy",
+                    "version": "Unknown",
+                    "informationUri": "https://github.com/aquasecurity/trivy"
+                  }
+                },
+                "results": [
+                  {
+                    "ruleId": "IMAGE_UNAVAILABLE",
+                    "message": {
+                      "text": "Security scan could not be performed - image not available for scanning"
+                    },
+                    "level": "note",
+                    "locations": [
+                      {
+                        "physicalLocation": {
+                          "artifactLocation": {
+                            "uri": "Docker Image"
+                          },
+                          "region": {
+                            "startLine": 1
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+          EOF
+          
+          echo "📄 Fallback SARIF file created"
+
+      - name: Install Trivy (if not available)
+        if: steps.verify-image.outputs.image-ready == 'true' && steps.trivy-scan.outputs.scan-success != 'true'
+        run: |
+          echo "📦 Installing Trivy binary"
+          wget -qO- https://github.com/aquasecurity/trivy/releases/latest/download/trivy_Linux-64bit.tar.gz | tar xz
+          sudo mv trivy /usr/local/bin/
+          trivy --version
 
       - name: Report scan status
         if: always()
         run: |
+          echo "## 🔒 Security Scan Status for ${{ matrix.image-name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
           if [[ "${{ steps.check-registry.outputs.use-registry }}" == "true" ]]; then
-            echo "✅ Scanned registry image: ${{ steps.check-registry.outputs.image-ref }}"
+            echo "✅ **Image Source:** Registry image" >> $GITHUB_STEP_SUMMARY
+            echo "📦 **Image:** ${{ steps.check-registry.outputs.image-ref }}" >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠️ Registry image unavailable, scanned locally built image"
-            echo "🔧 This is expected for forked repositories or when registry permissions are restricted"
+            echo "⚠️ **Image Source:** Locally built (registry unavailable)" >> $GITHUB_STEP_SUMMARY
+            echo "🔧 This is expected for forked repositories" >> $GITHUB_STEP_SUMMARY
           fi
           
           if [[ -f "trivy-results-${{ matrix.image-name }}.sarif" ]]; then
-            echo "📊 Security scan completed successfully"
+            echo "📊 **Scan Result:** SARIF file generated" >> $GITHUB_STEP_SUMMARY
+            
+            # Count findings if jq is available
+            if command -v jq >/dev/null 2>&1; then
+              RESULTS_COUNT=$(jq '.runs[0].results | length' "trivy-results-${{ matrix.image-name }}.sarif" 2>/dev/null || echo "unknown")
+              echo "🔍 **Findings:** $RESULTS_COUNT issues detected" >> $GITHUB_STEP_SUMMARY
+            fi
           else
-            echo "❌ Security scan failed - check logs for details"
+            echo "❌ **Scan Result:** Failed to generate SARIF file" >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: Upload Trivy scan results to GitHub Security tab

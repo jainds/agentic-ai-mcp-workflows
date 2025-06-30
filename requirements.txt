@@ -18,7 +18,7 @@ pydantic-settings>=2.9.0
 httpx==0.28.1
 
 # Environment and Configuration
-python-dotenv==1.1.0
+python-dotenv==1.1.1
 
 # Monitoring and Observability
 langfuse>=2.60.0

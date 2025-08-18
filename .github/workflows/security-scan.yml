@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.inputs.scan_type != 'code-only'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -149,7 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.inputs.scan_type != 'dependencies-only'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -247,7 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == ''
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -553,7 +553,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.inputs.scan_type == 'full' || github.event.inputs.scan_type == ''
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up Python
         uses: actions/setup-python@v4

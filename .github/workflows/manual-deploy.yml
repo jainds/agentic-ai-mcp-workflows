@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.validate-deployment.outputs.should-proceed == 'true' && !github.event.inputs.skip_tests
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -126,7 +126,7 @@ jobs:
     if: needs.validate-deployment.outputs.should-proceed == 'true' && github.event.inputs.rollback == 'true'
     environment: ${{ github.event.inputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
@@ -163,7 +163,7 @@ jobs:
     if: needs.validate-deployment.outputs.should-proceed == 'true' && !github.event.inputs.rollback
     environment: ${{ github.event.inputs.environment }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
@@ -260,7 +260,7 @@ jobs:
     runs-on: ubuntu-latest
     if: needs.deploy.result == 'success' && !github.event.inputs.skip_tests
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
